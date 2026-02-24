@@ -1,0 +1,20 @@
+<div class="login-container">
+  <div class="login-image-section">
+    <img src="assets/login_icon.jpg" alt="Login Icon" class="login-image"/>
+  </div>
+  <div class="login-box">
+    <h2 class="h2-ti2">Inicio de sesión</h2>
+    <div class="form-group">
+      <form [formGroup]="profileForm">
+        <label class="label1">Ingresar usuario:</label>
+        <input type="email" formControlName="email" name="email" placeholder="Correo electrónico" class="form-control" />
+        <label class="label1">Ingresar contraseña:</label>
+        <input type="password" formControlName="password" name="password" placeholder="Contraseña" class="form-control"/>
+      </form>
+    </div>
+    <div class="actions">
+      <button class="btn btn-success" [disabled]="!profileForm.valid" (click)="login()">Entrar</button>
+    </div>
+  </div>
+</div>
+

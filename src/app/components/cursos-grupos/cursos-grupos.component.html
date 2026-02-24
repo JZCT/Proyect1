@@ -1,0 +1,269 @@
+<ng-container *ngIf="currentUser$ | async as user">
+
+<div class="container-fluid">
+
+  <div class="header">
+    <h2>Gestión de Cursos y Grupos</h2>
+  </div>
+
+  <div class="content-wrapper">
+
+    <!-- ================= PANEL CURSOS ================= -->
+    <div class="cursos-panel">
+
+      <div class="panel-header">
+        <h3>Cursos</h3>
+      </div>
+
+      <!-- FORMULARIO SOLO ADMIN -->
+      <div
+        *ngIf="showCursoForm && user.role === 'admin'"
+        class="form-section"
+      >
+        <h4>{{ editingCursoId ? 'Editar Curso' : 'Nuevo Curso' }}</h4>
+
+        <form
+          (ngSubmit)="editingCursoId ? updateCurso() : addCurso()"
+          class="form"
+        >
+
+          <div class="form-group">
+            <label>Nombre:</label>
+            <input
+              type="text"
+              name="curso_nombre"
+              required
+              [ngModel]="editingCursoId ? editingCurso.nombre : newCurso.nombre"
+              (ngModelChange)="editingCursoId
+                ? (editingCurso.nombre = $event)
+                : (newCurso.nombre = $event)"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Descripción:</label>
+            <textarea
+              rows="3"
+              name="curso_descripcion"
+              required
+              [ngModel]="editingCursoId ? editingCurso.descripcion : newCurso.descripcion"
+              (ngModelChange)="editingCursoId
+                ? (editingCurso.descripcion = $event)
+                : (newCurso.descripcion = $event)"
+            ></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Fecha de Inicio:</label>
+            <input
+              type="date"
+              name="curso_fecha_inicio"
+              required
+              [ngModel]="editingCursoId
+                ? formatDate(editingCurso.Fecha_inicio)
+                : formatDate(newCurso.Fecha_inicio)"
+              (ngModelChange)="editingCursoId
+                ? (editingCurso.Fecha_inicio = $event)
+                : (newCurso.Fecha_inicio = $event)"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Fecha de Fin:</label>
+            <input
+              type="date"
+              name="curso_fecha_fin"
+              required
+              [ngModel]="editingCursoId
+                ? formatDate(editingCurso.Fecha_fin)
+                : formatDate(newCurso.Fecha_fin)"
+              (ngModelChange)="editingCursoId
+                ? (editingCurso.Fecha_fin = $event)
+                : (newCurso.Fecha_fin = $event)"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Representante:</label>
+
+            <input
+              type="text"
+              name="curso_representante"
+              placeholder="Nombre del representante"
+              required
+              [ngModel]="editingCursoId
+                ? editingCurso.nom_representante
+                : newCurso.nom_representante"
+              (ngModelChange)="editingCursoId
+                ? (editingCurso.nom_representante = $event)
+                : (newCurso.nom_representante = $event)"
+            />
+
+            <input
+              type="text"
+              name="curso_num_representantes"
+              placeholder="Número de teléfono del representante"
+              required
+              maxlength="10"
+              pattern="[0-9]*"
+              inputmode="numeric"
+              [ngModel]="editingCursoId
+                ? editingCurso.num_represnetantes
+                : newCurso.num_represnetantes"
+              (ngModelChange)="editingCursoId
+                ? (editingCurso.num_represnetantes = $event)
+                : (newCurso.num_represnetantes = $event)"
+            />
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-success">
+              {{ editingCursoId ? 'Actualizar' : 'Guardar' }}
+            </button>
+
+            <button
+              type="button"
+              class="btn btn-secondary"
+              (click)="resetCursoForm()"
+            >
+              Cancelar
+            </button>
+          </div>
+
+        </form>
+      </div>
+
+      <!-- LISTA CURSOS -->
+      <div class="cursos-list">
+
+        <div *ngIf="cursos.length === 0" class="empty-state">
+          No hay cursos registrados
+        </div>
+
+        <div
+          *ngFor="let curso of cursos"
+          class="curso-item"
+          [class.selected]="selectedCurso?.id === curso.id"
+          (click)="selectCurso(curso)"
+        >
+
+          <div class="curso-info">
+            <h5>{{ curso.nombre }}</h5>
+            <p>{{ curso.descripcion }}</p>
+            <p>
+              Inicio: {{ curso.Fecha_inicio | date }}
+              | Fin: {{ curso.Fecha_fin | date }}
+            </p>
+            <p>
+              Representante: {{ curso.nom_representante }}
+              | Teléfono: {{ curso.num_represnetantes }}
+            </p>
+          </div>
+
+          <!-- BOTONES SOLO ADMIN -->
+          <div
+            class="curso-actions"
+            *ngIf="user.role === 'admin'"
+          >
+            <button
+              class="btn btn-sm btn-info"
+              (click)="startEditCurso(curso); $event.stopPropagation()"
+            >
+              ✏️
+            </button>
+
+            <button
+              class="btn btn-sm btn-danger"
+              (click)="deleteCurso(curso.id); $event.stopPropagation()"
+            >
+              🗑️
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= PANEL PERSONAS ================= -->
+    <div class="grupos-panel">
+
+      <div *ngIf="selectedCurso" class="panel-header">
+        <h3>
+          Personas de:
+          <strong>{{ selectedCurso.nombre }}</strong>
+        </h3>
+      </div>
+
+      <div *ngIf="!selectedCurso" class="empty-state">
+        Selecciona un curso para ver y gestionar personas
+      </div>
+
+      <!-- ASIGNAR PERSONA (SOLO ADMIN) -->
+      <div
+        *ngIf="selectedCurso && user.role === 'instructor' || user.role === 'admin'"
+        class="form-section"
+      >
+        <h4>Asignar persona</h4>
+
+        <div class="form-group">
+          <label>Personas disponibles:</label>
+
+          <select [(ngModel)]="selectedPersonaToAdd" name="persona_select">
+            <option [ngValue]="null">-- Seleccionar --</option>
+
+            <option
+              *ngFor="let p of personasDisponibles"
+              [ngValue]="p.id"
+            >
+              {{ p.nombre }} ({{ p.email }})
+            </option>
+          </select>
+
+          <button
+            class="btn btn-sm btn-primary"
+            (click)="addPersonaToCurso(selectedPersonaToAdd)"
+          >
+            Añadir
+          </button>
+        </div>
+      </div>
+
+      <!-- PERSONAS ASIGNADAS -->
+      <div *ngIf="selectedCurso" class="grupos-list">
+
+        <div *ngIf="personasEnCurso.length === 0" class="empty-state">
+          No hay personas asignadas a este curso
+        </div>
+
+        <div
+          *ngFor="let persona of personasEnCurso"
+          class="grupo-item"
+        >
+
+          <div class="grupo-info">
+            <h5>{{ persona.nombre }}</h5>
+            <p>{{ persona.email }} | {{ persona.telefono }}</p>
+          </div>
+
+          <!-- REMOVER SOLO ADMIN -->
+          <div
+            class="grupo-actions"
+            *ngIf="user.role === 'instructor' || user.role === 'admin'"
+          >
+            <button
+              class="btn btn-sm btn-danger"
+              (click)="removePersonaFromCurso(persona.id)"
+            >
+              Remover
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+</ng-container>

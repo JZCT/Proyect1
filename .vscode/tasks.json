@@ -1,0 +1,32 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ng serve",
+      "type": "shell",
+      "command": "ng serve",
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^(?:.*?\\s+)?(?:ERROR|✔)\\s+(?:\\[.*?\\])?\\s*(.*)$",
+          "file": 1
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*ng serve.*",
+          "endsPattern": "^.*Application bundle generated.*"
+        }
+      }
+    },
+    {
+      "label": "ng build",
+      "type": "shell",
+      "command": "ng build"
+    },
+    {
+      "label": "ng test",
+      "type": "shell",
+      "command": "ng test"
+    }
+  ]
+}

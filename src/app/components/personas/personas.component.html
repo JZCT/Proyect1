@@ -1,0 +1,86 @@
+<div class="crud-container">
+  <div class="header">
+    <h2>Gestión de Personas</h2>
+    <button class="btn btn-primary" (click)="toggleForm()">
+      {{ showForm ? 'Cerrar' : 'Agregar Persona' }}
+    </button>
+  </div>
+
+  <!-- Formulario -->
+  <div *ngIf="showForm" class="form-section">
+    <h3>{{ editingId ? 'Editar Persona' : 'Nueva Persona' }}</h3>
+    <form (ngSubmit)="editingId ? updatePersona() : addPersona()" class="form">
+      <div class="form-group">
+        <label for="nombre">Nombre:</label>
+        <input 
+          type="text" 
+          id="nombre" 
+          [ngModel]="editingId ? editingPersona.nombre : newPersona.nombre"
+          (ngModelChange)="editingId ? (editingPersona.nombre = $event) : (newPersona.nombre = $event)"
+          name="nombre"
+          required
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email:</label>
+        <input 
+          type="email" 
+          id="email"
+          [ngModel]="editingId ? editingPersona.email : newPersona.email"
+          (ngModelChange)="editingId ? (editingPersona.email = $event) : (newPersona.email = $event)"
+          name="email"
+          required
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="telefono">Teléfono:</label>
+        <input 
+          type="tel" 
+          id="telefono"
+          [ngModel]="editingId ? editingPersona.telefono : newPersona.telefono"
+          (ngModelChange)="editingId ? (editingPersona.telefono = $event) : (newPersona.telefono = $event)"
+          name="telefono"
+          required
+        />
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-success">{{ editingId ? 'Actualizar' : 'Guardar' }}</button>
+        <button type="button" class="btn btn-secondary" (click)="resetForm()">Cancelar</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Tabla de Personas -->
+  <div class="table-section">
+    <h3>Lista de Personas</h3>
+    <div *ngIf="personas.length === 0" class="empty-state">
+      No hay personas registradas
+    </div>
+    <table *ngIf="personas.length > 0" class="table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nombre</th>
+          <th>Email</th>
+          <th>Teléfono</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let persona of personas">
+          <td>{{ persona.id }}</td>
+          <td>{{ persona.nombre }}</td>
+          <td>{{ persona.email }}</td>
+          <td>{{ persona.telefono }}</td>
+          <td class="actions">
+            <button class="btn btn-sm btn-info" (click)="startEdit(persona)">Editar</button>
+            <button class="btn btn-sm btn-danger" (click)="deletePersona(persona.id)">Eliminar</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

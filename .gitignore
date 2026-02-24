@@ -1,0 +1,31 @@
+# Environment files
+.env
+.env.local
+
+# Dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build output
+dist/
+out-tsc/
+
+# Development server
+.angular/
+
+# IDE
+.idea/
+.vscode/*.log
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+coverage/
+karma.conf.js
+
+# OS
+Thumbs.db
+.DS_Store

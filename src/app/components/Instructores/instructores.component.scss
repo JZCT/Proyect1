@@ -1,0 +1,301 @@
+/* ===== RESET SUAVE ===== */
+* {
+  box-sizing: border-box;
+}
+
+:host {
+  display: block;
+}
+
+/* ===== FONDO APP ===== */
+.contenedor {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 30px;
+  padding: 35px;
+  min-height: 100vh;
+
+  background:
+    radial-gradient(circle at 20% 20%, #eef2ff 0%, transparent 40%),
+    radial-gradient(circle at 80% 0%, #e0f2fe 0%, transparent 35%),
+    #f8fafc;
+
+  font-family: Inter, system-ui, sans-serif;
+}
+
+/* ===========================
+   FORMULARIO GLASSMORPHISM
+=========================== */
+.formulario {
+  backdrop-filter: blur(14px);
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 18px;
+  padding: 28px;
+
+  border: 1px solid rgba(255,255,255,.6);
+
+  box-shadow:
+    0 20px 40px rgba(0,0,0,.08),
+    inset 0 1px 0 rgba(255,255,255,.7);
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  animation: aparecer .5s ease;
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.formulario h2 {
+  text-align: center;
+  margin-bottom: 10px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: #0f172a;
+}
+
+/* ===== INPUTS MODERNOS ===== */
+.formulario input[type="text"],
+.formulario input[type="file"] {
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  font-size: 14px;
+
+  transition: all .25s ease;
+}
+
+.formulario input::placeholder {
+  color: #94a3b8;
+}
+
+.formulario input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow:
+    0 0 0 3px rgba(99,102,241,.15),
+    0 8px 18px rgba(99,102,241,.08);
+}
+
+/* ===== CHECK ===== */
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+  color: #334155;
+}
+
+/* ===== PREVIEW AVATAR ===== */
+.preview {
+  width: 130px;
+  height: 130px;
+  margin: 10px auto;
+  border-radius: 50%;
+  object-fit: cover;
+
+  border: 4px solid white;
+
+  box-shadow:
+    0 10px 25px rgba(0,0,0,.15),
+    0 0 0 3px #6366f1;
+
+  transition: .3s;
+}
+
+.preview:hover {
+  transform: scale(1.05);
+}
+
+/* ===== BOTONES PREMIUM ===== */
+.acciones-form {
+  display: flex;
+  gap: 12px;
+}
+
+.guardar,
+.cancelar {
+  flex: 1;
+  border: none;
+  padding: 13px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .25s ease;
+}
+
+/* BOTON PRINCIPAL */
+.guardar {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  color: white;
+  box-shadow: 0 10px 20px rgba(79,70,229,.3);
+}
+
+.guardar:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 15px 28px rgba(79,70,229,.4);
+}
+
+/* BOTON SECUNDARIO */
+.cancelar {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.cancelar:hover {
+  background: #e2e8f0;
+  transform: translateY(-2px);
+}
+
+/* ===========================
+        GRID MODERNO
+=========================== */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 25px;
+}
+
+/* ===== CARD PREMIUM ===== */
+.card {
+  position: relative;
+  padding: 22px;
+  border-radius: 18px;
+
+  background: white;
+
+  box-shadow:
+    0 15px 35px rgba(0,0,0,.08);
+
+  transition: all .35s cubic-bezier(.2,.8,.2,1);
+  overflow: hidden;
+}
+
+/* glow effect */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    transparent,
+    rgba(99,102,241,.15),
+    transparent
+  );
+  opacity: 0;
+  transition: .4s;
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.card:hover {
+  transform: translateY(-8px) scale(1.01);
+  box-shadow:
+    0 25px 45px rgba(0,0,0,.12);
+}
+
+/* ===== AVATAR ===== */
+.avatar {
+  width: 95px;
+  height: 95px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  margin: auto;
+
+  border: 3px solid #eef2ff;
+
+  transition: .3s;
+}
+
+.card:hover .avatar {
+  transform: scale(1.08);
+}
+
+/* ===== INFO ===== */
+.info {
+  text-align: center;
+  margin-top: 12px;
+}
+
+.info h3 {
+  margin: 6px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #020617;
+}
+
+.info p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+/* ===== BADGES ===== */
+.badge {
+  margin-top: 10px;
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .3px;
+}
+
+.asignado {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+}
+
+.sin-asignar {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+}
+
+/* ===== BOTONES ACCION ===== */
+.acciones {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+}
+
+.acciones button {
+  border: none;
+  background: #f8fafc;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+
+  transition: all .2s ease;
+}
+
+.acciones button:hover {
+  background: #6366f1;
+  color: white;
+  transform: scale(1.15);
+}
+
+/* ===========================
+        RESPONSIVE
+=========================== */
+@media (max-width: 950px) {
+  .contenedor {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+}

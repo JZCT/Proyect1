@@ -1,0 +1,47 @@
+<h2>Administración de Usuarios</h2>
+
+<div *ngIf="authService.isAdmin(); else noAccess">
+
+  <h3>Crear Usuario</h3>
+
+  <input
+    type="text"
+    placeholder="Nombre"
+    [(ngModel)]="newUser.nombre"
+  />
+
+  <input
+    type="email"
+    placeholder="Correo"
+    [(ngModel)]="newUser.email"
+  />
+
+  <select [(ngModel)]="newUser.role">
+    <option *ngFor="let role of roles" [value]="role">
+      {{ role }}
+    </option>
+  </select>
+
+  <button (click)="addUser()">Agregar Usuario</button>
+
+  <hr>
+
+  <h3>Lista de Usuarios</h3>
+
+  <ul>
+    <li *ngFor="let user of users">
+      <strong>{{ user.nombre }}</strong>
+      - {{ user.email }}
+      ({{ user.role }})
+
+      <button (click)="deleteUser(user.id)">
+        Eliminar
+      </button>
+    </li>
+  </ul>
+
+</div>
+
+<ng-template #noAccess>
+  <p>No tienes permisos para acceder.</p>
+</ng-template>

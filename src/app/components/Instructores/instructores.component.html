@@ -1,0 +1,82 @@
+<div class="contenedor">
+
+  <!-- ===== FORMULARIO ===== -->
+  <div class="formulario">
+
+    <h2>
+      {{ editIndex !== null ? 'Editar Instructor' : 'Nuevo Instructor' }}
+    </h2>
+
+    <input
+      type="text"
+      placeholder="Nombre"
+      [(ngModel)]="nuevoInstructor.nombre">
+
+    <input
+      type="text"
+      placeholder="Teléfono"
+      [(ngModel)]="nuevoInstructor.telefono">
+
+    <label class="check">
+      <input type="checkbox" [(ngModel)]="nuevoInstructor.asignado">
+      Asignado
+    </label>
+
+    <!-- Imagen -->
+    <input type="file" accept="image/*"
+      (change)="seleccionarImagen($event)">
+
+    <img
+      class="preview"
+      [src]="nuevoInstructor.foto || defaultImg"
+      (error)="onImgError($event)">
+
+    <div class="acciones-form">
+      <button (click)="guardarInstructor()" class="guardar">
+        💾 Guardar
+      </button>
+
+      <button (click)="cancelar()" class="cancelar">
+        ❌ Cancelar
+      </button>
+    </div>
+
+  </div>
+
+  <!-- ===== LISTA ===== -->
+  <div class="grid">
+
+    <article
+      class="card"
+      *ngFor="let instructor of instructores; let i = index">
+
+      <img
+        class="avatar"
+        [src]="instructor.foto || defaultImg"
+        (error)="onImgError($event)">
+
+      <div class="info">
+        <h3>{{ instructor.nombre }}</h3>
+        <p>📞 {{ instructor.telefono }}</p>
+
+        <span
+          class="badge"
+          [ngClass]="{
+            'asignado': instructor.asignado,
+            'sin-asignar': !instructor.asignado
+          }">
+
+          {{ instructor.asignado ? 'Asignado' : 'Sin asignar' }}
+        </span>
+      </div>
+
+      <div class="acciones">
+        <button (click)="editarInstructor(i)">✏️</button>
+        <button (click)="eliminarInstructor(i)">🗑️</button>
+      </div>
+
+    </article>
+
+  </div>
+
+</div>

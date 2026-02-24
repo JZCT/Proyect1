@@ -1,0 +1,45 @@
+<div class="contact-content">
+  <h2>{{ title }}</h2>
+  <p>¿Tienes alguna pregunta? ¡No dudes en ponerte en contacto con nosotros!</p>
+
+  <div *ngIf="submitted" class="alert alert-success">
+    ¡Tu mensaje ha sido enviado correctamente!
+  </div>
+
+  <form (ngSubmit)="onSubmit()" class="contact-form">
+    <div class="form-group">
+      <label for="name">Nombre:</label>
+      <input
+        type="text"
+        id="name"
+        [(ngModel)]="contactForm.name"
+        name="name"
+        required
+      />
+    </div>
+
+    <div class="form-group">
+      <label for="email">Correo Electrónico:</label>
+      <input
+        type="email"
+        id="email"
+        [(ngModel)]="contactForm.email"
+        name="email"
+        required
+      />
+    </div>
+
+    <div class="form-group">
+      <label for="message">Mensaje:</label>
+      <textarea
+        id="message"
+        [(ngModel)]="contactForm.message"
+        name="message"
+        rows="5"
+        required
+      ></textarea>
+    </div>
+
+    <button type="submit" class="submit-button">Enviar Mensaje</button>
+  </form>
+</div>

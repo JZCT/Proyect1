@@ -1,0 +1,51 @@
+html, body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+// Estilos para pantallas normales (no login)
+body:not(.login-page) {
+  background-color: #c2c2c200;
+  color: #333;
+}
+
+// Estilos para pantalla de login
+body.login-page {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #000;
+}
+
+app-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+}
+
+app-root.login-page {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+app-root.login-page main {
+  width: 100%;
+  padding: 0;
+  max-width: 100%;
+  margin: 0;
+}

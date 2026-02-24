@@ -1,0 +1,45 @@
+<div class="container">
+  <header *ngIf="!isLoginPage">
+    <h1>{{ title }}</h1>
+    <nav>
+      <ul *ngIf="currentUser$ | async as user; else guestLinks">
+        
+        <li *ngIf="user.role === 'admin'">
+          <a routerLink="usuario">Usuarios</a>
+        </li>
+        <li *ngIf="user.role === 'admin'">
+          <a routerLink="instructores">Instructores</a>
+        </li>
+
+        <li *ngIf="user.role === 'admin' || user.role === 'instructor'">
+          <a routerLink="cursos">Cursos</a>
+        </li>
+        <li *ngIf="user.role === 'admin' || user.role === 'instructor'">
+          <a routerLink="personas">Personas</a>
+        </li>
+
+        <li><a routerLink="/">Cursos y Personas</a></li>
+        <li><a routerLink="home">Home</a></li>
+
+        <li class="auth-status">
+          <span class="user-info">👤 {{ user.nombre }} ({{ user.role }})</span>
+          <button class="btn-logout" (click)="logout()">Logout</button>
+        </li>
+      </ul>
+
+      <ng-template #guestLinks>
+        <ul>
+          <li><a routerLink="/login" class="btn-login">Login</a></li>
+        </ul>
+      </ng-template>
+    </nav>
+  </header>
+
+  <main>
+    <router-outlet></router-outlet>
+  </main>
+
+  <footer *ngIf="!isLoginPage">
+    <p>&copy; 2026 CecaptaINS. Todos los derechos reservados.</p>
+  </footer>
+</div>

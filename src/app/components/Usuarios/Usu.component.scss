@@ -1,0 +1,136 @@
+/* CONTENEDOR GENERAL */
+:host {
+  display: block;
+  padding: 2rem;
+  background: #f4f6f9;
+  min-height: 100vh;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* TITULOS */
+h2 {
+  text-align: center;
+  margin-bottom: 2rem;
+  color: #2c3e50;
+}
+
+h3 {
+  margin: 1.5rem 0 1rem;
+  color: #34495e;
+}
+
+/* PANEL */
+div {
+  max-width: 700px;
+  margin: auto;
+  background: #ffffff;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* INPUTS Y SELECT */
+input,
+select {
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  border: 1px solid #dcdcdc;
+  font-size: 14px;
+  transition: all 0.25s ease;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+}
+
+/* BOTONES */
+button {
+  background: #1976d2;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s;
+  margin-top: 5px;
+}
+
+button:hover {
+  background: #125ea7;
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* BOTON ELIMINAR */
+li button {
+  background: #e53935;
+  margin-left: 10px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+li button:hover {
+  background: #c62828;
+}
+
+/* SEPARADOR */
+hr {
+  margin: 2rem 0;
+  border: none;
+  border-top: 1px solid #eee;
+}
+
+/* LISTA */
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+li {
+  background: #f8fafc;
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: 0.2s;
+}
+
+li:hover {
+  background: #eef3f8;
+}
+
+/* TEXTO SIN ACCESO */
+p {
+  text-align: center;
+  color: #e53935;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+/* RESPONSIVE */
+@media (max-width: 600px) {
+  div {
+    padding: 1.2rem;
+  }
+
+  li {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  li button {
+    margin-left: 0;
+  }
+}

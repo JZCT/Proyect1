@@ -1,0 +1,291 @@
+/* =====================================================
+   BASE GLOBAL
+===================================================== */
+* {
+  box-sizing: border-box;
+}
+
+.container-fluid {
+  min-height: 100vh;
+  padding: 30px;
+
+  font-family: Inter, system-ui, sans-serif;
+
+  background:
+    radial-gradient(circle at 0% 0%, #eef2ff 0%, transparent 40%),
+    radial-gradient(circle at 100% 0%, #ecfeff 0%, transparent 40%),
+    #f8fafc;
+}
+
+/* =====================================================
+   HEADER
+===================================================== */
+.header {
+  margin-bottom: 25px;
+}
+
+.header h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #020617;
+}
+
+/* =====================================================
+   LAYOUT PRINCIPAL
+===================================================== */
+.content-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 25px;
+}
+
+/* =====================================================
+   PANELES
+===================================================== */
+.cursos-panel,
+.grupos-panel {
+  background: rgba(255,255,255,.85);
+  backdrop-filter: blur(14px);
+
+  border-radius: 18px;
+  padding: 22px;
+
+  box-shadow:
+    0 20px 45px rgba(0,0,0,.08);
+}
+
+/* HEADER PANEL */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.panel-header h3 {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* =====================================================
+   BOTONES
+===================================================== */
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all .25s ease;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg,#6366f1,#4f46e5);
+  color: white;
+  box-shadow: 0 8px 18px rgba(79,70,229,.25);
+}
+
+.btn-success {
+  background: linear-gradient(135deg,#22c55e,#16a34a);
+  color: white;
+}
+
+.btn-secondary {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.btn-info {
+  background: #0ea5e9;
+  color: white;
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+}
+
+.btn-sm {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+/* =====================================================
+   FORMULARIOS
+===================================================== */
+.form-section {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 20px;
+
+  box-shadow: 0 10px 25px rgba(0,0,0,.05);
+
+  animation: fadeIn .35s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form {
+  display: grid;
+  gap: 14px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* INPUTS */
+.form-group input,
+.form-group textarea,
+.form-group select {
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  padding: 10px;
+  font-size: 14px;
+  transition: all .25s ease;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99,102,241,.15);
+}
+
+/* BOTONES FORM */
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* =====================================================
+   LISTA CURSOS
+===================================================== */
+.cursos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.curso-item {
+  background: #f8fafc;
+  border-radius: 14px;
+  padding: 14px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  cursor: pointer;
+  transition: all .25s ease;
+
+  border: 1px solid transparent;
+}
+
+.curso-item:hover {
+  background: #eef2ff;
+  transform: translateY(-2px);
+}
+
+.curso-item.selected {
+  border: 1px solid #6366f1;
+  background: #eef2ff;
+}
+
+.curso-info h5 {
+  margin: 0;
+  font-size: 16px;
+  color: #020617;
+}
+
+.curso-info p {
+  margin: 3px 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.curso-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* =====================================================
+   PERSONAS / GRUPOS
+===================================================== */
+.grupos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grupo-item {
+  background: #f1f5f9;
+  border-radius: 12px;
+  padding: 12px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  transition: .25s;
+}
+
+.grupo-item:hover {
+  background: #e2e8f0;
+}
+
+.grupo-info h5 {
+  margin: 0;
+  color: #020617;
+}
+
+.grupo-info p {
+  margin: 2px 0;
+  font-size: 13px;
+  color: #475569;
+}
+
+/* =====================================================
+   EMPTY STATE
+===================================================== */
+.empty-state {
+  text-align: center;
+  padding: 35px;
+  color: #64748b;
+  font-style: italic;
+}
+
+/* =====================================================
+   RESPONSIVE
+===================================================== */
+@media (max-width: 1000px) {
+
+  .content-wrapper {
+    grid-template-columns: 1fr;
+  }
+
+}

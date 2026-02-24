@@ -1,0 +1,239 @@
+/* ==============================
+        BASE
+============================== */
+* {
+  box-sizing: border-box;
+}
+
+.crud-container {
+  padding: 35px;
+  min-height: 100vh;
+
+  font-family: Inter, system-ui, sans-serif;
+
+  background:
+    radial-gradient(circle at 10% 20%, #eef2ff 0%, transparent 40%),
+    radial-gradient(circle at 90% 0%, #e0f2fe 0%, transparent 35%),
+    #f8fafc;
+}
+
+/* ==============================
+        HEADER
+============================== */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.header h2 {
+  font-size: 26px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* ==============================
+        BOTONES
+============================== */
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all .25s ease;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  color: white;
+  box-shadow: 0 10px 20px rgba(79,70,229,.25);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+}
+
+.btn-secondary {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.btn-info {
+  background: #0ea5e9;
+  color: white;
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+/* ==============================
+        FORMULARIO
+============================== */
+.form-section {
+  background: rgba(255,255,255,.8);
+  backdrop-filter: blur(12px);
+  padding: 25px;
+  border-radius: 16px;
+  margin-bottom: 30px;
+
+  box-shadow:
+    0 15px 35px rgba(0,0,0,.08);
+
+  animation: fadeIn .4s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form-section h3 {
+  margin-bottom: 18px;
+  color: #020617;
+}
+
+/* ===== GRID FORM ===== */
+.form {
+  display: grid;
+  gap: 18px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #334155;
+  font-size: 14px;
+}
+
+/* INPUT MODERNO */
+.form-group input {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  transition: all .25s ease;
+  font-size: 14px;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow:
+    0 0 0 3px rgba(99,102,241,.15);
+}
+
+/* BOTONES FORM */
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* ==============================
+        TABLA
+============================== */
+.table-section {
+  background: white;
+  padding: 25px;
+  border-radius: 16px;
+
+  box-shadow:
+    0 15px 35px rgba(0,0,0,.08);
+}
+
+.table-section h3 {
+  margin-bottom: 15px;
+  color: #020617;
+}
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #64748b;
+  font-style: italic;
+}
+
+/* ===== TABLE ===== */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+}
+
+.table thead {
+  background: #f1f5f9;
+}
+
+.table th {
+  text-align: left;
+  padding: 14px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.table td {
+  padding: 14px;
+  border-top: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+/* FILAS HOVER */
+.table tbody tr {
+  transition: all .2s ease;
+}
+
+.table tbody tr:hover {
+  background: #f8fafc;
+  transform: scale(1.003);
+}
+
+/* ACCIONES */
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ==============================
+        RESPONSIVE
+============================== */
+@media (max-width: 768px) {
+
+  .header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+  }
+
+  .table {
+    font-size: 13px;
+  }
+
+  .crud-container {
+    padding: 20px;
+  }
+}
