@@ -6,44 +6,58 @@
     </button>
   </div>
 
-  <!-- Formulario -->
   <div *ngIf="showForm" class="form-section">
     <h3>{{ editingId ? 'Editar Persona' : 'Nueva Persona' }}</h3>
+    
+    <div class="photo-preview-container">
+      <img [src]="getFotoUrl(editingId ? editingPersona.foto : newPersona.foto)" 
+           alt="Vista previa" class="photo-preview">
+    </div>
+
     <form (ngSubmit)="editingId ? updatePersona() : addPersona()" class="form">
-      <div class="form-group">
-        <label for="nombre">Nombre:</label>
-        <input 
-          type="text" 
-          id="nombre" 
-          [ngModel]="editingId ? editingPersona.nombre : newPersona.nombre"
-          (ngModelChange)="editingId ? (editingPersona.nombre = $event) : (newPersona.nombre = $event)"
-          name="nombre"
-          required
-        />
-      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="nombre">Nombre:</label>
+          <input type="text" id="nombre" name="nombre" required
+            [ngModel]="editingId ? editingPersona.nombre : newPersona.nombre"
+            (ngModelChange)="editingId ? (editingPersona.nombre = $event) : (newPersona.nombre = $event)" />
+        </div>
 
-      <div class="form-group">
-        <label for="email">Email:</label>
-        <input 
-          type="email" 
-          id="email"
-          [ngModel]="editingId ? editingPersona.email : newPersona.email"
-          (ngModelChange)="editingId ? (editingPersona.email = $event) : (newPersona.email = $event)"
-          name="email"
-          required
-        />
-      </div>
+        <div class="form-group">
+          <label for="foto">URL de la Foto:</label>
+          <input type="text" id="foto" name="foto" placeholder="https://ejemplo.com/foto.jpg"
+            [ngModel]="editingId ? editingPersona.foto : newPersona.foto"
+            (ngModelChange)="editingId ? (editingPersona.foto = $event) : (newPersona.foto = $event)" />
+        </div>
 
-      <div class="form-group">
-        <label for="telefono">Teléfono:</label>
-        <input 
-          type="tel" 
-          id="telefono"
-          [ngModel]="editingId ? editingPersona.telefono : newPersona.telefono"
-          (ngModelChange)="editingId ? (editingPersona.telefono = $event) : (newPersona.telefono = $event)"
-          name="telefono"
-          required
-        />
+        <div class="form-group">
+          <label for="email">Email:</label>
+          <input type="email" id="email" name="email" required
+            [ngModel]="editingId ? editingPersona.email : newPersona.email"
+            (ngModelChange)="editingId ? (editingPersona.email = $event) : (newPersona.email = $event)" />
+        </div>
+
+        <div class="form-group">
+          <label for="empresa">Empresa:</label>
+          <input type="text" id="empresa" name="empresa" required
+            [ngModel]="editingId ? editingPersona.empresa : newPersona.empresa"
+            (ngModelChange)="editingId ? (editingPersona.empresa = $event) : (newPersona.empresa = $event)" />
+        </div>
+
+        <div class="form-group">
+          <label for="telefono">Teléfono:</label>
+          <input type="tel" id="telefono" name="telefono" required
+            [ngModel]="editingId ? editingPersona.telefono : newPersona.telefono"
+            (ngModelChange)="editingId ? (editingPersona.telefono = $event) : (newPersona.telefono = $event)" />
+        </div>
+
+        <div class="form-group">
+          <label for="archivos">Adjuntar Archivos:</label>
+          <input type="file" (change)="onFilesSelected($event)" class="file-input" multiple />
+          <div class="file-list-preview" *ngIf="(editingId ? editingPersona.archivos : newPersona.archivos)?.length">
+            <small>Seleccionados: {{ (editingId ? editingPersona.archivos : newPersona.archivos)?.join(', ') }}</small>
+          </div>
+        </div>
       </div>
 
       <div class="form-actions">
@@ -53,7 +67,6 @@
     </form>
   </div>
 
-  <!-- Tabla de Personas -->
   <div class="table-section">
     <h3>Lista de Personas</h3>
     <div *ngIf="personas.length === 0" class="empty-state">
@@ -62,19 +75,32 @@
     <table *ngIf="personas.length > 0" class="table">
       <thead>
         <tr>
-          <th>ID</th>
+          <th>Foto</th>
           <th>Nombre</th>
-          <th>Email</th>
-          <th>Teléfono</th>
+          <th>Email / Empresa</th>
+          <th>Archivos</th>
           <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngFor="let persona of personas">
-          <td>{{ persona.id }}</td>
-          <td>{{ persona.nombre }}</td>
-          <td>{{ persona.email }}</td>
-          <td>{{ persona.telefono }}</td>
+          <td>
+            <img [src]="getFotoUrl(persona.foto)" class="table-avatar" alt="User">
+          </td>
+          <td>
+            <strong>{{ persona.nombre }}</strong><br>
+            <small>{{ persona.telefono }}</small>
+          </td>
+          <td>
+            {{ persona.email }}<br>
+            <small class="text-muted">{{ persona.empresa }}</small>
+          </td>
+          <td>
+            <div class="files-container">
+              <span *ngFor="let f of persona.archivos" class="file-tag">📄 {{ f }}</span>
+              <span *ngIf="!persona.archivos?.length" class="text-muted small">---</span>
+            </div>
+          </td>
           <td class="actions">
             <button class="btn btn-sm btn-info" (click)="startEdit(persona)">Editar</button>
             <button class="btn btn-sm btn-danger" (click)="deletePersona(persona.id)">Eliminar</button>
