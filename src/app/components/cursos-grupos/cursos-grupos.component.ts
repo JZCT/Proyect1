@@ -262,4 +262,5 @@ export class CursosGruposComponent implements OnInit {
 
     this.updatePersonasEnCurso();
   }
+  
 }

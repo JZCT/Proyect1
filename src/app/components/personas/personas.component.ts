@@ -13,10 +13,26 @@ import { Persona } from '../../models/persona.model';
 })
 export class PersonasComponent implements OnInit {
   personas: Persona[] = [];
-  newPersona: Persona = { nombre: '', email: '', telefono: '' };
-  editingId: number | null = null;
-  editingPersona: Persona = { nombre: '', email: '', telefono: '' };
   showForm = false;
+  editingId: string | null = null; // Cambiado a string para Firestore IDs
+
+  // Objeto inicializador para evitar repetición de código
+  private initialPersonaState = (): Persona => ({
+    nombre: '',
+    email: '',
+    telefono: '',
+    empresa: '',
+    foto: '',
+    archivos: [],
+    estado: true
+  });
+
+  newPersona: Persona = this.initialPersonaState();
+  editingPersona: Persona = this.initialPersonaState();
+
+  // Para mostrar la imagen inmediatamente antes de que termine de subir a Firebase
+  previewImage: string | ArrayBuffer | null = null;
+  loadingFile = false;
 
   constructor(private personaService: PersonaService) {}
 
@@ -26,43 +42,108 @@ export class PersonasComponent implements OnInit {
     });
   }
 
-  toggleForm() {
-    this.showForm = !this.showForm;
-    if (!this.showForm) {
-      this.resetForm();
+  // Retorna la URL de la foto, la vista previa local o la de defecto
+  getFotoUrl(url: string | undefined): string {
+    if (this.previewImage && this.showForm) return this.previewImage as string;
+    return (url && url.trim() !== '') ? url : 'assets/user-default.png';
+  }
+
+  // Captura foto (cámara) o sube archivo de imagen
+  async onPhotoSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      this.loadingFile = true;
+
+      // 1. Mostrar vista previa local (inmediato)
+      const reader = new FileReader();
+      reader.onload = () => { this.previewImage = reader.result; };
+      reader.readAsDataURL(file);
+
+      // 2. Subir a Firebase Storage
+      try {
+        const downloadURL = await this.personaService.uploadFile(file);
+        if (this.editingId) {
+          this.editingPersona.foto = downloadURL;
+        } else {
+          this.newPersona.foto = downloadURL;
+        }
+      } catch (error) {
+        console.error("Error al subir imagen:", error);
+        alert("No se pudo subir la imagen");
+      } finally {
+        this.loadingFile = false;
+      }
     }
   }
 
-  addPersona() {
-    if (this.newPersona.nombre && this.newPersona.email && this.newPersona.telefono) {
-      this.personaService.addPersona({ ...this.newPersona });
-      this.resetForm();
+  // Maneja la subida de múltiples archivos adjuntos
+  async onFilesSelected(event: any) {
+    const files: FileList = event.target.files;
+    if (files.length > 0) {
+      this.loadingFile = true;
+      try {
+        for (let i = 0; i < files.length; i++) {
+          const downloadURL = await this.personaService.uploadFile(files[i]);
+          const target = this.editingId ? this.editingPersona : this.newPersona;
+          target.archivos = [...(target.archivos || []), downloadURL];
+        }
+      } catch (error) {
+        console.error("Error al subir archivos:", error);
+      } finally {
+        this.loadingFile = false;
+      }
+    }
+  }
+
+  toggleForm() {
+    this.showForm = !this.showForm;
+    if (!this.showForm) this.resetForm();
+  }
+
+  async addPersona() {
+    if (this.newPersona.nombre && this.newPersona.email) {
+      try {
+        await this.personaService.addPersona({ ...this.newPersona });
+        this.resetForm();
+      } catch (error) {
+        console.error("Error al guardar:", error);
+      }
     }
   }
 
   startEdit(persona: Persona) {
-    this.editingId = persona.id || null;
-    this.editingPersona = { ...persona };
+    this.editingId = persona.id?.toString() || null;
+    this.editingPersona = { ...persona, archivos: persona.archivos || [] };
     this.showForm = true;
   }
 
-  updatePersona() {
-    if (this.editingId && this.editingPersona.nombre && this.editingPersona.email) {
-      this.personaService.updatePersona(this.editingId, this.editingPersona);
-      this.resetForm();
+  async updatePersona() {
+    if (this.editingId) {
+      try {
+        await this.personaService.updatePersona(this.editingId, this.editingPersona);
+        this.resetForm();
+      } catch (error) {
+        console.error("Error al actualizar:", error);
+      }
     }
   }
 
-  deletePersona(id: number | undefined) {
+  async deletePersona(id: string | number | undefined) {
     if (id && confirm('¿Estás seguro de eliminar esta persona?')) {
-      this.personaService.deletePersona(id);
+      try {
+        await this.personaService.deletePersona(id.toString());
+      } catch (error) {
+        console.error("Error al eliminar:", error);
+      }
     }
   }
 
   resetForm() {
-    this.newPersona = { nombre: '', email: '', telefono: '' };
+    this.newPersona = this.initialPersonaState();
+    this.editingPersona = this.initialPersonaState();
     this.editingId = null;
-    this.editingPersona = { nombre: '', email: '', telefono: '' };
     this.showForm = false;
+    this.previewImage = null;
+    this.loadingFile = false;
   }
 }

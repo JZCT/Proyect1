@@ -1,5 +1,5 @@
 /* ==============================
-        BASE
+        BASE & VARIABLES
 ============================== */
 * {
   box-sizing: border-box;
@@ -8,9 +8,7 @@
 .crud-container {
   padding: 35px;
   min-height: 100vh;
-
-  font-family: Inter, system-ui, sans-serif;
-
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background:
     radial-gradient(circle at 10% 20%, #eef2ff 0%, transparent 40%),
     radial-gradient(circle at 90% 0%, #e0f2fe 0%, transparent 35%),
@@ -31,6 +29,7 @@
   font-size: 26px;
   font-weight: 700;
   color: #0f172a;
+  margin: 0;
 }
 
 /* ==============================
@@ -43,16 +42,20 @@
   cursor: pointer;
   font-weight: 600;
   transition: all .25s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-primary {
   background: linear-gradient(135deg, #6366f1, #4f46e5);
   color: white;
-  box-shadow: 0 10px 20px rgba(79,70,229,.25);
+  box-shadow: 0 10px 20px rgba(79, 70, 229, .25);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(79, 70, 229, .35);
 }
 
 .btn-success {
@@ -84,38 +87,49 @@
         FORMULARIO
 ============================== */
 .form-section {
-  background: rgba(255,255,255,.8);
+  background: rgba(255, 255, 255, .8);
   backdrop-filter: blur(12px);
   padding: 25px;
   border-radius: 16px;
   margin-bottom: 30px;
-
-  box-shadow:
-    0 15px 35px rgba(0,0,0,.08);
-
+  box-shadow: 0 15px 35px rgba(0, 0, 0, .08);
   animation: fadeIn .4s ease;
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(15px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .form-section h3 {
   margin-bottom: 18px;
   color: #020617;
+  font-size: 20px;
 }
 
-/* ===== GRID FORM ===== */
-.form {
+/* VISTA PREVIA FOTO FORM */
+.photo-preview-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 25px;
+}
+
+.main-preview {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid white;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  background: #f1f5f9;
+}
+
+/* GRID FORM */
+.form-grid {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 18px;
+  margin-bottom: 20px;
 }
 
 .form-group {
@@ -130,23 +144,27 @@
   font-size: 14px;
 }
 
-/* INPUT MODERNO */
 .form-group input {
   padding: 12px;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
   transition: all .25s ease;
   font-size: 14px;
+  background: white;
 }
 
 .form-group input:focus {
   outline: none;
   border-color: #6366f1;
-  box-shadow:
-    0 0 0 3px rgba(99,102,241,.15);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, .15);
 }
 
-/* BOTONES FORM */
+.file-input {
+  padding: 8px !important;
+  font-size: 12px !important;
+  cursor: pointer;
+}
+
 .form-actions {
   display: flex;
   gap: 10px;
@@ -160,9 +178,7 @@
   background: white;
   padding: 25px;
   border-radius: 16px;
-
-  box-shadow:
-    0 15px 35px rgba(0,0,0,.08);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, .08);
 }
 
 .table-section h3 {
@@ -170,7 +186,6 @@
   color: #020617;
 }
 
-/* ===== EMPTY STATE ===== */
 .empty-state {
   text-align: center;
   padding: 40px;
@@ -178,28 +193,76 @@
   font-style: italic;
 }
 
-/* ===== TABLE ===== */
 .table {
   width: 100%;
   border-collapse: collapse;
-  overflow: hidden;
 }
 
 .table thead {
-  background: #f1f5f9;
+  background: #f8fafc;
 }
 
 .table th {
   text-align: left;
   padding: 14px;
-  font-size: 14px;
-  color: #475569;
+  font-size: 13px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #f1f5f9;
 }
 
 .table td {
   padding: 14px;
   border-top: 1px solid #f1f5f9;
-  color: #334155;
+  vertical-align: middle;
+}
+
+/* ELEMENTOS DENTRO DE TABLA */
+.table-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+
+.primary-text {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 14px;
+}
+
+.secondary-text {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+/* ARCHIVOS TAGS */
+.file-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 200px;
+}
+
+.file-tag {
+  background: #eff6ff;
+  color: #3b82f6;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid #dbeafe;
+  white-space: nowrap;
+}
+
+.empty-files {
+  font-size: 12px;
+  color: #cbd5e1;
+  font-style: italic;
 }
 
 /* FILAS HOVER */
@@ -208,8 +271,7 @@
 }
 
 .table tbody tr:hover {
-  background: #f8fafc;
-  transform: scale(1.003);
+  background: #fcfdfe;
 }
 
 /* ACCIONES */
@@ -222,15 +284,19 @@
         RESPONSIVE
 ============================== */
 @media (max-width: 768px) {
-
   .header {
     flex-direction: column;
     gap: 15px;
     align-items: flex-start;
   }
 
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
   .table {
-    font-size: 13px;
+    display: block;
+    overflow-x: auto;
   }
 
   .crud-container {
