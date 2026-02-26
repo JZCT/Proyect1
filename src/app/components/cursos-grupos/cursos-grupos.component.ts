@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Observable } from 'rxjs';
 
 import { CursoService } from '../../services/curso.service';
 import { PersonaService } from '../../services/persona.service';
@@ -8,6 +9,7 @@ import { AuthService } from '../../services/auth.service';
 
 import { Curso } from '../../models/curso.model';
 import { Persona } from '../../models/persona.model';
+import { User } from '../../models/user.model';
 
 @Component({
   selector: 'app-cursos-grupos',
@@ -17,14 +19,11 @@ import { Persona } from '../../models/persona.model';
   styleUrl: './cursos-grupos.component.scss'
 })
 export class CursosGruposComponent implements OnInit {
-
   /* ================= USER ================= */
-
-  // 👇 usado por el HTML: currentUser$ | async as user
-  currentUser$ = this.authService.currentUser$;
+  currentUser$: Observable<any>;
+  currentUser: User | null = null;
 
   /* ================= DATA ================= */
-
   cursos: Curso[] = [];
   personas: Persona[] = [];
 
@@ -33,13 +32,12 @@ export class CursosGruposComponent implements OnInit {
   personasEnCurso: Persona[] = [];
   personasDisponibles: Persona[] = [];
 
-  selectedPersonaToAdd: number | null = null;
+  selectedPersonaToAdd: string | null = null; // Cambiado a string para Firebase
 
   /* ================= FORM ================= */
-
   showCursoForm = false;
 
-  newCurso: Curso = {
+  newCurso: Partial<Curso> = {
     nombre: '',
     descripcion: '',
     Fecha_inicio: undefined,
@@ -48,9 +46,9 @@ export class CursosGruposComponent implements OnInit {
     num_represnetantes: ''
   };
 
-  editingCursoId: number | null = null;
+  editingCursoId: string | null = null; // Cambiado a string
 
-  editingCurso: Curso = {
+  editingCurso: Partial<Curso> = {
     nombre: '',
     descripcion: '',
     Fecha_inicio: undefined,
@@ -60,22 +58,35 @@ export class CursosGruposComponent implements OnInit {
   };
 
   /* ================= CONSTRUCTOR ================= */
-
   constructor(
     private cursoService: CursoService,
     private personaService: PersonaService,
     private authService: AuthService
-  ) {}
+  ) {
+    this.currentUser$ = this.authService.currentUser$;
+  }
 
   /* ================= INIT ================= */
-
   ngOnInit(): void {
+    this.loadCurrentUser();
     this.loadCursos();
     this.loadPersonas();
   }
 
-  /* ================= HELPERS ================= */
+  /* ================= LOAD USER ================= */
+  private loadCurrentUser() {
+    this.authService.currentUser$.subscribe(async (firebaseUser) => {
+      if (firebaseUser) {
+        // Obtener datos adicionales del usuario desde Firestore
+        const userData = await this.authService.getUserData(firebaseUser.uid);
+        this.currentUser = userData;
+      } else {
+        this.currentUser = null;
+      }
+    });
+  }
 
+  /* ================= HELPERS ================= */
   formatDate(date: Date | string | null | undefined): string | null {
     if (!date) return null;
 
@@ -87,12 +98,7 @@ export class CursosGruposComponent implements OnInit {
     return `${year}-${month}-${day}`;
   }
 
-  /* ===== ROLE HELPERS (🔥 LIMPIO) ===== */
-
-  get currentUser() {
-    return this.authService.getCurrentUser();
-  }
-
+  /* ===== ROLE HELPERS ===== */
   isAdmin(): boolean {
     return this.currentUser?.role === 'admin';
   }
@@ -106,36 +112,46 @@ export class CursosGruposComponent implements OnInit {
   }
 
   canManagePersonas(): boolean {
-    if (!this.selectedCurso) return false;
+    if (!this.selectedCurso || !this.currentUser) return false;
 
     return !!(
       this.isAdmin() ||
       (
         this.isInstructor() &&
         this.currentUser?.assignedCourseIds?.includes(
-          this.selectedCurso.id || 0
+          this.selectedCurso.id || ''
         )
       )
     );
   }
 
   /* ================= LOAD DATA ================= */
-
   loadCursos() {
-    this.cursoService.getCursos().subscribe(cursos => {
-      this.cursos = cursos;
+    this.cursoService.getCursos().subscribe({
+      next: (cursos) => {
+        this.cursos = cursos;
+        console.log('Cursos cargados:', cursos);
+      },
+      error: (error) => {
+        console.error('Error cargando cursos:', error);
+      }
     });
   }
 
   loadPersonas() {
-    this.personaService.getPersonas().subscribe(personas => {
-      this.personas = personas;
-      if (this.selectedCurso) this.updatePersonasEnCurso();
+    this.personaService.getPersonas().subscribe({
+      next: (personas) => {
+        this.personas = personas;
+        if (this.selectedCurso) this.updatePersonasEnCurso();
+        console.log('Personas cargadas:', personas);
+      },
+      error: (error) => {
+        console.error('Error cargando personas:', error);
+      }
     });
   }
 
   /* ================= CURSO SELECTION ================= */
-
   selectCurso(curso: Curso) {
     this.selectedCurso = curso;
     this.updatePersonasEnCurso();
@@ -151,16 +167,15 @@ export class CursosGruposComponent implements OnInit {
     const assignedIds = this.selectedCurso.personasIds || [];
 
     this.personasEnCurso = this.personas.filter(p =>
-      assignedIds.includes(p.id || 0)
+      assignedIds.includes(p.id || '')
     );
 
     this.personasDisponibles = this.personas.filter(p =>
-      !assignedIds.includes(p.id || 0)
+      !assignedIds.includes(p.id || '')
     );
   }
 
   /* ================= CRUD CURSOS ================= */
-
   toggleCursoForm() {
     if (!this.canManageCurso()) return;
 
@@ -171,7 +186,7 @@ export class CursosGruposComponent implements OnInit {
     }
   }
 
-  addCurso() {
+  async addCurso() {
     if (!this.canManageCurso()) return;
 
     if (
@@ -182,12 +197,16 @@ export class CursosGruposComponent implements OnInit {
       this.newCurso.nom_representante &&
       this.newCurso.num_represnetantes
     ) {
-      this.cursoService.addCurso({
-        ...this.newCurso,
-        personasIds: []
-      });
-
-      this.resetCursoForm();
+      try {
+        await this.cursoService.addCurso({
+          ...this.newCurso as Curso,
+          personasIds: []
+        });
+        this.resetCursoForm();
+      } catch (error) {
+        console.error('Error agregando curso:', error);
+        alert('Error al agregar curso');
+      }
     }
   }
 
@@ -199,26 +218,35 @@ export class CursosGruposComponent implements OnInit {
     this.showCursoForm = true;
   }
 
-  updateCurso() {
+  async updateCurso() {
     if (!this.canManageCurso()) return;
 
     if (this.editingCursoId) {
-      this.cursoService.updateCurso(
-        this.editingCursoId,
-        this.editingCurso
-      );
-
-      this.resetCursoForm();
+      try {
+        await this.cursoService.updateCurso(
+          this.editingCursoId,
+          this.editingCurso as Curso
+        );
+        this.resetCursoForm();
+      } catch (error) {
+        console.error('Error actualizando curso:', error);
+        alert('Error al actualizar curso');
+      }
     }
   }
 
-  deleteCurso(id: number | undefined) {
+  async deleteCurso(id: string | undefined) {
     if (!this.canManageCurso()) return;
 
-    if (id && confirm('¿Estás seguro?')) {
-      this.cursoService.deleteCurso(id);
-      this.selectedCurso = null;
-      this.personasEnCurso = [];
+    if (id && confirm('¿Estás seguro de eliminar este curso?')) {
+      try {
+        await this.cursoService.deleteCurso(id);
+        this.selectedCurso = null;
+        this.personasEnCurso = [];
+      } catch (error) {
+        console.error('Error eliminando curso:', error);
+        alert('Error al eliminar curso');
+      }
     }
   }
 
@@ -237,30 +265,36 @@ export class CursosGruposComponent implements OnInit {
   }
 
   /* ================= PERSONAS ================= */
-
-  addPersonaToCurso(personaId: number | null) {
+  async addPersonaToCurso(personaId: string | null) {
     if (!this.selectedCurso || !personaId) return;
     if (!this.canManagePersonas()) return;
 
-    this.cursoService.addPersonaToCurso(
-      this.selectedCurso.id || 0,
-      personaId
-    );
-
-    this.updatePersonasEnCurso();
-    this.selectedPersonaToAdd = null;
+    try {
+      await this.cursoService.addPersonaToCurso(
+        this.selectedCurso.id || '',
+        personaId
+      );
+      this.updatePersonasEnCurso();
+      this.selectedPersonaToAdd = null;
+    } catch (error) {
+      console.error('Error agregando persona al curso:', error);
+      alert('Error al agregar persona al curso');
+    }
   }
 
-  removePersonaFromCurso(personaId: number | undefined) {
+  async removePersonaFromCurso(personaId: string | undefined) {
     if (!this.selectedCurso || !personaId) return;
     if (!this.canManagePersonas()) return;
 
-    this.cursoService.removePersonaFromCurso(
-      this.selectedCurso.id || 0,
-      personaId
-    );
-
-    this.updatePersonasEnCurso();
+    try {
+      await this.cursoService.removePersonaFromCurso(
+        this.selectedCurso.id || '',
+        personaId
+      );
+      this.updatePersonasEnCurso();
+    } catch (error) {
+      console.error('Error removiendo persona del curso:', error);
+      alert('Error al remover persona del curso');
+    }
   }
-  
 }

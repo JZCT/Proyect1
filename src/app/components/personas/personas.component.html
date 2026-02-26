@@ -1,83 +1,95 @@
 <div class="crud-container">
   <div class="header">
     <h2>Gestión de Personas</h2>
-    <button class="btn btn-primary" (click)="toggleForm()">
+    <button class="btn btn-primary" (click)="toggleForm()" *ngIf="isAdmin">
       {{ showForm ? 'Cerrar' : 'Agregar Persona' }}
     </button>
   </div>
 
   <div *ngIf="showForm" class="form-section">
     <h3>{{ editingId ? 'Editar Persona' : 'Nueva Persona' }}</h3>
-    
-    <div class="photo-preview-container">
-      <img [src]="getFotoUrl(editingId ? editingPersona.foto : newPersona.foto)" 
-           alt="Vista previa" class="photo-preview">
+
+    <div class="photo-preview-wrapper">
+      <div style="position: relative;">
+        <img [src]="getFotoUrl(editingId ? editingPersona.foto : newPersona.foto)" class="main-preview">
+        
+        <button type="button" class="btn btn-primary btn-sm" 
+          (click)="triggerCamera()" 
+          style="position: absolute; bottom: 0; right: 0; border-radius: 50%; width: 35px; height: 35px; padding: 0;">
+          {{ loadingFile ? '...' : '📷' }}
+        </button>
+      </div>
+      
+      <input #photoInput type="file" accept="image/*" capture="user" (change)="onPhotoSelected($event)" hidden>
     </div>
 
-    <form (ngSubmit)="editingId ? updatePersona() : addPersona()" class="form">
+    <form (ngSubmit)="editingId ? updatePersona() : addPersona()">
       <div class="form-grid">
         <div class="form-group">
-          <label for="nombre">Nombre:</label>
-          <input type="text" id="nombre" name="nombre" required
+          <label>Nombre Completo</label>
+          <input type="text" 
             [ngModel]="editingId ? editingPersona.nombre : newPersona.nombre"
-            (ngModelChange)="editingId ? (editingPersona.nombre = $event) : (newPersona.nombre = $event)" />
+            (ngModelChange)="editingId ? editingPersona.nombre = $event : newPersona.nombre = $event"
+            name="nombre" placeholder="Nombre de la persona" required />
         </div>
 
         <div class="form-group">
-          <label for="foto">URL de la Foto:</label>
-          <input type="text" id="foto" name="foto" placeholder="https://ejemplo.com/foto.jpg"
-            [ngModel]="editingId ? editingPersona.foto : newPersona.foto"
-            (ngModelChange)="editingId ? (editingPersona.foto = $event) : (newPersona.foto = $event)" />
-        </div>
-
-        <div class="form-group">
-          <label for="email">Email:</label>
-          <input type="email" id="email" name="email" required
+          <label>Email</label>
+          <input type="email" 
             [ngModel]="editingId ? editingPersona.email : newPersona.email"
-            (ngModelChange)="editingId ? (editingPersona.email = $event) : (newPersona.email = $event)" />
+            (ngModelChange)="editingId ? editingPersona.email = $event : newPersona.email = $event"
+            name="email" placeholder="correo@ejemplo.com" required />
         </div>
 
         <div class="form-group">
-          <label for="empresa">Empresa:</label>
-          <input type="text" id="empresa" name="empresa" required
-            [ngModel]="editingId ? editingPersona.empresa : newPersona.empresa"
-            (ngModelChange)="editingId ? (editingPersona.empresa = $event) : (newPersona.empresa = $event)" />
-        </div>
-
-        <div class="form-group">
-          <label for="telefono">Teléfono:</label>
-          <input type="tel" id="telefono" name="telefono" required
+          <label>Teléfono</label>
+          <input type="tel" 
             [ngModel]="editingId ? editingPersona.telefono : newPersona.telefono"
-            (ngModelChange)="editingId ? (editingPersona.telefono = $event) : (newPersona.telefono = $event)" />
+            (ngModelChange)="editingId ? editingPersona.telefono = $event : newPersona.telefono = $event"
+            name="telefono" placeholder="+52 ..." />
         </div>
 
         <div class="form-group">
-          <label for="archivos">Adjuntar Archivos:</label>
-          <input type="file" (change)="onFilesSelected($event)" class="file-input" multiple />
-          <div class="file-list-preview" *ngIf="(editingId ? editingPersona.archivos : newPersona.archivos)?.length">
-            <small>Seleccionados: {{ (editingId ? editingPersona.archivos : newPersona.archivos)?.join(', ') }}</small>
+          <label>Empresa</label>
+          <input type="text" 
+            [ngModel]="editingId ? editingPersona.empresa : newPersona.empresa"
+            (ngModelChange)="editingId ? editingPersona.empresa = $event : newPersona.empresa = $event"
+            name="empresa" placeholder="Nombre de la empresa" />
+        </div>
+
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>Documentos Adicionales</label>
+          <input type="file" (change)="onFilesSelected($event)" multiple class="file-input" />
+          <div class="file-badges" style="margin-top: 10px;">
+            <span class="file-tag" *ngFor="let file of (editingId ? editingPersona.archivos : newPersona.archivos)">
+              📄 {{ file.nombre }}
+            </span>
           </div>
         </div>
       </div>
 
       <div class="form-actions">
-        <button type="submit" class="btn btn-success">{{ editingId ? 'Actualizar' : 'Guardar' }}</button>
+        <button type="submit" class="btn btn-success" [disabled]="loadingFile">
+          {{ editingId ? 'Actualizar Registro' : 'Guardar Persona' }}
+        </button>
         <button type="button" class="btn btn-secondary" (click)="resetForm()">Cancelar</button>
       </div>
     </form>
   </div>
 
   <div class="table-section">
-    <h3>Lista de Personas</h3>
+    <h3>Lista de Registros</h3>
+    
     <div *ngIf="personas.length === 0" class="empty-state">
-      No hay personas registradas
+      No hay personas registradas aún.
     </div>
-    <table *ngIf="personas.length > 0" class="table">
+
+    <table class="table" *ngIf="personas.length > 0">
       <thead>
         <tr>
-          <th>Foto</th>
-          <th>Nombre</th>
-          <th>Email / Empresa</th>
+          <th>Perfil</th>
+          <th>Información</th>
+          <th>Contacto</th>
           <th>Archivos</th>
           <th>Acciones</th>
         </tr>
@@ -85,25 +97,27 @@
       <tbody>
         <tr *ngFor="let persona of personas">
           <td>
-            <img [src]="getFotoUrl(persona.foto)" class="table-avatar" alt="User">
+            <img [src]="getFotoUrl(persona.foto)" class="table-avatar">
           </td>
           <td>
-            <strong>{{ persona.nombre }}</strong><br>
-            <small>{{ persona.telefono }}</small>
+            <div class="primary-text">{{ persona.nombre }}</div>
+            <div class="secondary-text">{{ persona.empresa }}</div>
           </td>
           <td>
-            {{ persona.email }}<br>
-            <small class="text-muted">{{ persona.empresa }}</small>
+            <div class="primary-text">{{ persona.email }}</div>
+            <div class="secondary-text">{{ persona.telefono }}</div>
           </td>
           <td>
-            <div class="files-container">
-              <span *ngFor="let f of persona.archivos" class="file-tag">📄 {{ f }}</span>
-              <span *ngIf="!persona.archivos?.length" class="text-muted small">---</span>
+            <div class="file-badges" *ngIf="persona.archivos && persona.archivos.length > 0; else noFiles">
+              <span class="file-tag" *ngFor="let f of persona.archivos">📄 {{ f.nombre }}</span>
             </div>
+            <ng-template #noFiles><span class="empty-files">Sin archivos</span></ng-template>
           </td>
-          <td class="actions">
-            <button class="btn btn-sm btn-info" (click)="startEdit(persona)">Editar</button>
-            <button class="btn btn-sm btn-danger" (click)="deletePersona(persona.id)">Eliminar</button>
+          <td>
+            <div class="actions">
+              <button class="btn btn-info btn-sm" (click)="startEdit(persona)" *ngIf="isAdmin">Editar</button>
+              <button class="btn btn-danger btn-sm" (click)="deletePersona(persona.id)" *ngIf="isAdmin">Eliminar</button>
+            </div>
           </td>
         </tr>
       </tbody>

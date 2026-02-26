@@ -1,9 +1,9 @@
-export type UserRole = 'admin' | 'instructor' | 'company';
-
 export interface User {
-  id?: number;
+  id?: string; // Asegúrate que sea string
   nombre: string;
   email: string;
-  role: UserRole;
-  assignedCourseIds?: number[];
+  role: 'admin' | 'instructor' | 'company';
+  uid?: string;
+  assignedCourseIds?: string[]; // Array de strings
+  createdAt?: Date;
 }

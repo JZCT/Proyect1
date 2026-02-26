@@ -1,43 +1,63 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormGroup, FormControl, FormsModule, Validators } from '@angular/forms';
+import { FormGroup, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
-import { User } from '../../models/user.model';
-import { ReactiveFormsModule } from '@angular/forms';
-import { routes } from 'src/app/app.routes';
-import { Call } from '@angular/compiler';
-import { RouterEvent, RouterLink, Router } from '@angular/router';
+import { Router } from '@angular/router';
+
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss'
 })
 export class LoginComponent {
-  profileForm = new FormGroup({
-    email: new FormControl('', Validators.required),
-    password: new FormControl('', Validators.required)
+  // Cambiado de profileForm a loginForm para consistencia
+  loginForm = new FormGroup({
+    email: new FormControl('', [Validators.required, Validators.email]),
+    password: new FormControl('', [Validators.required, Validators.minLength(6)])
   });
+
+  errorMessage: string = '';
+  loading: boolean = false;
 
   constructor(private authService: AuthService, private router: Router) {}
 
-  // Este método se llama cuando el usuario hace clic en el botón de inicio de sesión
-  login() {
-    if (this.profileForm.valid) {
-      const email = this.profileForm.get('email')?.value;
-      const password = this.profileForm.get('password')?.value;
-      if (email) {
-        const user: User | null = this.authService.loginByEmail(email);
-        if (user) {
-          this.router.navigate(['/home']);
-        } else {
-          /*alert('Credenciales inválidas');
-          this.profileForm.reset();*/
-          this.router.navigate(['/home']);
-        }
+  async login() {
+    if (this.loginForm.invalid) {
+      this.errorMessage = 'Por favor completa todos los campos correctamente';
+      return;
+    }
+
+    this.loading = true;
+    this.errorMessage = '';
+
+    const email = this.loginForm.get('email')?.value || '';
+    const password = this.loginForm.get('password')?.value || '';
+
+    try {
+      await this.authService.login(email, password);
+      this.router.navigate(['/home']);
+    } catch (error: any) {
+      console.error('Error de login:', error);
+      switch (error.code) {
+        case 'auth/user-not-found':
+          this.errorMessage = 'Usuario no encontrado';
+          break;
+        case 'auth/wrong-password':
+          this.errorMessage = 'Contraseña incorrecta';
+          break;
+        case 'auth/invalid-email':
+          this.errorMessage = 'Email inválido';
+          break;
+        case 'auth/user-disabled':
+          this.errorMessage = 'Usuario deshabilitado';
+          break;
+        default:
+          this.errorMessage = 'Error al iniciar sesión. Intenta de nuevo.';
       }
+    } finally {
+      this.loading = false;
     }
   }
 }
-

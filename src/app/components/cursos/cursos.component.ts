@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CursoService } from '../../services/curso.service';
+import { AuthService } from '../../services/auth.service';
 import { Curso } from '../../models/curso.model';
 
 @Component({
@@ -13,71 +14,147 @@ import { Curso } from '../../models/curso.model';
 })
 export class CursosComponent implements OnInit {
   cursos: Curso[] = [];
-  newCurso: Curso = { nombre: '', descripcion: '',  Fecha_inicio: undefined, Fecha_fin: undefined, nom_representante: '', num_represnetantes: "" };
-  editingId: number | null = null;
-  editingCurso: Curso = { nombre: '', descripcion: '',  Fecha_inicio: undefined, Fecha_fin: undefined, nom_representante: '', num_represnetantes: "" };
   showForm = false;
+  editingId: string | null = null; // Cambiado a string
+  isAdmin = false;
 
-  formatDate(date: Date | string | null | undefined): string | null {
-    if (!date) return null;
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+  newCurso: Partial<Curso> = {
+    nombre: '',
+    descripcion: '',
+    Fecha_inicio: undefined,
+    Fecha_fin: undefined,
+    nom_representante: '',
+    num_represnetantes: ''
+  };
+
+  editingCurso: Partial<Curso> = {
+    nombre: '',
+    descripcion: '',
+    Fecha_inicio: undefined,
+    Fecha_fin: undefined,
+    nom_representante: '',
+    num_represnetantes: ''
+  };
+
+  constructor(
+    private cursoService: CursoService,
+    private authService: AuthService
+  ) {}
+
+  ngOnInit(): void {
+    this.checkAdminStatus();
+    this.loadCursos();
   }
-  constructor(private cursoService: CursoService) {}
 
-  ngOnInit() {
-    this.cursoService.getCursos().subscribe(cursos => {
-      this.cursos = cursos;
+  private checkAdminStatus() {
+    this.authService.isAdmin().subscribe(isAdmin => {
+      this.isAdmin = isAdmin;
+    });
+  }
+
+  loadCursos() {
+    this.cursoService.getCursos().subscribe({
+      next: (cursos) => {
+        this.cursos = cursos;
+        console.log('Cursos cargados:', cursos);
+      },
+      error: (error) => {
+        console.error('Error cargando cursos:', error);
+      }
     });
   }
 
   toggleForm() {
+    if (!this.isAdmin) {
+      alert('No tienes permisos para realizar esta acción');
+      return;
+    }
     this.showForm = !this.showForm;
     if (!this.showForm) {
       this.resetForm();
     }
   }
 
-  addCurso() {
-    if (this.newCurso.nombre 
-      && this.newCurso.descripcion
-       && this.newCurso.Fecha_inicio
-        && this.newCurso.Fecha_fin
-         && this.newCurso.nom_representante
-          && this.newCurso.num_represnetantes) {
-      this.cursoService.addCurso({ ...this.newCurso });
+  async addCurso() {
+    if (!this.isAdmin) return;
+
+    if (!this.newCurso.nombre || !this.newCurso.descripcion) {
+      alert('Nombre y descripción son requeridos');
+      return;
+    }
+
+    try {
+      await this.cursoService.addCurso(this.newCurso as Curso);
       this.resetForm();
+      this.showForm = false;
+      alert('Curso agregado exitosamente');
+    } catch (error) {
+      console.error('Error agregando curso:', error);
+      alert('Error al agregar curso');
     }
   }
 
   startEdit(curso: Curso) {
+    if (!this.isAdmin) return;
+
     this.editingId = curso.id || null;
     this.editingCurso = { ...curso };
     this.showForm = true;
   }
 
-  updateCurso() {
-    if (this.editingId && this.editingCurso.nombre 
-      && this.editingCurso.descripcion 
-      && this.editingCurso.nom_representante) {
-      this.cursoService.updateCurso(this.editingId, this.editingCurso);
+  async updateCurso() {
+    if (!this.isAdmin || !this.editingId) return;
+
+    try {
+      await this.cursoService.updateCurso(this.editingId, this.editingCurso as Curso);
       this.resetForm();
+      alert('Curso actualizado exitosamente');
+    } catch (error) {
+      console.error('Error actualizando curso:', error);
+      alert('Error al actualizar curso');
     }
   }
 
-  deleteCurso(id: number | undefined) {
-    if (id && confirm('¿Estás seguro de eliminar este curso?')) {
-      this.cursoService.deleteCurso(id);
+  async deleteCurso(id: string | undefined) {
+    if (!this.isAdmin || !id) return;
+
+    if (confirm('¿Estás seguro de eliminar este curso?')) {
+      try {
+        await this.cursoService.deleteCurso(id);
+        alert('Curso eliminado exitosamente');
+      } catch (error) {
+        console.error('Error eliminando curso:', error);
+        alert('Error al eliminar curso');
+      }
     }
   }
 
   resetForm() {
-    this.newCurso = { nombre: '', descripcion: '',  Fecha_inicio: undefined, Fecha_fin: undefined, nom_representante: '', num_represnetantes: '' };
+    this.newCurso = {
+      nombre: '',
+      descripcion: '',
+      Fecha_inicio: undefined,
+      Fecha_fin: undefined,
+      nom_representante: '',
+      num_represnetantes: ''
+    };
+    
+    this.editingCurso = {
+      nombre: '',
+      descripcion: '',
+      Fecha_inicio: undefined,
+      Fecha_fin: undefined,
+      nom_representante: '',
+      num_represnetantes: ''
+    };
+    
     this.editingId = null;
-    this.editingCurso = { nombre: '', descripcion: '',  Fecha_inicio: undefined, Fecha_fin: undefined, nom_representante: '', num_represnetantes: '' };
     this.showForm = false;
+  }
+
+  formatDate(date: Date | string | null | undefined): string | null {
+    if (!date) return null;
+    const d = new Date(date);
+    return d.toISOString().split('T')[0];
   }
 }

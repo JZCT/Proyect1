@@ -1,47 +1,49 @@
-<h2>Administración de Usuarios</h2>
+<div *ngIf="isAdmin; else noAccess">
+  <h2>Administración de Usuarios</h2>
 
-<div *ngIf="authService.isAdmin(); else noAccess">
+  <div>
+    <h3>Crear Usuario</h3>
+    
+    <input
+      type="text"
+      placeholder="Nombre completo"
+      [(ngModel)]="newUser.nombre"
+    />
 
-  <h3>Crear Usuario</h3>
+    <input
+      type="email"
+      placeholder="Correo electrónico"
+      [(ngModel)]="newUser.email"
+    />
 
-  <input
-    type="text"
-    placeholder="Nombre"
-    [(ngModel)]="newUser.nombre"
-  />
-
-  <input
-    type="email"
-    placeholder="Correo"
-    [(ngModel)]="newUser.email"
-  />
-
-  <select [(ngModel)]="newUser.role">
-    <option *ngFor="let role of roles" [value]="role">
-      {{ role }}
-    </option>
-  </select>
-
-  <button (click)="addUser()">Agregar Usuario</button>
+    <button (click)="addUser()">
+      Agregar Usuario
+    </button>
+  </div>
 
   <hr>
 
-  <h3>Lista de Usuarios</h3>
+  <div>
+    <h3>Lista de Usuarios ({{ users.length }})</h3>
 
-  <ul>
-    <li *ngFor="let user of users">
-      <strong>{{ user.nombre }}</strong>
-      - {{ user.email }}
-      ({{ user.role }})
+    <ul>
+      <li *ngFor="let user of users">
+        <strong>{{ user.nombre }}</strong> - {{ user.email }}
+        <button (click)="deleteUser(user.id)">
+          Eliminar
+        </button>
+      </li>
+    </ul>
 
-      <button (click)="deleteUser(user.id)">
-        Eliminar
-      </button>
-    </li>
-  </ul>
-
+    <div *ngIf="users.length === 0">
+      No hay usuarios registrados
+    </div>
+  </div>
 </div>
 
 <ng-template #noAccess>
-  <p>No tienes permisos para acceder.</p>
+  <div>
+    <h2>Acceso Denegado</h2>
+    <p>No tienes permisos para acceder a esta sección.</p>
+  </div>
 </ng-template>
