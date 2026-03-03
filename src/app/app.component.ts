@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { AuthService } from './services/auth.service';
 import { filter } from 'rxjs';
-
+import { NotificationComponent } from './components/notification/notification.component';
+import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.component';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, NotificationComponent, ThemeToggleComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })

@@ -1,136 +1,160 @@
-/* CONTENEDOR GENERAL */
 :host {
   display: block;
   padding: 2rem;
   background: #f4f6f9;
   min-height: 100vh;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Segoe UI", sans-serif;
 }
 
-/* TITULOS */
-h2 {
-  text-align: center;
+.container {
+  max-width: 1100px;
+  margin: auto;
+}
+
+.page-header {
   margin-bottom: 2rem;
+}
+
+.page-header h2 {
+  margin: 0;
+  font-size: 24px;
   color: #2c3e50;
 }
 
-h3 {
-  margin: 1.5rem 0 1rem;
-  color: #34495e;
+.subtitle {
+  color: #6c757d;
+  font-size: 14px;
 }
 
-/* PANEL */
-div {
-  max-width: 700px;
-  margin: auto;
-  background: #ffffff;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+.card {
+  background: #fff;
+  padding: 1.8rem;
+  border-radius: 14px;
+  margin-bottom: 2rem;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.05);
 }
 
-/* INPUTS Y SELECT */
-input,
-select {
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px,1fr));
+  gap: 1rem;
+}
+
+.form-group label {
+  font-size: 13px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.form-control {
   width: 100%;
-  padding: 10px 12px;
-  margin-bottom: 12px;
+  padding: 10px;
   border-radius: 8px;
   border: 1px solid #dcdcdc;
-  font-size: 14px;
-  transition: all 0.25s ease;
 }
 
-input:focus,
-select:focus {
+.form-control:focus {
   outline: none;
   border-color: #1976d2;
-  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
 }
 
-/* BOTONES */
-button {
-  background: #1976d2;
-  color: white;
+.password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-field input {
+  flex: 1;
+  padding-right: 40px;
+}
+
+.password-field .btn-icon {
+  position: absolute;
+  right: 10px;
+  background: transparent;
   border: none;
-  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.hint {
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.actions {
+  margin-top: 1.5rem;
+}
+
+.btn {
+  border: none;
+  padding: 8px 15px;
   border-radius: 8px;
   cursor: pointer;
-  font-weight: 600;
-  transition: 0.25s;
-  margin-top: 5px;
 }
 
-button:hover {
-  background: #125ea7;
-  transform: translateY(-1px);
+.btn-primary {
+  background: #1976d2;
+  color: white;
 }
 
-button:active {
-  transform: scale(0.98);
-}
-
-/* BOTON ELIMINAR */
-li button {
+.btn-delete {
   background: #e53935;
-  margin-left: 10px;
-  padding: 6px 12px;
-  font-size: 13px;
+  color: white;
 }
 
-li button:hover {
-  background: #c62828;
-}
-
-/* SEPARADOR */
-hr {
-  margin: 2rem 0;
-  border: none;
-  border-top: 1px solid #eee;
-}
-
-/* LISTA */
-ul {
+.user-list {
   list-style: none;
   padding: 0;
 }
 
-li {
-  background: #f8fafc;
-  margin-bottom: 10px;
-  padding: 12px 14px;
-  border-radius: 8px;
+.user-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: 0.2s;
+  background: #f9fbfd;
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 10px;
 }
 
-li:hover {
-  background: #eef3f8;
-}
-
-/* TEXTO SIN ACCESO */
-p {
-  text-align: center;
-  color: #e53935;
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #1976d2;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-weight: bold;
-  font-size: 16px;
 }
 
-/* RESPONSIVE */
-@media (max-width: 600px) {
-  div {
-    padding: 1.2rem;
-  }
+.user-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 
-  li {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
+.empty-state {
+  text-align: center;
+  color: #6c757d;
+}
 
-  li button {
-    margin-left: 0;
-  }
+.alert.success {
+  margin-top: 1rem;
+  background: #e8f5e9;
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.password-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.warning {
+  font-size: 12px;
+  color: #c62828;
 }

@@ -1,47 +1,167 @@
-<h2>Administración de Usuarios</h2>
+<!-- Usu.component.html -->
+<div class="container">
 
-<div *ngIf="authService.isAdmin(); else noAccess">
+  <header class="page-header">
+    <h2>Administración de Usuarios</h2>
+    <p class="subtitle">Gestiona accesos y roles del sistema</p>
+  </header>
 
-  <h3>Crear Usuario</h3>
+  <!-- CREAR USUARIO -->
+  <section class="card create-card">
+    <div class="card-header">
+      <h3>Crear Usuario</h3>
+    </div>
 
-  <input
-    type="text"
-    placeholder="Nombre"
-    [(ngModel)]="newUser.nombre"
-  />
+    <div class="form-grid">
 
-  <input
-    type="email"
-    placeholder="Correo"
-    [(ngModel)]="newUser.email"
-  />
+      <div class="form-group">
+        <label for="nombreInput">Nombre completo</label>
+        <input
+          type="text"
+          id="nombreInput"
+          placeholder="Ej. Juan Pérez"
+          [(ngModel)]="newUser.nombre"
+          class="form-control"
+        />
+      </div>
 
-  <select [(ngModel)]="newUser.role">
-    <option *ngFor="let role of roles" [value]="role">
-      {{ role }}
-    </option>
-  </select>
+      <div class="form-group">
+        <label for="emailInput">Correo electrónico</label>
+        <input
+          type="email"
+          id="emailInput"
+          placeholder="correo@empresa.com"
+          [(ngModel)]="newUser.email"
+          class="form-control"
+        />
+      </div>
+      
+      
 
-  <button (click)="addUser()">Agregar Usuario</button>
+      <div class="form-group">
+        <label>Rol</label>
+        <select [(ngModel)]="newUser.role" class="form-control">
+          <option *ngFor="let role of roles" [value]="role">
+            {{ role | titlecase }}
+          </option>
+        </select>
+      </div>
 
-  <hr>
+    </div>
 
-  <h3>Lista de Usuarios</h3>
-
-  <ul>
-    <li *ngFor="let user of users">
-      <strong>{{ user.nombre }}</strong>
-      - {{ user.email }}
-      ({{ user.role }})
-
-      <button (click)="deleteUser(user.id)">
-        Eliminar
+    <div class="actions">
+      <button 
+        (click)="addUser()" 
+        class="btn btn-primary"
+        [disabled]="!newUser.nombre || !newUser.email">
+        Guardar Usuario
       </button>
-    </li>
-  </ul>
+    </div>
+
+    <!-- CONTRASEÑA GENERADA -->
+    <div *ngIf="lastCreatedPassword" class="alert success">
+      <strong>Usuario creado correctamente</strong>
+
+      <div class="password-display">
+        <code>{{ lastCreatedPassword }}</code>
+        <button 
+          class="btn-icon"
+          (click)="copyPassword(lastCreatedPassword)"
+          title="Copiar contraseña">
+          📋
+        </button>
+      </div>
+
+      <small class="warning">
+        Guarda esta contraseña, no se mostrará nuevamente
+      </small>
+    </div>
+
+  </section>
+
+  <!-- LISTA USUARIOS -->
+  <section class="card list-card">
+
+    <div class="list-header">
+      <div>
+        <h3>Usuarios Registrados</h3>
+        <small>{{ users.length }} en total</small>
+      </div>
+    </div>
+
+    <div *ngIf="users.length === 0" class="empty-state">
+      <p>No hay usuarios registrados</p>
+      <small>Usa el formulario superior para crear el primero</small>
+    </div>
+
+    <ul *ngIf="users.length > 0" class="user-list">
+      <li *ngFor="let user of users" class="user-item">
+
+        <div class="user-left">
+          <div class="user-avatar">
+            {{ user.nombre.charAt(0) | uppercase }}
+          </div>
+
+          <div class="user-details">
+            <strong>{{ user.nombre }}</strong>
+            <span class="email">{{ user.email }}</span>
+            <span class="role-badge" [ngClass]="'role-' + user.role">
+              {{ user.role }}
+            </span>
+          </div>
+        </div>
+
+        <div class="user-actions">
+
+          <!-- Mostrar contraseña temporal -->
+          <div *ngIf="user.tempPassword" class="password-inline">
+            <code>
+              {{ showPassword[user.id!] ? user.tempPassword : '••••••••' }}
+            </code>
+
+            <button 
+              class="btn-icon small"
+              (click)="togglePassword(user.id!)"
+              [title]="showPassword[user.id!] ? 'Ocultar' : 'Mostrar'">
+              {{ showPassword[user.id!] ? '👁️' : '👁️‍🗨️' }}
+            </button>
+
+            <button 
+              class="btn-icon small"
+              (click)="copyPassword(user.tempPassword!)"
+              title="Copiar">
+              📋
+            </button>
+
+            <button 
+              class="btn-icon small"
+              (click)="regeneratePassword(user.id!, user.email)"
+              title="Regenerar">
+              🔄
+            </button>
+          </div>
+
+          <button 
+            (click)="deleteUser(user.id)" 
+            class="btn btn-delete"
+            title="Eliminar usuario">
+            🗑️
+          </button>
+
+        </div>
+
+      </li>
+    </ul>
+
+  </section>
 
 </div>
 
+<!-- SIN ACCESO -->
 <ng-template #noAccess>
-  <p>No tienes permisos para acceder.</p>
+  <div class="access-denied">
+    <span class="lock-icon">🔒</span>
+    <h3>Acceso Restringido</h3>
+    <p>No tienes permisos para administrar usuarios.</p>
+  </div>
 </ng-template>

@@ -2,7 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CursoService } from '../../services/curso.service';
+import { AuthService } from '../../services/auth.service';
+import { NotificationService } from '../../services/notification.service';
 import { Curso } from '../../models/curso.model';
+import { User } from '../../models/user.model';
 
 @Component({
   selector: 'app-cursos',
@@ -13,71 +16,207 @@ import { Curso } from '../../models/curso.model';
 })
 export class CursosComponent implements OnInit {
   cursos: Curso[] = [];
-  newCurso: Curso = { nombre: '', descripcion: '',  Fecha_inicio: undefined, Fecha_fin: undefined, nom_representante: '', num_represnetantes: "" };
-  editingId: number | null = null;
-  editingCurso: Curso = { nombre: '', descripcion: '',  Fecha_inicio: undefined, Fecha_fin: undefined, nom_representante: '', num_represnetantes: "" };
   showForm = false;
+  editingId: string | null = null;
+  
+  currentUser: User | null = null;
+  isAdmin = false;
+  isInstructor = false;
+  isCompany = false;
 
-  formatDate(date: Date | string | null | undefined): string | null {
-    if (!date) return null;
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+  newCurso: Partial<Curso> = {
+    nombre: '',
+    descripcion: '',
+    fechaInicio: undefined,
+    fechaFin: undefined,
+    nomRepresentante: '',
+    numRepresentantes: '',
+    instructorIds: [],
+    personasIds: []
+  };
+
+  editingCurso: Partial<Curso> = {
+    nombre: '',
+    descripcion: '',
+    fechaInicio: undefined,
+    fechaFin: undefined,
+    nomRepresentante: '',
+    numRepresentantes: '',
+    instructorIds: [],
+    personasIds: []
+  };
+
+  constructor(
+    private cursoService: CursoService,
+    private authService: AuthService,
+    private notificationService: NotificationService
+  ) {}
+
+  ngOnInit(): void {
+    this.loadCurrentUser();
+    this.loadCursos();
   }
-  constructor(private cursoService: CursoService) {}
 
-  ngOnInit() {
-    this.cursoService.getCursos().subscribe(cursos => {
-      this.cursos = cursos;
+  private loadCurrentUser() {
+    this.authService.currentUser$.subscribe(async (firebaseUser) => {
+      if (firebaseUser) {
+        const userData = await this.authService.getUserData(firebaseUser.uid);
+        this.currentUser = userData;
+        this.isAdmin = userData?.role === 'admin';
+        this.isInstructor = userData?.role === 'instructor';
+        this.isCompany = userData?.role === 'company';
+      }
+    });
+  }
+
+  // ========== MÉTODOS DE PERMISOS ==========
+  canCreateCurso(): boolean {
+    return this.isAdmin;
+  }
+
+  canEditCurso(): boolean {
+    return this.isAdmin;
+  }
+
+  canDeleteCurso(): boolean {
+    return this.isAdmin;
+  }
+
+  canViewCurso(): boolean {
+    return true;
+  }
+
+  loadCursos() {
+    this.cursoService.getCursos().subscribe({
+      next: (cursos) => {
+        this.cursos = cursos;
+        console.log('Cursos cargados:', cursos);
+      },
+      error: (error) => {
+        console.error('Error cargando cursos:', error);
+        this.notificationService.showError('Error al cargar los cursos');
+      }
     });
   }
 
   toggleForm() {
+    if (!this.canCreateCurso()) {
+      this.notificationService.showError('No tienes permisos para realizar esta acción');
+      return;
+    }
     this.showForm = !this.showForm;
     if (!this.showForm) {
       this.resetForm();
     }
   }
 
-  addCurso() {
-    if (this.newCurso.nombre 
-      && this.newCurso.descripcion
-       && this.newCurso.Fecha_inicio
-        && this.newCurso.Fecha_fin
-         && this.newCurso.nom_representante
-          && this.newCurso.num_represnetantes) {
-      this.cursoService.addCurso({ ...this.newCurso });
+  async addCurso() {
+    if (!this.canCreateCurso()) return;
+
+    if (
+      !this.newCurso.nombre || 
+      !this.newCurso.descripcion || 
+      !this.newCurso.fechaInicio || 
+      !this.newCurso.fechaFin || 
+      !this.newCurso.nomRepresentante || 
+      !this.newCurso.numRepresentantes
+    ) {
+      this.notificationService.showWarning('Por favor completa todos los campos');
+      return;
+    }
+
+    try {
+      await this.cursoService.addCurso({
+        ...this.newCurso as Curso,
+        personasIds: [],
+        instructorIds: []
+      });
       this.resetForm();
+      this.showForm = false;
+      this.notificationService.showSuccess('✅ Curso agregado exitosamente');
+      this.loadCursos();
+    } catch (error) {
+      console.error('Error agregando curso:', error);
+      this.notificationService.showError('❌ Error al agregar curso');
     }
   }
 
   startEdit(curso: Curso) {
+    if (!this.canEditCurso()) {
+      this.notificationService.showError('No tienes permisos para editar cursos');
+      return;
+    }
+
     this.editingId = curso.id || null;
     this.editingCurso = { ...curso };
     this.showForm = true;
   }
 
-  updateCurso() {
-    if (this.editingId && this.editingCurso.nombre 
-      && this.editingCurso.descripcion 
-      && this.editingCurso.nom_representante) {
-      this.cursoService.updateCurso(this.editingId, this.editingCurso);
+  async updateCurso() {
+    if (!this.canEditCurso() || !this.editingId) {
+      this.notificationService.showError('No tienes permisos para editar cursos');
+      return;
+    }
+
+    try {
+      await this.cursoService.updateCurso(this.editingId, this.editingCurso as Curso);
       this.resetForm();
+      this.notificationService.showSuccess('✅ Curso actualizado exitosamente');
+      this.loadCursos();
+    } catch (error) {
+      console.error('Error actualizando curso:', error);
+      this.notificationService.showError('❌ Error al actualizar curso');
     }
   }
 
-  deleteCurso(id: number | undefined) {
-    if (id && confirm('¿Estás seguro de eliminar este curso?')) {
-      this.cursoService.deleteCurso(id);
+  async deleteCurso(id: string | undefined) {
+    if (!this.canDeleteCurso() || !id) {
+      this.notificationService.showError('No tienes permisos para eliminar cursos');
+      return;
+    }
+
+    if (confirm('¿Estás seguro de eliminar este curso?')) {
+      try {
+        await this.cursoService.deleteCurso(id);
+        this.notificationService.showSuccess('✅ Curso eliminado exitosamente');
+        this.loadCursos();
+      } catch (error) {
+        console.error('Error eliminando curso:', error);
+        this.notificationService.showError('❌ Error al eliminar curso');
+      }
     }
   }
 
   resetForm() {
-    this.newCurso = { nombre: '', descripcion: '',  Fecha_inicio: undefined, Fecha_fin: undefined, nom_representante: '', num_represnetantes: '' };
+    this.newCurso = {
+      nombre: '',
+      descripcion: '',
+      fechaInicio: undefined,
+      fechaFin: undefined,
+      nomRepresentante: '',
+      numRepresentantes: '',
+      instructorIds: [],
+      personasIds: []
+    };
+    
+    this.editingCurso = {
+      nombre: '',
+      descripcion: '',
+      fechaInicio: undefined,
+      fechaFin: undefined,
+      nomRepresentante: '',
+      numRepresentantes: '',
+      instructorIds: [],
+      personasIds: []
+    };
+    
     this.editingId = null;
-    this.editingCurso = { nombre: '', descripcion: '',  Fecha_inicio: undefined, Fecha_fin: undefined, nom_representante: '', num_represnetantes: '' };
     this.showForm = false;
+  }
+
+  formatDate(date: Date | string | null | undefined): string | null {
+    if (!date) return null;
+    const d = new Date(date);
+    return d.toISOString().split('T')[0];
   }
 }

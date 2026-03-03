@@ -3,7 +3,10 @@
   <!-- HEADER -->
   <div class="header">
     <h2>Gestión de Cursos</h2>
-    <button class="btn btn-primary" (click)="toggleForm()">
+    <button 
+      class="btn btn-primary" 
+      (click)="toggleForm()"
+      *ngIf="canCreateCurso()">
       {{ showForm ? 'Cerrar' : 'Agregar Curso' }}
     </button>
   </div>
@@ -16,8 +19,6 @@
       class="form"
       (ngSubmit)="editingId ? updateCurso() : addCurso()"
     >
-
-      <!-- Nombre -->
       <div class="form-group">
         <label for="nombre">Nombre del Curso:</label>
         <input
@@ -26,13 +27,10 @@
           name="nombre"
           required
           [ngModel]="editingId ? editingCurso.nombre : newCurso.nombre"
-          (ngModelChange)="editingId
-            ? (editingCurso.nombre = $event)
-            : (newCurso.nombre = $event)"
+          (ngModelChange)="editingId ? (editingCurso.nombre = $event) : (newCurso.nombre = $event)"
         />
       </div>
 
-      <!-- Descripción -->
       <div class="form-group">
         <label for="descripcion">Descripción:</label>
         <textarea
@@ -41,90 +39,66 @@
           rows="4"
           required
           [ngModel]="editingId ? editingCurso.descripcion : newCurso.descripcion"
-          (ngModelChange)="editingId
-            ? (editingCurso.descripcion = $event)
-            : (newCurso.descripcion = $event)"
+          (ngModelChange)="editingId ? (editingCurso.descripcion = $event) : (newCurso.descripcion = $event)"
         ></textarea>
       </div>
 
-      <!-- Fecha Inicio -->
       <div class="form-group">
-        <label for="Fecha_inicio">Fecha de Inicio:</label>
+        <label for="fechaInicio">Fecha de Inicio:</label>
         <input
           type="date"
-          id="Fecha_inicio"
-          name="Fecha_inicio"
+          id="fechaInicio"
+          name="fechaInicio"
           required
-          [ngModel]="editingId
-            ? formatDate(editingCurso.Fecha_inicio)
-            : formatDate(newCurso.Fecha_inicio)"
-          (ngModelChange)="editingId
-            ? (editingCurso.Fecha_inicio = $event)
-            : (newCurso.Fecha_inicio = $event)"
+          [ngModel]="editingId ? formatDate(editingCurso.fechaInicio) : formatDate(newCurso.fechaInicio)"
+          (ngModelChange)="editingId ? (editingCurso.fechaInicio = $event) : (newCurso.fechaInicio = $event)"
         />
       </div>
 
-      <!-- Fecha Fin -->
       <div class="form-group">
-        <label for="fecha_fin">Fecha de Fin:</label>
+        <label for="fechaFin">Fecha de Fin:</label>
         <input
           type="date"
-          id="fecha_fin"
-          name="fecha_fin"
+          id="fechaFin"
+          name="fechaFin"
           required
-          [ngModel]="editingId
-            ? (editingCurso.Fecha_fin | date:'yyyy-MM-dd')
-            : (newCurso.Fecha_fin | date:'yyyy-MM-dd')"
-          (ngModelChange)="editingId
-            ? (editingCurso.Fecha_fin = $event)
-            : (newCurso.Fecha_fin = $event)"
+          [ngModel]="editingId ? (editingCurso.fechaFin | date:'yyyy-MM-dd') : (newCurso.fechaFin | date:'yyyy-MM-dd')"
+          (ngModelChange)="editingId ? (editingCurso.fechaFin = $event) : (newCurso.fechaFin = $event)"
         />
       </div>
 
-      <!-- Representante -->
       <div class="form-group">
-        <label for="nom_representante">Representante:</label>
+        <label for="nomRepresentante">Representante:</label>
         <input
           type="text"
-          id="nom_representante"
-          name="nom_representante"
+          id="nomRepresentante"
+          name="nomRepresentante"
           placeholder="Nombre del representante"
           required
-          [ngModel]="editingId
-            ? editingCurso.nom_representante
-            : newCurso.nom_representante"
-          (ngModelChange)="editingId
-            ? (editingCurso.nom_representante = $event)
-            : (newCurso.nom_representante = $event)"
+          [ngModel]="editingId ? editingCurso.nomRepresentante : newCurso.nomRepresentante"
+          (ngModelChange)="editingId ? (editingCurso.nomRepresentante = $event) : (newCurso.nomRepresentante = $event)"
         />
       </div>
 
-      <!-- Número Representantes -->
       <div class="form-group">
-        <label for="num_representante">
+        <label for="numRepresentantes">
           Número de Representantes:
         </label>
         <input
           type="text"
-          id="num_representante"
-          name="num_representante"
+          id="numRepresentantes"
+          name="numRepresentantes"
           placeholder="Número de representantes"
           required
-          [ngModel]="editingId
-            ? editingCurso.num_represnetantes
-            : newCurso.num_represnetantes"
-          (ngModelChange)="editingId
-            ? (editingCurso.num_represnetantes = $event)
-            : (newCurso.num_represnetantes = $event)"
+          [ngModel]="editingId ? editingCurso.numRepresentantes : newCurso.numRepresentantes"
+          (ngModelChange)="editingId ? (editingCurso.numRepresentantes = $event) : (newCurso.numRepresentantes = $event)"
         />
       </div>
 
-      <!-- BOTONES -->
       <div class="form-actions">
         <button type="submit" class="btn btn-success">
           {{ editingId ? 'Actualizar' : 'Guardar' }}
         </button>
-
         <button
           type="button"
           class="btn btn-secondary"
@@ -133,7 +107,6 @@
           Cancelar
         </button>
       </div>
-
     </form>
   </div>
 
@@ -151,42 +124,39 @@
           <th>ID</th>
           <th>Nombre</th>
           <th>Descripción</th>
-          <th>Fecha de Inicio</th>
+          <th>Fecha Inicio</th>
           <th>Fecha Fin</th>
           <th>Representante</th>
-          <th>Número de Representantes</th>
+          <th>Teléfono</th>
           <th>Acciones</th>
         </tr>
       </thead>
-
       <tbody>
         <tr *ngFor="let curso of cursos">
-          <td>{{ curso.id }}</td>
+          <td>{{ curso.id?.substring(0,6) }}...</td>
           <td>{{ curso.nombre }}</td>
-          <td>{{ curso.descripcion }}</td>
-          <td>{{ curso.Fecha_inicio | date }}</td>
-          <td>{{ curso.Fecha_fin | date }}</td>
-          <td>{{ curso.nom_representante }}</td>
-          <td>{{ curso.num_represnetantes }}</td>
-
+          <td>{{ curso.descripcion | slice:0:30 }}...</td>
+          <td>{{ curso.fechaInicio | date }}</td>
+          <td>{{ curso.fechaFin | date }}</td>
+          <td>{{ curso.nomRepresentante }}</td>
+          <td>{{ curso.numRepresentantes }}</td>
           <td class="actions">
             <button
               class="btn btn-sm btn-info"
               (click)="startEdit(curso)"
-            >
+              *ngIf="canEditCurso()">
               Editar
             </button>
-
             <button
               class="btn btn-sm btn-danger"
               (click)="deleteCurso(curso.id)"
-            >
+              *ngIf="canDeleteCurso()">
               Eliminar
             </button>
+            <span *ngIf="!canEditCurso()" class="view-only">🔍 Ver</span>
           </td>
         </tr>
       </tbody>
     </table>
-
   </div>
 </div>

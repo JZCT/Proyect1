@@ -1,9 +1,14 @@
-export type UserRole = 'admin' | 'instructor' | 'company';
-
+// src/app/models/user.model.ts
 export interface User {
-  id?: number;
+  id?: string;
   nombre: string;
   email: string;
-  role: UserRole;
-  assignedCourseIds?: number[];
+  role: 'admin' | 'instructor' | 'company';
+  uid: string;
+  assignedCourseIds?: string[];
+  createdAt?: Date;
+  // 👇 NUEVOS CAMPOS
+  tempPassword?: string;      // Contraseña temporal (solo para usuarios de prueba)
+  isTestUser?: boolean;       // Marcar si es usuario de prueba
+  lastPasswordReset?: Date;   // Último cambio de contraseña
 }
