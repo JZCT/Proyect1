@@ -17,13 +17,11 @@ body {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
-// Estilos para pantallas normales (no login)
 body:not(.login-page) {
-  background-color: #c2c2c200;
+  background-color: #f5f5f5;
   color: #333;
 }
 
-// Estilos para pantalla de login
 body.login-page {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #000;
@@ -48,4 +46,166 @@ app-root.login-page main {
   padding: 0;
   max-width: 100%;
   margin: 0;
+}
+
+/* Badges de roles - AÑADIR ESTO */
+.role-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 8px;
+  text-transform: uppercase;
+}
+
+.role-admin {
+  background: #ef4444;
+  color: white;
+}
+
+.role-instructor {
+  background: #3b82f6;
+  color: white;
+}
+
+.role-company {
+  background: #10b981;
+  color: white;
+}
+
+/* Indicador de solo lectura - AÑADIR ESTO */
+.view-only {
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+  padding: 4px 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  display: inline-block;
+}
+// styles.scss - Agregar al final
+
+/* ===== TEMA OSCURO ===== */
+body.dark-theme {
+  background: #1a1a1a;
+  color: #e5e5e5;
+
+  // Componentes principales
+  .cursos-panel, .grupos-panel, .panel, .card, .form-section, .table-section {
+    background: #2d2d2d;
+    color: #e5e5e5;
+  }
+
+  // Headers
+  header {
+    background: #2d2d2d !important;
+  }
+
+  // Inputs
+  input, select, textarea {
+    background: #3d3d3d;
+    color: #e5e5e5;
+    border-color: #4d4d4d;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: #6366f1;
+  }
+
+  // Tablas
+  .table thead {
+    background: #3d3d3d;
+  }
+
+  .table td {
+    border-top-color: #4d4d4d;
+  }
+
+  .table tbody tr:hover {
+    background: #3d3d3d;
+  }
+
+  // Listas
+  .list-item {
+    background: #3d3d3d;
+  }
+
+  .list-item:hover {
+    background: #4d4d4d;
+  }
+
+  // Badges y etiquetas
+  .badge-personas, .badge-instructores {
+    opacity: 0.9;
+  }
+
+  // Textos
+  h1, h2, h3, h4, h5 {
+    color: #f5f5f5;
+  }
+
+  p, span {
+    color: #e5e5e5;
+  }
+
+  // Bordes
+  .curso-item {
+    background: #3d3d3d;
+  }
+
+  .curso-item:hover {
+    background: #4d4d4d;
+  }
+
+  // Botones secundarios
+  .btn-secondary {
+    background: #4d4d4d;
+    color: #e5e5e5;
+  }
+
+  .btn-secondary:hover {
+    background: #5d5d5d;
+  }
+
+  // Notificaciones
+  .notification-container {
+    border: 1px solid #4d4d4d;
+  }
+
+  // Modales
+  .modal-container {
+    background: #2d2d2d;
+  }
+
+  .modal-header, .modal-footer {
+    border-color: #4d4d4d;
+  }
+
+  .close-btn {
+    color: #e5e5e5;
+  }
+
+  .close-btn:hover {
+    background: #4d4d4d;
+  }
+
+  // Scrollbar
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #2d2d2d;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #4d4d4d;
+    border-radius: 5px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #5d5d5d;
+  }
 }

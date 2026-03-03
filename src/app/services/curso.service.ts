@@ -7,9 +7,7 @@ import {
   doc, 
   deleteDoc, 
   updateDoc,
-  query,
-  where,
-  getDocs 
+  getDoc
 } from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
 import { Curso } from '../models/curso.model';
@@ -18,6 +16,7 @@ import { Curso } from '../models/curso.model';
   providedIn: 'root'
 })
 export class CursoService {
+
   private cursosCollection;
 
   constructor(private firestore: Firestore) {
@@ -33,11 +32,19 @@ export class CursoService {
   async addCurso(curso: Curso): Promise<void> {
     try {
       const newCurso = {
-        ...curso,
+        nombre: curso.nombre,
+        descripcion: curso.descripcion,
+        fechaInicio: curso.fechaInicio,           // ✅ Nombre actualizado
+        fechaFin: curso.fechaFin,                  // ✅ Nombre actualizado
+        nomRepresentante: curso.nomRepresentante,  // ✅ Nombre actualizado
+        numRepresentantes: curso.numRepresentantes, // ✅ Nombre actualizado
         personasIds: curso.personasIds || [],
+        instructorIds: curso.instructorIds || [],
         createdAt: new Date()
       };
+
       await addDoc(this.cursosCollection, newCurso);
+
     } catch (error) {
       console.error('Error agregando curso:', error);
       throw error;
@@ -48,7 +55,11 @@ export class CursoService {
   async updateCurso(id: string, curso: Partial<Curso>): Promise<void> {
     try {
       const cursoDoc = doc(this.firestore, `cursos/${id}`);
-      await updateDoc(cursoDoc, { ...curso });
+      
+      // Mapear los campos si es necesario
+      const updateData: any = { ...curso };
+      
+      await updateDoc(cursoDoc, updateData);
     } catch (error) {
       console.error('Error actualizando curso:', error);
       throw error;
@@ -69,13 +80,13 @@ export class CursoService {
   // Obtener curso por ID
   async getCursoById(id: string): Promise<Curso | null> {
     try {
-      const q = query(this.cursosCollection, where('__name__', '==', id));
-      const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-        return querySnapshot.docs[0].data() as Curso;
-      }
-      return null;
+      const cursoDoc = doc(this.firestore, `cursos/${id}`);
+      const snap = await getDoc(cursoDoc);
+
+      if (!snap.exists()) return null;
+
+      return { id: snap.id, ...snap.data() } as Curso;
+
     } catch (error) {
       console.error('Error obteniendo curso:', error);
       return null;
@@ -87,11 +98,12 @@ export class CursoService {
     try {
       const cursoDoc = doc(this.firestore, `cursos/${cursoId}`);
       const curso = await this.getCursoById(cursoId);
-      
+
       if (curso) {
         const personasIds = [...(curso.personasIds || []), personaId];
         await updateDoc(cursoDoc, { personasIds });
       }
+
     } catch (error) {
       console.error('Error agregando persona al curso:', error);
       throw error;
@@ -103,13 +115,48 @@ export class CursoService {
     try {
       const cursoDoc = doc(this.firestore, `cursos/${cursoId}`);
       const curso = await this.getCursoById(cursoId);
-      
+
       if (curso && curso.personasIds) {
         const personasIds = curso.personasIds.filter(id => id !== personaId);
         await updateDoc(cursoDoc, { personasIds });
       }
+
     } catch (error) {
       console.error('Error removiendo persona del curso:', error);
+      throw error;
+    }
+  }
+
+  // Agregar instructor a curso
+  async addInstructorToCurso(cursoId: string, instructorId: string): Promise<void> {
+    try {
+      const cursoDoc = doc(this.firestore, `cursos/${cursoId}`);
+      const curso = await this.getCursoById(cursoId);
+
+      if (curso) {
+        const instructorIds = [...(curso.instructorIds || []), instructorId];
+        await updateDoc(cursoDoc, { instructorIds });
+      }
+
+    } catch (error) {
+      console.error('Error agregando instructor al curso:', error);
+      throw error;
+    }
+  }
+
+  // Remover instructor de curso
+  async removeInstructorFromCurso(cursoId: string, instructorId: string): Promise<void> {
+    try {
+      const cursoDoc = doc(this.firestore, `cursos/${cursoId}`);
+      const curso = await this.getCursoById(cursoId);
+
+      if (curso && curso.instructorIds) {
+        const instructorIds = curso.instructorIds.filter(id => id !== instructorId);
+        await updateDoc(cursoDoc, { instructorIds });
+      }
+
+    } catch (error) {
+      console.error('Error removiendo instructor del curso:', error);
       throw error;
     }
   }

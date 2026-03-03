@@ -3,7 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CursoService } from '../../services/curso.service';
 import { AuthService } from '../../services/auth.service';
+import { NotificationService } from '../../services/notification.service';
 import { Curso } from '../../models/curso.model';
+import { User } from '../../models/user.model';
 
 @Component({
   selector: 'app-cursos',
@@ -15,41 +17,73 @@ import { Curso } from '../../models/curso.model';
 export class CursosComponent implements OnInit {
   cursos: Curso[] = [];
   showForm = false;
-  editingId: string | null = null; // Cambiado a string
+  editingId: string | null = null;
+  
+  currentUser: User | null = null;
   isAdmin = false;
+  isInstructor = false;
+  isCompany = false;
 
   newCurso: Partial<Curso> = {
     nombre: '',
     descripcion: '',
-    Fecha_inicio: undefined,
-    Fecha_fin: undefined,
-    nom_representante: '',
-    num_represnetantes: ''
+    fechaInicio: undefined,
+    fechaFin: undefined,
+    nomRepresentante: '',
+    numRepresentantes: '',
+    instructorIds: [],
+    personasIds: []
   };
 
   editingCurso: Partial<Curso> = {
     nombre: '',
     descripcion: '',
-    Fecha_inicio: undefined,
-    Fecha_fin: undefined,
-    nom_representante: '',
-    num_represnetantes: ''
+    fechaInicio: undefined,
+    fechaFin: undefined,
+    nomRepresentante: '',
+    numRepresentantes: '',
+    instructorIds: [],
+    personasIds: []
   };
 
   constructor(
     private cursoService: CursoService,
-    private authService: AuthService
+    private authService: AuthService,
+    private notificationService: NotificationService
   ) {}
 
   ngOnInit(): void {
-    this.checkAdminStatus();
+    this.loadCurrentUser();
     this.loadCursos();
   }
 
-  private checkAdminStatus() {
-    this.authService.isAdmin().subscribe(isAdmin => {
-      this.isAdmin = isAdmin;
+  private loadCurrentUser() {
+    this.authService.currentUser$.subscribe(async (firebaseUser) => {
+      if (firebaseUser) {
+        const userData = await this.authService.getUserData(firebaseUser.uid);
+        this.currentUser = userData;
+        this.isAdmin = userData?.role === 'admin';
+        this.isInstructor = userData?.role === 'instructor';
+        this.isCompany = userData?.role === 'company';
+      }
     });
+  }
+
+  // ========== MÉTODOS DE PERMISOS ==========
+  canCreateCurso(): boolean {
+    return this.isAdmin;
+  }
+
+  canEditCurso(): boolean {
+    return this.isAdmin;
+  }
+
+  canDeleteCurso(): boolean {
+    return this.isAdmin;
+  }
+
+  canViewCurso(): boolean {
+    return true;
   }
 
   loadCursos() {
@@ -60,13 +94,14 @@ export class CursosComponent implements OnInit {
       },
       error: (error) => {
         console.error('Error cargando cursos:', error);
+        this.notificationService.showError('Error al cargar los cursos');
       }
     });
   }
 
   toggleForm() {
-    if (!this.isAdmin) {
-      alert('No tienes permisos para realizar esta acción');
+    if (!this.canCreateCurso()) {
+      this.notificationService.showError('No tienes permisos para realizar esta acción');
       return;
     }
     this.showForm = !this.showForm;
@@ -76,26 +111,41 @@ export class CursosComponent implements OnInit {
   }
 
   async addCurso() {
-    if (!this.isAdmin) return;
+    if (!this.canCreateCurso()) return;
 
-    if (!this.newCurso.nombre || !this.newCurso.descripcion) {
-      alert('Nombre y descripción son requeridos');
+    if (
+      !this.newCurso.nombre || 
+      !this.newCurso.descripcion || 
+      !this.newCurso.fechaInicio || 
+      !this.newCurso.fechaFin || 
+      !this.newCurso.nomRepresentante || 
+      !this.newCurso.numRepresentantes
+    ) {
+      this.notificationService.showWarning('Por favor completa todos los campos');
       return;
     }
 
     try {
-      await this.cursoService.addCurso(this.newCurso as Curso);
+      await this.cursoService.addCurso({
+        ...this.newCurso as Curso,
+        personasIds: [],
+        instructorIds: []
+      });
       this.resetForm();
       this.showForm = false;
-      alert('Curso agregado exitosamente');
+      this.notificationService.showSuccess('✅ Curso agregado exitosamente');
+      this.loadCursos();
     } catch (error) {
       console.error('Error agregando curso:', error);
-      alert('Error al agregar curso');
+      this.notificationService.showError('❌ Error al agregar curso');
     }
   }
 
   startEdit(curso: Curso) {
-    if (!this.isAdmin) return;
+    if (!this.canEditCurso()) {
+      this.notificationService.showError('No tienes permisos para editar cursos');
+      return;
+    }
 
     this.editingId = curso.id || null;
     this.editingCurso = { ...curso };
@@ -103,28 +153,36 @@ export class CursosComponent implements OnInit {
   }
 
   async updateCurso() {
-    if (!this.isAdmin || !this.editingId) return;
+    if (!this.canEditCurso() || !this.editingId) {
+      this.notificationService.showError('No tienes permisos para editar cursos');
+      return;
+    }
 
     try {
       await this.cursoService.updateCurso(this.editingId, this.editingCurso as Curso);
       this.resetForm();
-      alert('Curso actualizado exitosamente');
+      this.notificationService.showSuccess('✅ Curso actualizado exitosamente');
+      this.loadCursos();
     } catch (error) {
       console.error('Error actualizando curso:', error);
-      alert('Error al actualizar curso');
+      this.notificationService.showError('❌ Error al actualizar curso');
     }
   }
 
   async deleteCurso(id: string | undefined) {
-    if (!this.isAdmin || !id) return;
+    if (!this.canDeleteCurso() || !id) {
+      this.notificationService.showError('No tienes permisos para eliminar cursos');
+      return;
+    }
 
     if (confirm('¿Estás seguro de eliminar este curso?')) {
       try {
         await this.cursoService.deleteCurso(id);
-        alert('Curso eliminado exitosamente');
+        this.notificationService.showSuccess('✅ Curso eliminado exitosamente');
+        this.loadCursos();
       } catch (error) {
         console.error('Error eliminando curso:', error);
-        alert('Error al eliminar curso');
+        this.notificationService.showError('❌ Error al eliminar curso');
       }
     }
   }
@@ -133,19 +191,23 @@ export class CursosComponent implements OnInit {
     this.newCurso = {
       nombre: '',
       descripcion: '',
-      Fecha_inicio: undefined,
-      Fecha_fin: undefined,
-      nom_representante: '',
-      num_represnetantes: ''
+      fechaInicio: undefined,
+      fechaFin: undefined,
+      nomRepresentante: '',
+      numRepresentantes: '',
+      instructorIds: [],
+      personasIds: []
     };
     
     this.editingCurso = {
       nombre: '',
       descripcion: '',
-      Fecha_inicio: undefined,
-      Fecha_fin: undefined,
-      nom_representante: '',
-      num_represnetantes: ''
+      fechaInicio: undefined,
+      fechaFin: undefined,
+      nomRepresentante: '',
+      numRepresentantes: '',
+      instructorIds: [],
+      personasIds: []
     };
     
     this.editingId = null;

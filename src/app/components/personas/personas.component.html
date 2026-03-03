@@ -1,9 +1,92 @@
 <div class="crud-container">
   <div class="header">
     <h2>Gestión de Personas</h2>
-    <button class="btn btn-primary" (click)="toggleForm()" *ngIf="isAdmin">
-      {{ showForm ? 'Cerrar' : 'Agregar Persona' }}
-    </button>
+    <div class="header-actions">
+      <button 
+        class="btn btn-success" 
+        (click)="triggerFileUpload()" 
+        *ngIf="canCreatePersona()"
+        [disabled]="loadingFile">
+        {{ loadingFile ? 'Cargando...' : '📥 Importar desde Excel' }}
+      </button>
+      <input #excelInput type="file" accept=".xlsx, .xls" (change)="onExcelSelected($event)" hidden>
+      
+      <button 
+        class="btn btn-primary" 
+        (click)="toggleForm()" 
+        *ngIf="canCreatePersona()">
+        {{ showForm ? 'Cerrar' : 'Agregar Persona' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE ASIGNACIÓN POR CIUDAD -->
+  <div *ngIf="showCityAssignment" class="modal-overlay" (click)="closeCityAssignment()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <h3>Asignar Personas por Ciudad a Curso</h3>
+      
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Seleccionar Ciudad:</label>
+          <select [(ngModel)]="selectedCity" class="form-control">
+            <option [ngValue]="null">-- Seleccionar ciudad --</option>
+            <option *ngFor="let city of availableCities" [value]="city">
+              {{ city }} ({{ getPersonasPorCiudad(city).length }} personas)
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group" *ngIf="selectedCity">
+          <label>Personas en {{ selectedCity }}:</label>
+          <div class="city-personas-list">
+            <div *ngFor="let persona of getPersonasPorCiudad(selectedCity)" class="persona-chip">
+              <img [src]="getFotoUrl(persona.foto)" class="chip-avatar" (error)="handleImageError($event)">
+              <span>{{ persona.nombre }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Seleccionar Curso:</label>
+          <select [(ngModel)]="selectedCursoId" class="form-control">
+            <option [ngValue]="null">-- Seleccionar curso --</option>
+            <option *ngFor="let curso of cursos" [value]="curso.id">
+              {{ curso.nombre }} ({{ curso.personasIds?.length || 0 }} personas)
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button 
+          class="btn btn-primary" 
+          [disabled]="!selectedCity || !selectedCursoId || loadingAssignment"
+          (click)="assignCityToCurso()">
+          {{ loadingAssignment ? 'Asignando...' : 'Asignar Ciudad al Curso' }}
+        </button>
+        <button class="btn btn-secondary" (click)="closeCityAssignment()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BARRA DE PROGRESO DE IMPORTACIÓN -->
+  <div *ngIf="loadingFile && importProgress > 0" class="import-progress">
+    <div class="progress-bar">
+      <div class="progress-fill" [style.width.%]="importProgress"></div>
+    </div>
+    <p style="text-align: center; margin-top: 5px; font-size: 12px;">Importando... {{ importProgress }}%</p>
+  </div>
+
+  <!-- RESUMEN DE IMPORTACIÓN -->
+  <div *ngIf="importResult" class="import-summary" [class.success]="importResult.errors.length === 0" [class.warning]="importResult.errors.length > 0">
+    <p><strong>📊 Resultado de importación:</strong></p>
+    <p>✅ {{ importResult.success }} personas importadas correctamente</p>
+    <p *ngIf="importResult.errors.length > 0">⚠️ {{ importResult.errors.length }} errores:</p>
+    <ul *ngIf="importResult.errors.length > 0">
+      <li *ngFor="let error of importResult.errors.slice(0, 5)">{{ error }}</li>
+      <li *ngIf="importResult.errors.length > 5">... y {{ importResult.errors.length - 5 }} más</li>
+    </ul>
+    <button class="btn btn-sm btn-secondary" (click)="importResult = null">Cerrar</button>
   </div>
 
   <div *ngIf="showForm" class="form-section">
@@ -11,7 +94,7 @@
 
     <div class="photo-preview-wrapper">
       <div style="position: relative;">
-        <img [src]="getFotoUrl(editingId ? editingPersona.foto : newPersona.foto)" class="main-preview">
+        <img [src]="getFotoUrl(editingId ? editingPersona.foto : newPersona.foto)" class="main-preview" (error)="handleImageError($event)">
         
         <button type="button" class="btn btn-primary btn-sm" 
           (click)="triggerCamera()" 
@@ -57,6 +140,14 @@
             name="empresa" placeholder="Nombre de la empresa" />
         </div>
 
+        <div class="form-group">
+          <label>Ciudad</label>
+          <input type="text" 
+            [ngModel]="editingId ? editingPersona.ciudad : newPersona.ciudad"
+            (ngModelChange)="editingId ? editingPersona.ciudad = $event : newPersona.ciudad = $event"
+            name="ciudad" placeholder="Ciudad" />
+        </div>
+
         <div class="form-group" style="grid-column: 1 / -1;">
           <label>Documentos Adicionales</label>
           <input type="file" (change)="onFilesSelected($event)" multiple class="file-input" />
@@ -78,7 +169,15 @@
   </div>
 
   <div class="table-section">
-    <h3>Lista de Registros</h3>
+    <div class="table-header">
+      <h3>Lista de Registros</h3>
+      <button 
+        *ngIf="canCreatePersona() && availableCities.length > 0" 
+        class="btn btn-info btn-sm"
+        (click)="openCityAssignment()">
+        🏙️ Asignar Ciudad a Curso
+      </button>
+    </div>
     
     <div *ngIf="personas.length === 0" class="empty-state">
       No hay personas registradas aún.
@@ -90,6 +189,7 @@
           <th>Perfil</th>
           <th>Información</th>
           <th>Contacto</th>
+          <th>Ciudad</th>
           <th>Archivos</th>
           <th>Acciones</th>
         </tr>
@@ -97,7 +197,7 @@
       <tbody>
         <tr *ngFor="let persona of personas">
           <td>
-            <img [src]="getFotoUrl(persona.foto)" class="table-avatar">
+            <img [src]="getFotoUrl(persona.foto)" class="table-avatar" (error)="handleImageError($event)">
           </td>
           <td>
             <div class="primary-text">{{ persona.nombre }}</div>
@@ -108,6 +208,9 @@
             <div class="secondary-text">{{ persona.telefono }}</div>
           </td>
           <td>
+            <span class="city-badge">{{ persona.ciudad || 'Sin ciudad' }}</span>
+          </td>
+          <td>
             <div class="file-badges" *ngIf="persona.archivos && persona.archivos.length > 0; else noFiles">
               <span class="file-tag" *ngFor="let f of persona.archivos">📄 {{ f.nombre }}</span>
             </div>
@@ -115,8 +218,19 @@
           </td>
           <td>
             <div class="actions">
-              <button class="btn btn-info btn-sm" (click)="startEdit(persona)" *ngIf="isAdmin">Editar</button>
-              <button class="btn btn-danger btn-sm" (click)="deletePersona(persona.id)" *ngIf="isAdmin">Eliminar</button>
+              <button 
+                class="btn btn-info btn-sm" 
+                (click)="startEdit(persona)" 
+                *ngIf="canEditPersona()">
+                Editar
+              </button>
+              <button 
+                class="btn btn-danger btn-sm" 
+                (click)="deletePersona(persona.id)" 
+                *ngIf="canDeletePersona()">
+                Eliminar
+              </button>
+              <span *ngIf="!canEditPersona()" class="view-only">🔍 Solo lectura</span>
             </div>
           </td>
         </tr>

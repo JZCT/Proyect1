@@ -1,63 +1,87 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormGroup, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
-import { AuthService } from '../../services/auth.service';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms'; // IMPORTAR ReactiveFormsModule
 import { Router } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
+import { NotificationService } from 'src/app/services/notification.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule], // AGREGAR ReactiveFormsModule y NotificationComponent
   templateUrl: './login.component.html',
-  styleUrl: './login.component.scss'
+  styleUrls: ['./login.component.scss']
 })
-export class LoginComponent {
-  // Cambiado de profileForm a loginForm para consistencia
-  loginForm = new FormGroup({
-    email: new FormControl('', [Validators.required, Validators.email]),
-    password: new FormControl('', [Validators.required, Validators.minLength(6)])
-  });
+export class LoginComponent implements OnInit {
+  loginForm!: FormGroup; 
+  loading = false;
+  errorMessage = '';
 
-  errorMessage: string = '';
-  loading: boolean = false;
+  constructor(
+    private fb: FormBuilder, 
+    private authService: AuthService,
+    private router: Router,
+    private notificationService: NotificationService
+  ) {}
 
-  constructor(private authService: AuthService, private router: Router) {}
+  ngOnInit(): void {
+    // 👇 INICIALIZAR EL FORMULARIO
+    this.loginForm = this.fb.group({
+      email: ['', [Validators.required, Validators.email]],
+      password: ['', [Validators.required, Validators.minLength(6)]]
+    });
+  }
 
-  async login() {
+  // 👇 MÉTODO onSubmit (antes llamado login)
+  onSubmit(): void {
     if (this.loginForm.invalid) {
-      this.errorMessage = 'Por favor completa todos los campos correctamente';
+      this.markAllAsTouched();
       return;
     }
 
     this.loading = true;
     this.errorMessage = '';
 
-    const email = this.loginForm.get('email')?.value || '';
-    const password = this.loginForm.get('password')?.value || '';
+    const { email, password } = this.loginForm.value;
 
-    try {
-      await this.authService.login(email, password);
-      this.router.navigate(['/home']);
-    } catch (error: any) {
-      console.error('Error de login:', error);
-      switch (error.code) {
-        case 'auth/user-not-found':
-          this.errorMessage = 'Usuario no encontrado';
-          break;
-        case 'auth/wrong-password':
-          this.errorMessage = 'Contraseña incorrecta';
-          break;
-        case 'auth/invalid-email':
-          this.errorMessage = 'Email inválido';
-          break;
-        case 'auth/user-disabled':
-          this.errorMessage = 'Usuario deshabilitado';
-          break;
-        default:
-          this.errorMessage = 'Error al iniciar sesión. Intenta de nuevo.';
-      }
-    } finally {
-      this.loading = false;
-    }
+    this.authService.login(email, password)
+      .then(() => {
+        console.log('Login exitoso');
+        this.router.navigate(['/']);
+      })
+      .catch((error: any) => {
+        console.error('Error de login:', error);
+        
+        // Manejar errores específicos
+        switch (error.code) {
+          case 'auth/invalid-credential':
+          case 'auth/user-not-found':
+          case 'auth/wrong-password':
+            this.errorMessage = 'Email o contraseña incorrectos';
+            break;
+          case 'auth/too-many-requests':
+            this.errorMessage = 'Demasiados intentos fallidos. Intenta más tarde';
+            break;
+          case 'auth/user-disabled':
+            this.errorMessage = 'Esta cuenta ha sido deshabilitada';
+            break;
+          default:
+            this.errorMessage = 'Error al iniciar sesión. Intenta de nuevo';
+        }
+      })
+      .finally(() => {
+        this.loading = false;
+      });
   }
+
+  // 👇 MÉTODO AUXILIAR para marcar todos los campos como tocados
+  private markAllAsTouched(): void {
+    Object.values(this.loginForm.controls).forEach(control => {
+      control.markAsTouched();
+    });
+  }
+
+  // 👇 GETTERS para facilitar el acceso en el template
+  get email() { return this.loginForm.get('email'); }
+  get password() { return this.loginForm.get('password'); }
 }

@@ -1,12 +1,13 @@
 export interface Curso {
-  id?: string; // Asegúrate que sea string
+  id?: string;
   nombre: string;
   descripcion: string;
-  Fecha_inicio?: Date;
-  Fecha_fin?: Date;
-  nom_representante: string;
-  num_represnetantes: string;
-  personasIds?: string[]; // Array de strings
+  fechaInicio?: Date;           // ✅ Cambiado de Fecha_inicio
+  fechaFin?: Date;              // ✅ Cambiado de Fecha_fin
+  nomRepresentante: string;     // ✅ Cambiado de nom_representante
+  numRepresentantes: string;    // ✅ CORREGIDO el typo
+  personasIds?: string[];
+  instructorIds?: string[];
   createdAt?: Date;
   createdBy?: string;
 }

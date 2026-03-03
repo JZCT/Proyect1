@@ -303,3 +303,158 @@
     padding: 20px;
   }
 }
+/* ===== HEADER ACTIONS ===== */
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ===== MODAL ===== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 20px;
+  padding: 30px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  color: #0f172a;
+  font-size: 22px;
+}
+
+.modal-body {
+  margin: 20px 0;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+/* ===== CITY PERSONAS LIST ===== */
+.city-personas-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8fafc;
+}
+
+.persona-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.persona-chip:last-child {
+  border-bottom: none;
+}
+
+.chip-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* ===== TABLE HEADER ===== */
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.table-header h3 {
+  margin: 0;
+}
+
+/* ===== CITY BADGE ===== */
+.city-badge {
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-block;
+}
+
+/* ===== IMPORT PROGRESS ===== */
+.import-progress {
+  margin: 15px 0;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  transition: width 0.3s ease;
+}
+
+.import-summary {
+  margin: 15px 0;
+  padding: 15px;
+  border-radius: 10px;
+  animation: slideIn 0.3s ease;
+}
+
+.import-summary.success {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+}
+
+.import-summary.warning {
+  background: #fef9c3;
+  border: 1px solid #facc15;
+}
+
+.import-summary ul {
+  margin: 10px 0;
+  padding-left: 20px;
+  color: #92400e;
+  font-size: 12px;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
