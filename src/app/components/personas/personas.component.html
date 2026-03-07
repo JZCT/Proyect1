@@ -1,195 +1,83 @@
 <div class="crud-container">
   <div class="header">
     <h2>Gestión de Personas</h2>
-    <div class="header-actions">
-      <button 
-        class="btn btn-success" 
-        (click)="triggerFileUpload()" 
-        *ngIf="canCreatePersona()"
-        [disabled]="loadingFile">
-        {{ loadingFile ? 'Cargando...' : '📥 Importar desde Excel' }}
-      </button>
-      <input #excelInput type="file" accept=".xlsx, .xls" (change)="onExcelSelected($event)" hidden>
-      
-      <button 
-        class="btn btn-primary" 
-        (click)="toggleForm()" 
-        *ngIf="canCreatePersona()">
-        {{ showForm ? 'Cerrar' : 'Agregar Persona' }}
-      </button>
-    </div>
-  </div>
-
-  <!-- MODAL DE ASIGNACIÓN POR CIUDAD -->
-  <div *ngIf="showCityAssignment" class="modal-overlay" (click)="closeCityAssignment()">
-    <div class="modal-content" (click)="$event.stopPropagation()">
-      <h3>Asignar Personas por Ciudad a Curso</h3>
-      
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Seleccionar Ciudad:</label>
-          <select [(ngModel)]="selectedCity" class="form-control">
-            <option [ngValue]="null">-- Seleccionar ciudad --</option>
-            <option *ngFor="let city of availableCities" [value]="city">
-              {{ city }} ({{ getPersonasPorCiudad(city).length }} personas)
-            </option>
-          </select>
-        </div>
-
-        <div class="form-group" *ngIf="selectedCity">
-          <label>Personas en {{ selectedCity }}:</label>
-          <div class="city-personas-list">
-            <div *ngFor="let persona of getPersonasPorCiudad(selectedCity)" class="persona-chip">
-              <img [src]="getFotoUrl(persona.foto)" class="chip-avatar" (error)="handleImageError($event)">
-              <span>{{ persona.nombre }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Seleccionar Curso:</label>
-          <select [(ngModel)]="selectedCursoId" class="form-control">
-            <option [ngValue]="null">-- Seleccionar curso --</option>
-            <option *ngFor="let curso of cursos" [value]="curso.id">
-              {{ curso.nombre }} ({{ curso.personasIds?.length || 0 }} personas)
-            </option>
-          </select>
-        </div>
-      </div>
-
-      <div class="modal-actions">
-        <button 
-          class="btn btn-primary" 
-          [disabled]="!selectedCity || !selectedCursoId || loadingAssignment"
-          (click)="assignCityToCurso()">
-          {{ loadingAssignment ? 'Asignando...' : 'Asignar Ciudad al Curso' }}
-        </button>
-        <button class="btn btn-secondary" (click)="closeCityAssignment()">Cancelar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- BARRA DE PROGRESO DE IMPORTACIÓN -->
-  <div *ngIf="loadingFile && importProgress > 0" class="import-progress">
-    <div class="progress-bar">
-      <div class="progress-fill" [style.width.%]="importProgress"></div>
-    </div>
-    <p style="text-align: center; margin-top: 5px; font-size: 12px;">Importando... {{ importProgress }}%</p>
-  </div>
-
-  <!-- RESUMEN DE IMPORTACIÓN -->
-  <div *ngIf="importResult" class="import-summary" [class.success]="importResult.errors.length === 0" [class.warning]="importResult.errors.length > 0">
-    <p><strong>📊 Resultado de importación:</strong></p>
-    <p>✅ {{ importResult.success }} personas importadas correctamente</p>
-    <p *ngIf="importResult.errors.length > 0">⚠️ {{ importResult.errors.length }} errores:</p>
-    <ul *ngIf="importResult.errors.length > 0">
-      <li *ngFor="let error of importResult.errors.slice(0, 5)">{{ error }}</li>
-      <li *ngIf="importResult.errors.length > 5">... y {{ importResult.errors.length - 5 }} más</li>
-    </ul>
-    <button class="btn btn-sm btn-secondary" (click)="importResult = null">Cerrar</button>
+    <button class="btn btn-primary" (click)="toggleForm()">
+      {{ showForm ? 'Cerrar' : 'Agregar Persona' }}
+    </button>
   </div>
 
   <div *ngIf="showForm" class="form-section">
     <h3>{{ editingId ? 'Editar Persona' : 'Nueva Persona' }}</h3>
-
-    <div class="photo-preview-wrapper">
-      <div style="position: relative;">
-        <img [src]="getFotoUrl(editingId ? editingPersona.foto : newPersona.foto)" class="main-preview" (error)="handleImageError($event)">
-        
-        <button type="button" class="btn btn-primary btn-sm" 
-          (click)="triggerCamera()" 
-          style="position: absolute; bottom: 0; right: 0; border-radius: 50%; width: 35px; height: 35px; padding: 0;">
-          {{ loadingFile ? '...' : '📷' }}
-        </button>
-      </div>
-      
-      <input #photoInput type="file" accept="image/*" capture="user" (change)="onPhotoSelected($event)" hidden>
+    
+    <div class="photo-preview-container">
+      <img [src]="getFotoUrl(editingId ? editingPersona.foto : newPersona.foto)" 
+           alt="Vista previa" class="photo-preview">
     </div>
 
-    <form (ngSubmit)="editingId ? updatePersona() : addPersona()">
+    <form (ngSubmit)="editingId ? updatePersona() : addPersona()" class="form">
       <div class="form-grid">
         <div class="form-group">
-          <label>Nombre Completo</label>
-          <input type="text" 
+          <label for="nombre">Nombre:</label>
+          <input type="text" id="nombre" name="nombre" required
             [ngModel]="editingId ? editingPersona.nombre : newPersona.nombre"
-            (ngModelChange)="editingId ? editingPersona.nombre = $event : newPersona.nombre = $event"
-            name="nombre" placeholder="Nombre de la persona" required />
+            (ngModelChange)="editingId ? (editingPersona.nombre = $event) : (newPersona.nombre = $event)" />
         </div>
 
         <div class="form-group">
-          <label>Email</label>
-          <input type="email" 
+          <label for="foto">URL de la Foto:</label>
+          <input type="text" id="foto" name="foto" placeholder="https://ejemplo.com/foto.jpg"
+            [ngModel]="editingId ? editingPersona.foto : newPersona.foto"
+            (ngModelChange)="editingId ? (editingPersona.foto = $event) : (newPersona.foto = $event)" />
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email:</label>
+          <input type="email" id="email" name="email" required
             [ngModel]="editingId ? editingPersona.email : newPersona.email"
-            (ngModelChange)="editingId ? editingPersona.email = $event : newPersona.email = $event"
-            name="email" placeholder="correo@ejemplo.com" required />
+            (ngModelChange)="editingId ? (editingPersona.email = $event) : (newPersona.email = $event)" />
         </div>
 
         <div class="form-group">
-          <label>Teléfono</label>
-          <input type="tel" 
-            [ngModel]="editingId ? editingPersona.telefono : newPersona.telefono"
-            (ngModelChange)="editingId ? editingPersona.telefono = $event : newPersona.telefono = $event"
-            name="telefono" placeholder="+52 ..." />
-        </div>
-
-        <div class="form-group">
-          <label>Empresa</label>
-          <input type="text" 
+          <label for="empresa">Empresa:</label>
+          <input type="text" id="empresa" name="empresa" required
             [ngModel]="editingId ? editingPersona.empresa : newPersona.empresa"
-            (ngModelChange)="editingId ? editingPersona.empresa = $event : newPersona.empresa = $event"
-            name="empresa" placeholder="Nombre de la empresa" />
+            (ngModelChange)="editingId ? (editingPersona.empresa = $event) : (newPersona.empresa = $event)" />
         </div>
 
         <div class="form-group">
-          <label>Ciudad</label>
-          <input type="text" 
-            [ngModel]="editingId ? editingPersona.ciudad : newPersona.ciudad"
-            (ngModelChange)="editingId ? editingPersona.ciudad = $event : newPersona.ciudad = $event"
-            name="ciudad" placeholder="Ciudad" />
+          <label for="telefono">Teléfono:</label>
+          <input type="tel" id="telefono" name="telefono" required
+            [ngModel]="editingId ? editingPersona.telefono : newPersona.telefono"
+            (ngModelChange)="editingId ? (editingPersona.telefono = $event) : (newPersona.telefono = $event)" />
         </div>
 
-        <div class="form-group" style="grid-column: 1 / -1;">
-          <label>Documentos Adicionales</label>
-          <input type="file" (change)="onFilesSelected($event)" multiple class="file-input" />
-          <div class="file-badges" style="margin-top: 10px;">
-            <span class="file-tag" *ngFor="let file of (editingId ? editingPersona.archivos : newPersona.archivos)">
-              📄 {{ file.nombre }}
-            </span>
+        <div class="form-group">
+          <label for="archivos">Adjuntar Archivos:</label>
+          <input type="file" (change)="onFilesSelected($event)" class="file-input" multiple />
+          <div class="file-list-preview" *ngIf="(editingId ? editingPersona.archivos : newPersona.archivos)?.length">
+            <small>Seleccionados: {{ (editingId ? editingPersona.archivos : newPersona.archivos)?.join(', ') }}</small>
           </div>
         </div>
       </div>
 
       <div class="form-actions">
-        <button type="submit" class="btn btn-success" [disabled]="loadingFile">
-          {{ editingId ? 'Actualizar Registro' : 'Guardar Persona' }}
-        </button>
+        <button type="submit" class="btn btn-success">{{ editingId ? 'Actualizar' : 'Guardar' }}</button>
         <button type="button" class="btn btn-secondary" (click)="resetForm()">Cancelar</button>
       </div>
     </form>
   </div>
 
   <div class="table-section">
-    <div class="table-header">
-      <h3>Lista de Registros</h3>
-      <button 
-        *ngIf="canCreatePersona() && availableCities.length > 0" 
-        class="btn btn-info btn-sm"
-        (click)="openCityAssignment()">
-        🏙️ Asignar Ciudad a Curso
-      </button>
-    </div>
-    
+    <h3>Lista de Personas</h3>
     <div *ngIf="personas.length === 0" class="empty-state">
-      No hay personas registradas aún.
+      No hay personas registradas
     </div>
-
-    <table class="table" *ngIf="personas.length > 0">
+    <table *ngIf="personas.length > 0" class="table">
       <thead>
         <tr>
-          <th>Perfil</th>
-          <th>Información</th>
-          <th>Contacto</th>
-          <th>Ciudad</th>
+          <th>Foto</th>
+          <th>Nombre</th>
+          <th>Email / Empresa</th>
           <th>Archivos</th>
           <th>Acciones</th>
         </tr>
@@ -197,41 +85,25 @@
       <tbody>
         <tr *ngFor="let persona of personas">
           <td>
-            <img [src]="getFotoUrl(persona.foto)" class="table-avatar" (error)="handleImageError($event)">
+            <img [src]="getFotoUrl(persona.foto)" class="table-avatar" alt="User">
           </td>
           <td>
-            <div class="primary-text">{{ persona.nombre }}</div>
-            <div class="secondary-text">{{ persona.empresa }}</div>
+            <strong>{{ persona.nombre }}</strong><br>
+            <small>{{ persona.telefono }}</small>
           </td>
           <td>
-            <div class="primary-text">{{ persona.email }}</div>
-            <div class="secondary-text">{{ persona.telefono }}</div>
+            {{ persona.email }}<br>
+            <small class="text-muted">{{ persona.empresa }}</small>
           </td>
           <td>
-            <span class="city-badge">{{ persona.ciudad || 'Sin ciudad' }}</span>
-          </td>
-          <td>
-            <div class="file-badges" *ngIf="persona.archivos && persona.archivos.length > 0; else noFiles">
-              <span class="file-tag" *ngFor="let f of persona.archivos">📄 {{ f.nombre }}</span>
+            <div class="files-container">
+              <span *ngFor="let f of persona.archivos" class="file-tag">📄 {{ f }}</span>
+              <span *ngIf="!persona.archivos?.length" class="text-muted small">---</span>
             </div>
-            <ng-template #noFiles><span class="empty-files">Sin archivos</span></ng-template>
           </td>
-          <td>
-            <div class="actions">
-              <button 
-                class="btn btn-info btn-sm" 
-                (click)="startEdit(persona)" 
-                *ngIf="canEditPersona()">
-                Editar
-              </button>
-              <button 
-                class="btn btn-danger btn-sm" 
-                (click)="deletePersona(persona.id)" 
-                *ngIf="canDeletePersona()">
-                Eliminar
-              </button>
-              <span *ngIf="!canEditPersona()" class="view-only">🔍 Solo lectura</span>
-            </div>
+          <td class="actions">
+            <button class="btn btn-sm btn-info" (click)="startEdit(persona)">Editar</button>
+            <button class="btn btn-sm btn-danger" (click)="deletePersona(persona.id)">Eliminar</button>
           </td>
         </tr>
       </tbody>

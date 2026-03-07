@@ -13,16 +13,9 @@
 
       <div class="panel-header">
         <h3>Cursos</h3>
-        <button 
-          *ngIf="user.role === 'admin'" 
-          class="btn btn-sm btn-primary" 
-          (click)="toggleCursoForm()"
-        >
-          {{ showCursoForm ? '✕' : '➕ Nuevo Curso' }}
-        </button>
       </div>
       
-      <!-- FORMULARIO CURSOS SOLO ADMIN -->
+      <!-- FORMULARIO SOLO ADMIN -->
       <div
         *ngIf="showCursoForm && user.role === 'admin'"
         class="form-section"
@@ -33,6 +26,7 @@
           (ngSubmit)="editingCursoId ? updateCurso() : addCurso()"
           class="form"
         >
+
           <div class="form-group">
             <label>Nombre:</label>
             <input
@@ -40,7 +34,9 @@
               name="curso_nombre"
               required
               [ngModel]="editingCursoId ? editingCurso.nombre : newCurso.nombre"
-              (ngModelChange)="editingCursoId ? (editingCurso.nombre = $event) : (newCurso.nombre = $event)"
+              (ngModelChange)="editingCursoId
+                ? (editingCurso.nombre = $event)
+                : (newCurso.nombre = $event)"
             />
           </div>
 
@@ -51,7 +47,9 @@
               name="curso_descripcion"
               required
               [ngModel]="editingCursoId ? editingCurso.descripcion : newCurso.descripcion"
-              (ngModelChange)="editingCursoId ? (editingCurso.descripcion = $event) : (newCurso.descripcion = $event)"
+              (ngModelChange)="editingCursoId
+                ? (editingCurso.descripcion = $event)
+                : (newCurso.descripcion = $event)"
             ></textarea>
           </div>
 
@@ -61,8 +59,12 @@
               type="date"
               name="curso_fecha_inicio"
               required
-              [ngModel]="editingCursoId ? formatDate(editingCurso.fechaInicio) : formatDate(newCurso.fechaInicio)"
-              (ngModelChange)="editingCursoId ? (editingCurso.fechaInicio = $event) : (newCurso.fechaInicio = $event)"
+              [ngModel]="editingCursoId
+                ? formatDate(editingCurso.Fecha_inicio)
+                : formatDate(newCurso.Fecha_inicio)"
+              (ngModelChange)="editingCursoId
+                ? (editingCurso.Fecha_inicio = $event)
+                : (newCurso.Fecha_inicio = $event)"
             />
           </div>
 
@@ -72,35 +74,45 @@
               type="date"
               name="curso_fecha_fin"
               required
-              [ngModel]="editingCursoId ? formatDate(editingCurso.fechaFin) : formatDate(newCurso.fechaFin)"
-              (ngModelChange)="editingCursoId ? (editingCurso.fechaFin = $event) : (newCurso.fechaFin = $event)"
+              [ngModel]="editingCursoId
+                ? formatDate(editingCurso.Fecha_fin)
+                : formatDate(newCurso.Fecha_fin)"
+              (ngModelChange)="editingCursoId
+                ? (editingCurso.Fecha_fin = $event)
+                : (newCurso.Fecha_fin = $event)"
             />
           </div>
 
           <div class="form-group">
             <label>Representante:</label>
+
             <input
               type="text"
               name="curso_representante"
               placeholder="Nombre del representante"
               required
-              [ngModel]="editingCursoId ? editingCurso.nomRepresentante : newCurso.nomRepresentante"
-              (ngModelChange)="editingCursoId ? (editingCurso.nomRepresentante = $event) : (newCurso.nomRepresentante = $event)"
+              [ngModel]="editingCursoId
+                ? editingCurso.nom_representante
+                : newCurso.nom_representante"
+              (ngModelChange)="editingCursoId
+                ? (editingCurso.nom_representante = $event)
+                : (newCurso.nom_representante = $event)"
             />
-          </div>
 
-          <div class="form-group">
-            <label>Teléfono Representante:</label>
             <input
               type="text"
               name="curso_num_representantes"
-              placeholder="Número de teléfono"
+              placeholder="Número de teléfono del representante"
               required
               maxlength="10"
               pattern="[0-9]*"
               inputmode="numeric"
-              [ngModel]="editingCursoId ? editingCurso.numRepresentantes : newCurso.numRepresentantes"
-              (ngModelChange)="editingCursoId ? (editingCurso.numRepresentantes = $event) : (newCurso.numRepresentantes = $event)"
+              [ngModel]="editingCursoId
+                ? editingCurso.num_represnetantes
+                : newCurso.num_represnetantes"
+              (ngModelChange)="editingCursoId
+                ? (editingCurso.num_represnetantes = $event)
+                : (newCurso.num_represnetantes = $event)"
             />
           </div>
 
@@ -117,11 +129,13 @@
               Cancelar
             </button>
           </div>
+
         </form>
       </div>
 
       <!-- LISTA CURSOS -->
       <div class="cursos-list">
+
         <div *ngIf="cursos.length === 0" class="empty-state">
           No hay cursos registrados
         </div>
@@ -132,27 +146,28 @@
           [class.selected]="selectedCurso?.id === curso.id"
           (click)="selectCurso(curso)"
         >
+
           <div class="curso-info">
             <h5>{{ curso.nombre }}</h5>
-            <p class="curso-descripcion">{{ curso.descripcion }}</p>
-            <p class="curso-fechas">
-              📅 {{ curso.fechaInicio | date }} → {{ curso.fechaFin | date }}
+            <p>{{ curso.descripcion }}</p>
+            <p>
+              Inicio: {{ curso.Fecha_inicio | date }}
+              | Fin: {{ curso.Fecha_fin | date }}
             </p>
-            <p class="curso-representante">
-              👤 {{ curso.nomRepresentante }} | 📞 {{ curso.numRepresentantes }}
+            <p>
+              Representante: {{ curso.nom_representante }}
+              | Teléfono: {{ curso.num_represnetantes }}
             </p>
-            <div class="curso-stats">
-              <span class="badge-personas">👥 {{ curso.personasIds?.length || 0 }} personas</span>
-              <span class="badge-instructores">👨‍🏫 {{ curso.instructorIds?.length || 0 }}/3 instructores</span>
-            </div>
           </div>
 
           <!-- BOTONES SOLO ADMIN -->
-          <div class="curso-actions" *ngIf="user.role === 'admin'">
+          <div
+            class="curso-actions"
+            *ngIf="user.role === 'admin'"
+          >
             <button
               class="btn btn-sm btn-info"
               (click)="startEditCurso(curso); $event.stopPropagation()"
-              title="Editar curso"
             >
               ✏️
             </button>
@@ -160,215 +175,94 @@
             <button
               class="btn btn-sm btn-danger"
               (click)="deleteCurso(curso.id); $event.stopPropagation()"
-              title="Eliminar curso"
             >
               🗑️
             </button>
           </div>
+
         </div>
       </div>
     </div>
 
-    <!-- ================= PANEL DETALLE DEL CURSO ================= -->
+    <!-- ================= PANEL PERSONAS ================= -->
     <div class="grupos-panel">
-      
-      <!-- Si no hay curso seleccionado -->
-      <div *ngIf="!selectedCurso" class="empty-state large">
-        <span class="empty-icon">📌</span>
-        <h3>Selecciona un curso</h3>
-        <p>Haz clic en cualquier curso para ver y gestionar sus personas e instructores</p>
+
+      <div *ngIf="selectedCurso" class="panel-header">
+        <h3>
+          Personas de:
+          <strong>{{ selectedCurso.nombre }}</strong>
+        </h3>
       </div>
 
-      <!-- Si hay curso seleccionado -->
-      <div *ngIf="selectedCurso" class="curso-detalle">
-        
-        <!-- Cabecera del curso seleccionado -->
-        <div class="detalle-header">
-          <h3>{{ selectedCurso.nombre }}</h3>
-          <div class="detalle-meta">
-            <p><strong>Descripción:</strong> {{ selectedCurso.descripcion }}</p>
-            <p><strong>Fechas:</strong> {{ selectedCurso.fechaInicio | date }} - {{ selectedCurso.fechaFin | date }}</p>
-            <p><strong>Representante:</strong> {{ selectedCurso.nomRepresentante }} | {{ selectedCurso.numRepresentantes }}</p>
-          </div>
-        </div>
+      <div *ngIf="!selectedCurso" class="empty-state">
+        Selecciona un curso para ver y gestionar personas
+      </div>
 
-        <!-- ========== SECCIÓN PERSONAS ========== -->
-        <div class="section-card">
-          <div class="section-title">
-            <h4>👥 Personas en el curso ({{ personasEnCurso.length }})</h4>
-          </div>
+      <!-- ASIGNAR PERSONA (SOLO ADMIN) -->
+      <div
+        *ngIf="selectedCurso && user.role === 'instructor' || user.role === 'admin'"
+        class="form-section"
+      >
+        <h4>Asignar persona</h4>
 
-          <!-- ASIGNAR PERSONA (SOLO ADMIN/INSTRUCTOR CON PERMISO) -->
-          <div
-            *ngIf="canManagePersonas()"
-            class="asignar-section"
-          >
-            <h5>Asignar nueva persona</h5>
-            <div class="form-row">
-              <select 
-                [(ngModel)]="selectedPersonaToAdd" 
-                name="persona_select"
-                class="form-control"
-              >
-                <option [ngValue]="null">-- Seleccionar persona --</option>
-                <option
-                  *ngFor="let p of personasDisponibles"
-                  [ngValue]="p.id"
-                >
-                  {{ p.nombre }} ({{ p.email }})
-                </option>
-              </select>
+        <div class="form-group">
+          <label>Personas disponibles:</label>
 
-              <button
-                class="btn btn-primary"
-                (click)="addPersonaToCurso(selectedPersonaToAdd)"
-                [disabled]="!selectedPersonaToAdd"
-              >
-                Asignar
-              </button>
-            </div>
-            <small *ngIf="personasDisponibles.length === 0" class="text-muted">
-              No hay personas disponibles para asignar
-            </small>
-          </div>
+          <select [(ngModel)]="selectedPersonaToAdd" name="persona_select">
+            <option [ngValue]="null">-- Seleccionar --</option>
 
-          <!-- LISTA DE PERSONAS ASIGNADAS -->
-          <div class="items-list">
-            <div *ngIf="personasEnCurso.length === 0" class="empty-state small">
-              No hay personas asignadas a este curso
-            </div>
-
-            <div
-              *ngFor="let persona of personasEnCurso"
-              class="list-item"
+            <option
+              *ngFor="let p of personasDisponibles"
+              [ngValue]="p.id"
             >
-              <div class="item-avatar">
-                <img 
-                  [src]="persona.foto || 'assets/default-avatar.png'" 
-                  (error)="handleImageError($event)"
-                >
-              </div>
+              {{ p.nombre }} ({{ p.email }})
+            </option>
+          </select>
 
-              <div class="item-info">
-                <div class="item-name">{{ persona.nombre }}</div>
-                <div class="item-details">{{ persona.email }} | {{ persona.telefono || 'Sin teléfono' }}</div>
-                <div class="item-empresa" *ngIf="persona.empresa">{{ persona.empresa }}</div>
-              </div>
-
-              <!-- BOTÓN REMOVER (SOLO ADMIN/INSTRUCTOR CON PERMISO) -->
-              <div class="item-actions" *ngIf="canManagePersonas()">
-                <button
-                  class="btn btn-danger btn-sm"
-                  (click)="removePersonaFromCurso(persona.id)"
-                  title="Remover del curso"
-                >
-                  ✕ Remover
-                </button>
-              </div>
-              <div class="item-actions" *ngIf="!canManagePersonas()">
-                <span class="badge badge-secondary">Asignado</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ========== SECCIÓN INSTRUCTORES ========== -->
-        <div class="section-card">
-          <div class="section-title">
-            <h4>👨‍🏫 Instructores ({{ instructoresEnCurso.length }}/3)</h4>
-            <div class="progress-indicator">
-              <div 
-                class="progress-bar-small" 
-                [style.width.%]="(instructoresEnCurso.length / 3) * 100"
-                [class.full]="instructoresEnCurso.length >= 3"
-              ></div>
-              <span>{{ instructoresEnCurso.length }}/3</span>
-            </div>
-          </div>
-
-          <!-- ASIGNAR INSTRUCTOR (SOLO ADMIN) -->
-          <div
-            *ngIf="canManageInstructores()"
-            class="asignar-section"
+          <button
+            class="btn btn-sm btn-primary"
+            (click)="addPersonaToCurso(selectedPersonaToAdd)"
           >
-            <h5>Asignar instructor</h5>
-            <div class="form-row">
-              <select 
-                [(ngModel)]="selectedInstructorToAdd" 
-                name="instructor_select"
-                class="form-control"
-                [disabled]="maxInstructoresAlcanzado"
-              >
-                <option [ngValue]="null">
-                  {{ maxInstructoresAlcanzado ? '⚠️ Límite alcanzado (3/3)' : '-- Seleccionar instructor --' }}
-                </option>
-                <option
-                  *ngFor="let ins of instructoresDisponibles"
-                  [ngValue]="ins.id"
-                >
-                  {{ ins.nombre }} ({{ ins.telefono }})
-                </option>
-              </select>
-
-              <button
-                class="btn btn-primary"
-                (click)="addInstructorToCurso(selectedInstructorToAdd)"
-                [disabled]="!selectedInstructorToAdd || maxInstructoresAlcanzado"
-              >
-                Asignar
-              </button>
-            </div>
-            <div *ngIf="maxInstructoresAlcanzado" class="warning-message">
-              ⚠️ El curso ya tiene el máximo de 3 instructores
-            </div>
-            <small *ngIf="instructoresDisponibles.length === 0 && !maxInstructoresAlcanzado" class="text-muted">
-              No hay instructores disponibles
-            </small>
-          </div>
-
-          <!-- Mensaje para no-admin -->
-          <div *ngIf="!canManageInstructores() && isInstructor()" class="info-message">
-            ℹ️ Solo los administradores pueden gestionar instructores
-          </div>
-
-          <!-- LISTA DE INSTRUCTORES ASIGNADOS -->
-          <div class="items-list">
-            <div *ngIf="instructoresEnCurso.length === 0" class="empty-state small">
-              No hay instructores asignados a este curso
-            </div>
-
-            <div
-              *ngFor="let instructor of instructoresEnCurso"
-              class="list-item"
-            >
-              <div class="item-avatar">
-                <img 
-                  [src]="instructor.foto || 'assets/default-avatar.png'" 
-                  (error)="handleImageError($event)"
-                >
-              </div>
-
-              <div class="item-info">
-                <div class="item-name">{{ instructor.nombre }}</div>
-                <div class="item-details">📞 {{ instructor.telefono }}</div>
-                <div *ngIf="instructor.especialidad" class="item-badge">{{ instructor.especialidad }}</div>
-              </div>
-
-              <!-- BOTÓN REMOVER (SOLO ADMIN) -->
-              <div class="item-actions" *ngIf="canManageInstructores()">
-                <button
-                  class="btn btn-danger btn-sm"
-                  (click)="removeInstructorFromCurso(instructor.id)"
-                  title="Remover del curso"
-                >
-                  ✕ Remover
-                </button>
-              </div>
-            </div>
-          </div>
+            Añadir
+          </button>
         </div>
       </div>
+
+      <!-- PERSONAS ASIGNADAS -->
+      <div *ngIf="selectedCurso" class="grupos-list">
+
+        <div *ngIf="personasEnCurso.length === 0" class="empty-state">
+          No hay personas asignadas a este curso
+        </div>
+
+        <div
+          *ngFor="let persona of personasEnCurso"
+          class="grupo-item"
+        >
+
+          <div class="grupo-info">
+            <h5>{{ persona.nombre }}</h5>
+            <p>{{ persona.email }} | {{ persona.telefono }}</p>
+          </div>
+
+          <!-- REMOVER SOLO ADMIN -->
+          <div
+            class="grupo-actions"
+            *ngIf="user.role === 'instructor' || user.role === 'admin'"
+          >
+            <button
+              class="btn btn-sm btn-danger"
+              (click)="removePersonaFromCurso(persona.id)"
+            >
+              Remover
+            </button>
+          </div>
+
+        </div>
+      </div>
+
     </div>
+
   </div>
 </div>
 

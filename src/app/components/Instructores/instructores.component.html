@@ -1,309 +1,82 @@
-<div class="instructores-container">
-  <!-- HEADER -->
-  <div class="header">
-    <h2>👨‍🏫 Gestión de Instructores</h2>
-    <div class="header-actions">
-      <button 
-        class="btn btn-primary" 
-        (click)="showForm = !showForm"
-        *ngIf="canCreateInstructor()">
-        {{ showForm ? '✕ Cerrar' : '➕ Nuevo Instructor' }}
+<div class="contenedor">
+
+  <!-- ===== FORMULARIO ===== -->
+  <div class="formulario">
+
+    <h2>
+      {{ editIndex !== null ? 'Editar Instructor' : 'Nuevo Instructor' }}
+    </h2>
+
+    <input
+      type="text"
+      placeholder="Nombre"
+      [(ngModel)]="nuevoInstructor.nombre">
+
+    <input
+      type="text"
+      placeholder="Teléfono"
+      [(ngModel)]="nuevoInstructor.telefono">
+
+    <label class="check">
+      <input type="checkbox" [(ngModel)]="nuevoInstructor.asignado">
+      Asignado
+    </label>
+
+    <!-- Imagen -->
+    <input type="file" accept="image/*"
+      (change)="seleccionarImagen($event)">
+
+    <img
+      class="preview"
+      [src]="nuevoInstructor.foto || defaultImg"
+      (error)="onImgError($event)">
+
+    <div class="acciones-form">
+      <button (click)="guardarInstructor()" class="guardar">
+        💾 Guardar
+      </button>
+
+      <button (click)="cancelar()" class="cancelar">
+        ❌ Cancelar
       </button>
     </div>
+
   </div>
 
-  <!-- FORMULARIO NUEVO INSTRUCTOR (con foto) -->
-  <div *ngIf="showForm" class="form-section">
-    <h3>Nuevo Instructor</h3>
+  <!-- ===== LISTA ===== -->
+  <div class="grid">
 
-    <div class="photo-preview-wrapper">
-      <div class="preview-container" (click)="triggerPhotoInput()">
-        <img 
-          [src]="previewFoto || 'assets/default-avatar.png'" 
-          class="preview-img"
-          (error)="handleImageError($event)">
-        <div class="preview-overlay">
-          <span>📷 Cambiar foto</span>
-        </div>
-      </div>
-    </div>
+    <article
+      class="card"
+      *ngFor="let instructor of instructores; let i = index">
 
-    <input 
-      #photoInput
-      type="file" 
-      accept="image/*" 
-      (change)="onPhotoSelected($event)" 
-      style="display: none;">
+      <img
+        class="avatar"
+        [src]="instructor.foto || defaultImg"
+        (error)="onImgError($event)">
 
-    <form (ngSubmit)="agregarInstructor()">
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Nombre completo</label>
-          <input
-            type="text"
-            placeholder="Ej. Juan Pérez"
-            [(ngModel)]="newInstructor.nombre"
-            name="nombre"
-            class="form-control"
-            required
-          />
-        </div>
+      <div class="info">
+        <h3>{{ instructor.nombre }}</h3>
+        <p>📞 {{ instructor.telefono }}</p>
 
-        <div class="form-group">
-          <label>Email</label>
-          <input
-            type="email"
-            placeholder="correo@ejemplo.com"
-            [(ngModel)]="newInstructor.email"
-            name="email"
-            class="form-control"
-            required
-          />
-        </div>
+        <span
+          class="badge"
+          [ngClass]="{
+            'asignado': instructor.asignado,
+            'sin-asignar': !instructor.asignado
+          }">
 
-        <div class="form-group">
-          <label>Teléfono</label>
-          <input
-            type="tel"
-            placeholder="Ej. 7712927082"
-            [(ngModel)]="newInstructor.telefono"
-            name="telefono"
-            class="form-control"
-          />
-        </div>
-
-        <div class="form-group">
-          <label>Especialidad</label>
-          <input
-            type="text"
-            placeholder="Ej. Manejo defensivo"
-            [(ngModel)]="newInstructor.especialidad"
-            name="especialidad"
-            class="form-control"
-          />
-        </div>
+          {{ instructor.asignado ? 'Asignado' : 'Sin asignar' }}
+        </span>
       </div>
 
-      <div class="form-actions">
-        <button type="submit" class="btn btn-success">
-          Guardar Instructor
-        </button>
-        <button type="button" class="btn btn-secondary" (click)="showForm = false; newInstructor = { nombre: '', email: '', foto: '', telefono: '', especialidad: '', cursoIds: [] }; previewFoto = null">
-          Cancelar
-        </button>
+      <div class="acciones">
+        <button (click)="editarInstructor(i)">✏️</button>
+        <button (click)="eliminarInstructor(i)">🗑️</button>
       </div>
-    </form>
+
+    </article>
+
   </div>
 
-  <!-- CONTENIDO PRINCIPAL: DOS PANELES -->
-  <div class="content-wrapper">
-    <!-- PANEL IZQUIERDO: LISTA DE INSTRUCTORES -->
-    <div class="panel instructores-panel">
-      <div class="panel-header">
-        <h3>Instructores Registrados</h3>
-        <span class="badge">{{ instructores.length }} total</span>
-      </div>
-
-      <!-- Buscador -->
-      <div class="search-box">
-        <input
-          type="text"
-          placeholder="🔍 Buscar por nombre, email o teléfono..."
-          [(ngModel)]="filtroNombre"
-          class="form-control"
-        />
-      </div>
-
-      <!-- Lista de instructores -->
-      <div class="instructores-list">
-        <div *ngIf="instructoresFiltrados.length === 0" class="empty-state">
-          No hay instructores que coincidan con la búsqueda
-        </div>
-
-        <div
-          *ngFor="let inst of instructoresFiltrados"
-          class="instructor-card"
-          [class.selected]="selectedInstructor?.id === inst.id"
-          (click)="seleccionarInstructor(inst)"
-        >
-          <div class="instructor-avatar">
-            <img
-              [src]="inst.foto || 'assets/default-avatar.png'"
-              (error)="handleImageError($event)"
-              alt="avatar"
-            />
-          </div>
-
-          <div class="instructor-info">
-            <div class="instructor-name">{{ inst.nombre }}</div>
-            <div class="instructor-details">{{ inst.email }}</div>
-            <div class="instructor-details" *ngIf="inst.telefono">📞 {{ inst.telefono }}</div>
-            <div class="instructor-badge" *ngIf="inst.especialidad">{{ inst.especialidad }}</div>
-          </div>
-
-          <div class="instructor-actions" *ngIf="canEditInstructor()" (click)="$event.stopPropagation()">
-            <!-- Temporalmente sin argumento hasta que arreglemos el TS -->
-            <button class="btn-icon" (click)="openEditPhotoModal()" title="Cambiar foto">
-              📷
-            </button>
-            <button class="btn-icon" (click)="eliminarInstructor(inst.id)" title="Eliminar">
-              🗑️
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- PANEL DERECHO: CURSOS DEL INSTRUCTOR SELECCIONADO -->
-    <div class="panel cursos-panel" *ngIf="selectedInstructor; else selectInstructorFirst">
-      <div class="panel-header">
-        <div class="selected-instructor-header">
-          <div class="selected-avatar">
-            <img
-              [src]="selectedInstructor.foto || 'assets/default-avatar.png'"
-              (error)="handleImageError($event)"
-              alt="avatar"
-            />
-          </div>
-          <div class="selected-info">
-            <h3>{{ selectedInstructor.nombre }}</h3>
-            <p class="selected-details">
-              {{ selectedInstructor.email }} 
-              <span *ngIf="selectedInstructor.telefono"> | 📞 {{ selectedInstructor.telefono }}</span>
-            </p>
-            <p class="selected-specialty" *ngIf="selectedInstructor.especialidad">
-              🔧 {{ selectedInstructor.especialidad }}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- PROGRESS BAR: Cursos asignados -->
-      <div class="progress-section">
-        <div class="progress-label">
-          <span>Cursos asignados</span>
-          <span class="progress-count">{{ cursosAsignados.length }}/3</span>
-        </div>
-        <div class="progress-bar-container">
-          <div 
-            class="progress-bar-fill" 
-            [style.width.%]="(cursosAsignados.length / 3) * 100"
-            [class.full]="cursosAsignados.length >= 3">
-          </div>
-        </div>
-      </div>
-
-      <!-- CURSOS ASIGNADOS -->
-      <div class="sub-panel">
-        <div class="sub-panel-header">
-          <h4>📚 Cursos Asignados</h4>
-          <span class="badge">{{ cursosAsignados.length }}</span>
-        </div>
-
-        <div class="cursos-list">
-          <div *ngIf="cursosAsignados.length === 0" class="empty-state small">
-            No hay cursos asignados
-          </div>
-
-          <div *ngFor="let curso of cursosAsignados" class="curso-item">
-            <div class="curso-info">
-              <div class="curso-nombre">{{ curso.nombre }}</div>
-              <div class="curso-fechas">{{ curso.fechaInicio | date }} - {{ curso.fechaFin | date }}</div>
-            </div>
-            <button
-              class="btn-icon small danger"
-              (click)="desasignarCurso(curso.id!)"
-              title="Desasignar"
-              *ngIf="canAssignCourses()">
-              ✕
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- CURSOS DISPONIBLES -->
-      <div class="sub-panel">
-        <div class="sub-panel-header">
-          <h4>📖 Cursos Disponibles</h4>
-          <span class="badge">{{ cursosDisponibles.length }}</span>
-        </div>
-
-        <div class="cursos-list">
-          <div *ngIf="cursosDisponibles.length === 0" class="empty-state small">
-            No hay cursos disponibles
-          </div>
-
-          <div *ngFor="let curso of cursosDisponibles" class="curso-item">
-            <div class="curso-info">
-              <div class="curso-nombre">{{ curso.nombre }}</div>
-              <div class="curso-fechas">{{ curso.fechaInicio | date }} - {{ curso.fechaFin | date }}</div>
-            </div>
-            <button
-              class="btn-icon small success"
-              (click)="asignarCurso(curso.id!)"
-              title="Asignar"
-              [disabled]="cursosAsignados.length >= 3 || !canAssignCourses()"
-              *ngIf="canAssignCourses()">
-              ➕
-            </button>
-          </div>
-
-          <div *ngIf="cursosAsignados.length >= 3" class="warning-message">
-            ⚠️ Límite alcanzado (3/3). Desasigna un curso para asignar otro.
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- PLACEHOLDER cuando no hay instructor seleccionado -->
-    <ng-template #selectInstructorFirst>
-      <div class="panel placeholder-panel">
-        <div class="placeholder-content">
-          <span class="placeholder-icon">👨‍🏫</span>
-          <h3>Selecciona un instructor</h3>
-          <p>Haz clic en cualquier instructor de la lista para ver y gestionar sus cursos</p>
-        </div>
-      </div>
-    </ng-template>
-  </div>
-</div>
-
-<!-- MODAL PARA EDITAR FOTO -->
-<div *ngIf="showPhotoModal" class="modal-overlay" (click)="closeEditPhotoModal()">
-  <div class="modal-content" (click)="$event.stopPropagation()">
-    <h3>Cambiar Foto de Perfil</h3>
-    
-    <div class="modal-body text-center">
-      <div class="photo-preview-large">
-        <img 
-          [src]="modalPreviewFoto || selectedInstructor?.foto || 'assets/default-avatar.png'" 
-          class="preview-large-img"
-          (error)="handleImageError($event)">
-      </div>
-
-      <div class="photo-actions">
-        <input 
-          #modalPhotoInput
-          type="file" 
-          accept="image/*" 
-          (change)="onModalPhotoSelected($event)" 
-          style="display: none;">
-        
-        <button type="button" class="btn btn-primary" (click)="modalPhotoInput.click()">
-          📷 Seleccionar foto
-        </button>
-      </div>
-    </div>
-
-    <div class="modal-actions">
-      <button 
-        type="button"
-        class="btn btn-success" 
-        [disabled]="!modalNewFoto"
-        (click)="savePhoto()">
-        Guardar Cambios
-      </button>
-      <button type="button" class="btn btn-secondary" (click)="closeEditPhotoModal()">Cancelar</button>
-    </div>
-  </div>
 </div>

@@ -1,50 +1,41 @@
 <div class="container">
   <header *ngIf="!isLoginPage">
-    <!-- Agregar justo después del header o antes del main -->
-    <app-notification></app-notification>
     <h1>{{ title }}</h1>
-    
     <nav>
       <ul *ngIf="currentUser$ | async as user; else guestLinks">
         
-        <!-- SOLO ADMIN -->
-        <ng-container> <!--*ngIf="user.role === 'admin'">-->
-          <li><a routerLink="usuario">👥 Usuarios</a></li>
-          <li><a routerLink="instructores">👨‍🏫 Instructores</a></li>
-        </ng-container>
+        <li *ngIf="user.role === 'admin'">
+          <a routerLink="usuario">Usuarios</a>
+        </li>
+        <li *ngIf="user.role === 'admin'">
+          <a routerLink="instructores">Instructores</a>
+        </li>
 
-        <!-- ADMIN E INSTRUCTOR -->
-        <ng-container> <!--*ngIf="user.role === 'admin' || user.role === 'instructor'">-->
-          <li><a routerLink="cursos">📚 Cursos</a></li>
-        </ng-container>
+        <li *ngIf="user.role === 'admin' || user.role === 'instructor'">
+          <a routerLink="cursos">Cursos</a>
+        </li>
+        <li *ngIf="user.role === 'admin' || user.role === 'instructor'">
+          <a routerLink="personas">Personas</a>
+        </li>
 
-        <!-- TODOS LOS ROLES -->
-        <li><a routerLink="/">📊 Cursos y Personas</a></li>
-        <li><a routerLink="personas">👤 Personas</a></li>
-        <li><a routerLink="home">🏠 Home</a></li>
+        <li><a routerLink="/">Cursos y Personas</a></li>
+        <li><a routerLink="home">Home</a></li>
 
-        <!-- Info del usuario -->
         <li class="auth-status">
-          <span class="user-info">
-            👤 {{ user.nombre }} 
-            <span class="role-badge" [ngClass]="'role-' + user.role">
-              {{ user.role }}
-            </span>
-          </span>
-          <button class="btn-logout" (click)="logout()">Cerrar sesión</button>
+          <span class="user-info">👤 {{ user.nombre }} ({{ user.role }})</span>
+          <button class="btn-logout" (click)="logout()">Logout</button>
         </li>
       </ul>
 
       <ng-template #guestLinks>
         <ul>
-          <li><a routerLink="/login" class="btn-login">Iniciar Sesión</a></li>
+          <li><a routerLink="/login" class="btn-login">Login</a></li>
         </ul>
       </ng-template>
     </nav>
   </header>
 
   <main>
-    
     <router-outlet></router-outlet>
   </main>
 

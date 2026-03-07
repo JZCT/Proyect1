@@ -8,7 +8,9 @@
 .container-fluid {
   min-height: 100vh;
   padding: 30px;
+
   font-family: Inter, system-ui, sans-serif;
+
   background:
     radial-gradient(circle at 0% 0%, #eef2ff 0%, transparent 40%),
     radial-gradient(circle at 100% 0%, #ecfeff 0%, transparent 40%),
@@ -44,9 +46,12 @@
 .grupos-panel {
   background: rgba(255,255,255,.85);
   backdrop-filter: blur(14px);
+
   border-radius: 18px;
   padding: 22px;
-  box-shadow: 0 20px 45px rgba(0,0,0,.08);
+
+  box-shadow:
+    0 20px 45px rgba(0,0,0,.08);
 }
 
 /* HEADER PANEL */
@@ -109,14 +114,6 @@
   font-size: 13px;
 }
 
-.btn-icon {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: 6px;
-  font-size: 14px;
-}
-
 /* =====================================================
    FORMULARIOS
 ===================================================== */
@@ -125,18 +122,21 @@
   border-radius: 14px;
   padding: 18px;
   margin-bottom: 20px;
+
   box-shadow: 0 10px 25px rgba(0,0,0,.05);
+
   animation: fadeIn .35s ease;
 }
 
-.form-section.compact {
-  padding: 12px;
-  margin-bottom: 15px;
-}
-
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .form {
@@ -175,25 +175,9 @@
   box-shadow: 0 0 0 3px rgba(99,102,241,.15);
 }
 
-/* FORM ROW */
-.form-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.compact-select {
-  flex: 1;
-  padding: 8px;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  font-size: 13px;
-}
-
 /* BOTONES FORM */
 .form-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 10px;
   margin-top: 8px;
 }
@@ -205,20 +189,20 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: 600px;
-  overflow-y: auto;
-  padding-right: 5px;
 }
 
 .curso-item {
   background: #f8fafc;
   border-radius: 14px;
   padding: 14px;
+
   display: flex;
   justify-content: space-between;
   align-items: center;
+
   cursor: pointer;
   transition: all .25s ease;
+
   border: 1px solid transparent;
 }
 
@@ -232,12 +216,8 @@
   background: #eef2ff;
 }
 
-.curso-info {
-  flex: 1;
-}
-
 .curso-info h5 {
-  margin: 0 0 5px 0;
+  margin: 0;
   font-size: 16px;
   color: #020617;
 }
@@ -248,167 +228,45 @@
   color: #64748b;
 }
 
-.curso-fechas {
-  font-size: 12px;
-  color: #4b5563;
-}
-
-.curso-representante {
-  font-size: 12px;
-  color: #6b7280;
-}
-
-.curso-stats {
-  font-size: 12px;
-  font-weight: 600;
-  color: #4f46e5;
-  margin-top: 5px;
-}
-
 .curso-actions {
   display: flex;
   gap: 6px;
 }
 
 /* =====================================================
-   SECCIONES INTERNAS
+   PERSONAS / GRUPOS
 ===================================================== */
-.section-card {
-  background: #ffffff;
-  border-radius: 14px;
-  padding: 16px;
-  margin-bottom: 20px;
-  box-shadow: 0 5px 15px rgba(0,0,0,.03);
+.grupos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.section-title {
+.grupo-item {
+  background: #f1f5f9;
+  border-radius: 12px;
+  padding: 12px;
+
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+
+  transition: .25s;
 }
 
-.section-title h4 {
+.grupo-item:hover {
+  background: #e2e8f0;
+}
+
+.grupo-info h5 {
   margin: 0;
-  font-size: 16px;
-  color: #0f172a;
-}
-
-/* PROGRESS INDICATOR */
-.progress-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100px;
-  height: 20px;
-  background: #f1f5f9;
-  border-radius: 10px;
-  overflow: hidden;
-  position: relative;
-}
-
-.progress-bar-small {
-  height: 100%;
-  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
-  transition: width 0.3s ease;
-}
-
-.progress-bar-small.full {
-  background: linear-gradient(90deg, #ef4444, #f97316);
-}
-
-.progress-indicator span {
-  position: absolute;
-  right: 8px;
-  font-size: 10px;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-/* WARNING MESSAGE */
-.warning-message {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #ef4444;
-  font-weight: 500;
-}
-
-/* =====================================================
-   LISTAS DE ÍTEMS (Personas/Instructores)
-===================================================== */
-.items-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 300px;
-  overflow-y: auto;
-  padding-right: 5px;
-}
-
-.list-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  background: #f8fafc;
-  border-radius: 10px;
-  transition: all 0.2s;
-}
-
-.list-item:hover {
-  background: #eef2ff;
-  transform: translateX(2px);
-}
-
-.item-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.item-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.item-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.item-name {
-  font-weight: 600;
-  font-size: 14px;
   color: #020617;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.item-details {
-  font-size: 12px;
-  color: #64748b;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.item-badge {
-  display: inline-block;
-  margin-top: 2px;
-  padding: 2px 8px;
-  background: #e0f2fe;
-  color: #0369a1;
-  border-radius: 12px;
-  font-size: 10px;
-  font-weight: 600;
-}
-
-.item-actions {
-  flex-shrink: 0;
+.grupo-info p {
+  margin: 2px 0;
+  font-size: 13px;
+  color: #475569;
 }
 
 /* =====================================================
@@ -421,399 +279,13 @@
   font-style: italic;
 }
 
-.empty-state.small {
-  padding: 20px;
-  font-size: 13px;
-}
-
 /* =====================================================
    RESPONSIVE
 ===================================================== */
 @media (max-width: 1000px) {
+
   .content-wrapper {
     grid-template-columns: 1fr;
   }
 
-  .cursos-list {
-    max-height: 400px;
-  }
-}
-
-@media (max-width: 600px) {
-  .container-fluid {
-    padding: 15px;
-  }
-
-  .form-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .list-item {
-    flex-wrap: wrap;
-  }
-
-  .item-actions {
-    width: 100%;
-    display: flex;
-    justify-content: flex-end;
-  }
-}
-/* ========== ESTILOS ADICIONALES PARA ASIGNACIÓN DE PERSONAS ========== */
-
-/* Sección de asignación */
-.asignar-section {
-  background: #f8fafc;
-  border-radius: 10px;
-  padding: 15px;
-  margin-bottom: 20px;
-  border: 1px solid #e2e8f0;
-}
-
-.asignar-section h5 {
-  margin: 0 0 10px 0;
-  font-size: 14px;
-  color: #4b5563;
-}
-
-.form-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.form-row select {
-  flex: 1;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
-  font-size: 14px;
-}
-
-.text-muted {
-  color: #9ca3af;
-  font-size: 12px;
-  margin-top: 8px;
-  display: block;
-}
-
-/* Badges en los cursos */
-.curso-stats {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.badge-personas {
-  background: #3b82f6;
-  color: white;
-  padding: 3px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-}
-
-.badge-instructores {
-  background: #8b5cf6;
-  color: white;
-  padding: 3px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-}
-
-/* Curso descripción */
-.curso-descripcion {
-  font-size: 13px;
-  color: #4b5563;
-  margin: 5px 0;
-}
-
-/* Empty state grande */
-.empty-state.large {
-  padding: 60px 20px;
-  text-align: center;
-}
-
-.empty-icon {
-  font-size: 48px;
-  display: block;
-  margin-bottom: 15px;
-}
-
-.empty-state.large h3 {
-  font-size: 20px;
-  margin-bottom: 10px;
-  color: #1f2937;
-}
-
-.empty-state.large p {
-  color: #6b7280;
-}
-
-/* Detalle del curso */
-.curso-detalle {
-  animation: fadeIn 0.3s ease;
-}
-
-.detalle-header {
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
-  color: white;
-  padding: 20px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-}
-
-.detalle-header h3 {
-  margin: 0 0 10px 0;
-  font-size: 20px;
-}
-
-.detalle-meta p {
-  margin: 5px 0;
-  font-size: 14px;
-  opacity: 0.9;
-}
-
-.detalle-meta strong {
-  font-weight: 600;
-}
-
-/* Empresa en item */
-.item-empresa {
-  font-size: 11px;
-  color: #6b7280;
-  margin-top: 2px;
-}
-
-/* Botones pequeños */
-.btn-sm {
-  padding: 5px 10px;
-  font-size: 12px;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .form-row {
-    flex-direction: column;
-  }
-  
-  .form-row select,
-  .form-row button {
-    width: 100%;
-  }
-  
-  .detalle-header {
-    padding: 15px;
-  }
-  
-  .detalle-header h3 {
-    font-size: 18px;
-  }
-}
-/* =====================================================
-   ESTILOS ADICIONALES PARA ASIGNACIÓN DE PERSONAS
-===================================================== */
-
-/* Sección de asignación */
-.asignar-section {
-  background: #f8fafc;
-  border-radius: 10px;
-  padding: 15px;
-  margin-bottom: 20px;
-  border: 1px solid #e2e8f0;
-}
-
-.asignar-section h5 {
-  margin: 0 0 10px 0;
-  font-size: 14px;
-  color: #4b5563;
-}
-
-.form-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.form-row select {
-  flex: 1;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
-  font-size: 14px;
-}
-
-.text-muted {
-  color: #9ca3af;
-  font-size: 12px;
-  margin-top: 8px;
-  display: block;
-}
-
-/* Badges en los cursos */
-.curso-stats {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.badge-personas {
-  background: #3b82f6;
-  color: white;
-  padding: 3px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-}
-
-.badge-instructores {
-  background: #8b5cf6;
-  color: white;
-  padding: 3px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-}
-
-/* Curso descripción */
-.curso-descripcion {
-  font-size: 13px;
-  color: #4b5563;
-  margin: 5px 0;
-}
-
-/* Empty state grande */
-.empty-state.large {
-  padding: 60px 20px;
-  text-align: center;
-}
-
-.empty-icon {
-  font-size: 48px;
-  display: block;
-  margin-bottom: 15px;
-}
-
-.empty-state.large h3 {
-  font-size: 20px;
-  margin-bottom: 10px;
-  color: #1f2937;
-}
-
-.empty-state.large p {
-  color: #6b7280;
-}
-
-/* Detalle del curso */
-.curso-detalle {
-  animation: fadeIn 0.3s ease;
-}
-
-.detalle-header {
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
-  color: white;
-  padding: 20px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-}
-
-.detalle-header h3 {
-  margin: 0 0 10px 0;
-  font-size: 20px;
-}
-
-.detalle-meta p {
-  margin: 5px 0;
-  font-size: 14px;
-  opacity: 0.9;
-}
-
-.detalle-meta strong {
-  font-weight: 600;
-}
-
-/* Empresa en item */
-.item-empresa {
-  font-size: 11px;
-  color: #6b7280;
-  margin-top: 2px;
-}
-
-/* Botones pequeños */
-.btn-sm {
-  padding: 5px 10px;
-  font-size: 12px;
-}
-
-/* Mensaje informativo para no-admin */
-.info-message {
-  background: #e2e8f0;
-  color: #4b5563;
-  padding: 10px;
-  border-radius: 8px;
-  margin-bottom: 15px;
-  font-size: 13px;
-  text-align: center;
-  border-left: 3px solid #3b82f6;
-}
-
-/* Progress indicator */
-.progress-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100px;
-  height: 20px;
-  background: #f1f5f9;
-  border-radius: 10px;
-  overflow: hidden;
-  position: relative;
-}
-
-.progress-bar-small {
-  height: 100%;
-  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
-  transition: width 0.3s ease;
-}
-
-.progress-bar-small.full {
-  background: linear-gradient(90deg, #ef4444, #f97316);
-}
-
-.progress-indicator span {
-  position: absolute;
-  right: 8px;
-  font-size: 10px;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-/* Warning message */
-.warning-message {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #ef4444;
-  font-weight: 500;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .form-row {
-    flex-direction: column;
-  }
-  
-  .form-row select,
-  .form-row button {
-    width: 100%;
-  }
-  
-  .detalle-header {
-    padding: 15px;
-  }
-  
-  .detalle-header h3 {
-    font-size: 18px;
-  }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
 }
