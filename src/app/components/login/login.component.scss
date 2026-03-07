@@ -1,133 +1,326 @@
-/* Fondo general opcional */
-:host {
-  display: block;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-  padding-top: 60px;
-}
-
-/* Contenedor principal */
 .login-container {
-  margin: auto;
-  padding: 2.5rem 2rem;
-  width: 95%;
-  max-width: 420px;
-  border-radius: 18px;
-
-  /* Glassmorphism */
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-
-  box-shadow:
-    0 20px 40px rgba(0, 0, 0, 0.35),
-    inset 0 0 0 1px rgba(255,255,255,0.08);
-
-  color: white;
-  animation: fadeIn 0.6s ease;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0;
+  margin: 2.5rem auto;
+  padding: 0;
+  width: 90%;
+  max-width: 700px;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  z-index: 1;
 }
 
-/* Título */
-.login-container h2 {
-  text-align: center;
-  margin-bottom: 2rem;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+.login-image-section {
+  flex: 1;
+  width: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  animation: fadeIn 0.7s ease-out;
 }
 
-/* Grupo */
-.form-group {
+.login-box {
+  flex: 1;
+  width: 50%;
+  padding: clamp(1rem, 4vw, 2.2rem);
+  background: #4593ed;
+  border-radius: 0;
+  box-shadow: none;
+  animation: fadeIn 0.7s ease-out;
   display: flex;
   flex-direction: column;
-  margin-bottom: 1.2rem;
+  justify-content: center;
+
+  .h2-ti2 {
+    text-align: center;
+    margin-bottom: clamp(0.9rem, 3vw, 1.8rem);
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: clamp(1.1rem, 4vw, 1.6rem);
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(0.7rem, 2vw, 1.1rem);
+  }
+
+  .label1 {
+    font-size: clamp(0.75rem, 2vw, 0.9rem);
+    font-weight: 500;
+    color: #555;
+  }
+
+  .form-control {
+    padding: clamp(0.5rem, 1.5vw, 0.7rem);
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: clamp(0.8rem, 2vw, 0.9rem);
+    transition: all 0.25s ease;
+    width: 100%;
+
+    &:focus {
+      outline: none;
+      border-color: #6ec3ff;
+      box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
+    }
+
+    &::placeholder {
+      color: #aaa;
+    }
+  }
+
+  .actions {
+    margin-top: clamp(1rem, 3vw, 1.8rem);
+    text-align: center;
+
+    .btn {
+      width: 100%;
+      padding: clamp(0.5rem, 1.5vw, 0.65rem);
+      font-size: clamp(0.85rem, 2vw, 0.95rem);
+      border-radius: 8px;
+      transition: all 0.3s ease;
+
+      &:disabled {
+        background-color: #d39b9b;
+        cursor: not-allowed;
+      }
+
+      &:hover:not(:disabled) {
+        transform: translateY(-2px);
+        background-color: green;
+        box-shadow: 0 5px 12px rgba(40, 167, 69, 0.3);
+      }
+    }
+  }
 }
 
-/* Labels */
-label {
-  font-size: 0.85rem;
-  margin-bottom: 0.35rem;
-  opacity: 0.85;
-}
-
-/* Inputs */
-.form-control {
-  padding: 0.7rem 0.8rem;
-  border-radius: 10px;
-  border: none;
-  outline: none;
-  font-size: 0.95rem;
-
-  background: rgba(255, 255, 255, 0.12);
-  color: white;
-
-  transition: all 0.2s ease;
-}
-
-.form-control::placeholder {
-  color: rgba(255,255,255,0.6);
-}
-
-.form-control:focus {
-  background: rgba(255,255,255,0.18);
-  box-shadow: 0 0 0 2px #4fc3f7;
-}
-
-/* Error */
-.invalid-feedback {
-  font-size: 0.75rem;
-  margin-top: 0.25rem;
-  color: #ff6b6b;
-}
-
-/* Mensaje error */
-.alert-danger {
-  background: rgba(255, 0, 0, 0.15);
-  border-radius: 10px;
-  padding: 0.6rem;
-  margin-top: 0.8rem;
-  font-size: 0.85rem;
-}
-
-/* Botón */
-.form-actions {
-  margin-top: 1.6rem;
-}
-
-.btn-primary {
+.login-image {
   width: 100%;
-  padding: 0.75rem;
-  border-radius: 12px;
-  border: none;
-  font-weight: 600;
-  letter-spacing: 0.3px;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3), inset 0 0 30px rgba(255, 255, 255, 0.1);
+  transition: filter 0.3s ease;
+  filter: brightness(1.1) contrast(1.05);
 
-  background: linear-gradient(135deg, #00c6ff, #0072ff);
-  color: white;
-
-  cursor: pointer;
-  transition: all 0.25s ease;
+  &:hover {
+    filter: brightness(1.15) contrast(1.1);
+  }
 }
 
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(0, 114, 255, 0.35);
+/* Media queries responsivas */
+
+/* PC / Desktop - 1024px+ */
+@media (min-width: 1024px) {
+  .login-container {
+    max-width: 700px;
+    margin: 3rem auto;
+  }
 }
 
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
+/* Tablet / iPad - 600px a 1023px */
+@media (min-width: 600px) and (max-width: 1023px) {
+  .login-container {
+    flex-direction: row-reverse;
+    max-width: 90%;
+    margin: 2rem auto;
+  }
+
+  .login-box {
+    .h2-ti2 {
+      font-size: clamp(1.2rem, 4vw, 1.6rem);
+    }
+  }
 }
 
-/* Animación */
-@keyframes fadeIn {
+/* Android Pixel 7 / Dispositivos medianos - 412px */
+@media (min-width: 360px) and (max-width: 599px) {
+  .login-container {
+    flex-direction: column;
+    gap: 0;
+    margin: 1.5rem auto;
+    padding: 0;
+    aspect-ratio: auto;
+    max-width: 100%;
+    width: 95%;
+    border-radius: 10px;
+  }
+
+  .login-image-section {
+    animation: fadeIn 0.7s ease-out;
+    padding: 1rem;
+    width: 100%;
+    min-height: 220px;
+  }
+
+  .login-image {
+    width: 100%;
+    height: 100%;
+  }
+
+  .login-box {
+    animation: fadeIn 0.7s ease-out;
+    border-radius: 0;
+    background-color: #fff;
+    padding: clamp(1rem, 4vw, 1.5rem);
+    width: 100%;
+
+    .h2-ti2 {
+      font-size: clamp(1rem, 5vw, 1.3rem);
+      margin-bottom: clamp(0.8rem, 3vw, 1.2rem);
+    }
+
+    .form-group {
+      gap: clamp(0.7rem, 2vw, 1rem);
+    }
+
+    .label1 {
+      font-size: clamp(0.75rem, 2vw, 0.85rem);
+    }
+
+    .form-control {
+      padding: clamp(0.45rem, 1vw, 0.6rem);
+      font-size: clamp(0.8rem, 2vw, 0.9rem);
+    }
+
+    .actions .btn {
+      padding: clamp(0.45rem, 1vw, 0.6rem);
+      font-size: clamp(0.8rem, 2vw, 0.9rem);
+    }
+  }
+}
+
+/* iPhone / Dispositivos pequeños - 375px */
+@media (max-width: 359px) {
+  .login-container {
+    flex-direction: column;
+    gap: 0;
+    margin: 1rem auto;
+    padding: 0;
+    aspect-ratio: auto;
+    max-width: 100%;
+    width: 98%;
+    border-radius: 8px;
+  }
+
+  .login-image-section {
+    animation: fadeIn 0.7s ease-out;
+    padding: 0.8rem;
+    width: 100%;
+    min-height: 180px;
+  }
+
+  .login-image {
+    width: 100%;
+    height: 100%;
+  }
+
+  .login-box {
+    animation: fadeIn 0.7s ease-out;
+    border-radius: 0;
+    background-color: #fff;
+    padding: clamp(0.8rem, 4vw, 1.2rem);
+    width: 100%;
+
+    .h2-ti2 {
+      font-size: clamp(0.95rem, 5vw, 1.2rem);
+      margin-bottom: clamp(0.7rem, 3vw, 1rem);
+    }
+
+    .form-group {
+      gap: clamp(0.6rem, 2vw, 0.9rem);
+    }
+
+    .label1 {
+      font-size: clamp(0.7rem, 2vw, 0.8rem);
+    }
+
+    .form-control {
+      padding: clamp(0.4rem, 1vw, 0.55rem);
+      font-size: clamp(0.75rem, 2vw, 0.85rem);
+    }
+
+    .actions .btn {
+      padding: clamp(0.4rem, 1vw, 0.55rem);
+      font-size: clamp(0.75rem, 2vw, 0.85rem);
+    }
+  }
+}
+
+
+/* Animaciones de entrada */
+@keyframes slideInLeft {
   from {
     opacity: 0;
-    transform: translateY(15px);
+    transform: translateX(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInTop {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
+
+@keyframes slideInBottom {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Animaciones de salida */
+@keyframes slideOutLeft {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-50px);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(50px);
+  }
+}
+

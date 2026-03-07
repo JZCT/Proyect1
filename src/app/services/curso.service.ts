@@ -1,163 +1,103 @@
 import { Injectable } from '@angular/core';
-import { 
-  Firestore, 
-  collection, 
-  addDoc, 
-  collectionData, 
-  doc, 
-  deleteDoc, 
-  updateDoc,
-  getDoc
-} from '@angular/fire/firestore';
-import { Observable } from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
 import { Curso } from '../models/curso.model';
 
 @Injectable({
   providedIn: 'root'
 })
 export class CursoService {
+  // Array que almacena los cursos
+  private cursos: Curso[] = [
+    { 
+      id: 1, 
+      nombre: 'Angular Básico', 
+      descripcion: 'Introducción a Angular', 
+      Fecha_inicio: undefined,
+      Fecha_fin: undefined,
+      nom_representante: 'Juan Pérez',
+      num_represnetantes: "xxxx-xxxx-xx",
+      personasIds: [1, 2],    // Personas asignadas
+      estado: true 
+    },
+    { 
+      id: 2, 
+      nombre: 'TypeScript Avanzado', 
+      descripcion: 'TypeScript nivel avanzado', 
+      Fecha_inicio: undefined,
+      Fecha_fin: undefined,
+      nom_representante: 'María López',
+      num_represnetantes: "xxxx-xxxx-xx",
+      personasIds: [2],       // Personas asignadas
+      estado: true 
+    }
+  ];
 
-  private cursosCollection;
+  private cursosSubject = new BehaviorSubject<Curso[]>(this.cursos);
+  public cursos$ = this.cursosSubject.asObservable();
+  private nextId = 3;
 
-  constructor(private firestore: Firestore) {
-    this.cursosCollection = collection(this.firestore, 'cursos');
-  }
+  constructor() {}
 
-  // Obtener todos los cursos
+  // Retorna un Observable con la lista de cursos
   getCursos(): Observable<Curso[]> {
-    return collectionData(this.cursosCollection, { idField: 'id' }) as Observable<Curso[]>;
+    return this.cursos$;
   }
 
-  // Agregar curso
-  async addCurso(curso: Curso): Promise<void> {
-    try {
-      const newCurso = {
-        nombre: curso.nombre,
-        descripcion: curso.descripcion,
-        fechaInicio: curso.fechaInicio,           // ✅ Nombre actualizado
-        fechaFin: curso.fechaFin,                  // ✅ Nombre actualizado
-        nomRepresentante: curso.nomRepresentante,  // ✅ Nombre actualizado
-        numRepresentantes: curso.numRepresentantes, // ✅ Nombre actualizado
-        personasIds: curso.personasIds || [],
-        instructorIds: curso.instructorIds || [],
-        createdAt: new Date()
-      };
+  // Añade un nuevo curso
+  addCurso(curso: Curso): void {
+    curso.id = this.nextId++;
+    curso.estado = true;
+    // Si el curso no tiene personas, inicializa un array vacío
+    if (!curso.personasIds) {
+      curso.personasIds = [];
+    }
+    this.cursos.push(curso);
+    this.cursosSubject.next([...this.cursos]);
+  }
 
-      await addDoc(this.cursosCollection, newCurso);
-
-    } catch (error) {
-      console.error('Error agregando curso:', error);
-      throw error;
+  // Actualiza un curso existente
+  updateCurso(id: number, curso: Curso): void {
+    const index = this.cursos.findIndex(c => c.id === id);
+    if (index !== -1) {
+      this.cursos[index] = { ...curso, id };
+      this.cursosSubject.next([...this.cursos]);
     }
   }
 
-  // Actualizar curso
-  async updateCurso(id: string, curso: Partial<Curso>): Promise<void> {
-    try {
-      const cursoDoc = doc(this.firestore, `cursos/${id}`);
-      
-      // Mapear los campos si es necesario
-      const updateData: any = { ...curso };
-      
-      await updateDoc(cursoDoc, updateData);
-    } catch (error) {
-      console.error('Error actualizando curso:', error);
-      throw error;
-    }
+  // Elimina un curso por su ID
+  deleteCurso(id: number): void {
+    this.cursos = this.cursos.filter(c => c.id !== id);
+    this.cursosSubject.next([...this.cursos]);
   }
 
-  // Eliminar curso
-  async deleteCurso(id: string): Promise<void> {
-    try {
-      const cursoDoc = doc(this.firestore, `cursos/${id}`);
-      await deleteDoc(cursoDoc);
-    } catch (error) {
-      console.error('Error eliminando curso:', error);
-      throw error;
-    }
+  // Obtiene un curso específico
+  getCursoById(id: number): Curso | undefined {
+    return this.cursos.find(c => c.id === id);
   }
 
-  // Obtener curso por ID
-  async getCursoById(id: string): Promise<Curso | null> {
-    try {
-      const cursoDoc = doc(this.firestore, `cursos/${id}`);
-      const snap = await getDoc(cursoDoc);
-
-      if (!snap.exists()) return null;
-
-      return { id: snap.id, ...snap.data() } as Curso;
-
-    } catch (error) {
-      console.error('Error obteniendo curso:', error);
-      return null;
-    }
-  }
-
-  // Agregar persona a curso
-  async addPersonaToCurso(cursoId: string, personaId: string): Promise<void> {
-    try {
-      const cursoDoc = doc(this.firestore, `cursos/${cursoId}`);
-      const curso = await this.getCursoById(cursoId);
-
-      if (curso) {
-        const personasIds = [...(curso.personasIds || []), personaId];
-        await updateDoc(cursoDoc, { personasIds });
+  // Añade una persona a un curso específico
+  addPersonaToCurso(cursoId: number, personaId: number): void {
+    const curso = this.cursos.find(c => c.id === cursoId);
+    if (curso) {
+      if (!curso.personasIds) {
+        curso.personasIds = [];
       }
-
-    } catch (error) {
-      console.error('Error agregando persona al curso:', error);
-      throw error;
+      // Solo añade si no está duplicada
+      if (!curso.personasIds.includes(personaId)) {
+        curso.personasIds.push(personaId);
+        this.cursosSubject.next([...this.cursos]);
+      }
     }
   }
 
-  // Remover persona de curso
-  async removePersonaFromCurso(cursoId: string, personaId: string): Promise<void> {
-    try {
-      const cursoDoc = doc(this.firestore, `cursos/${cursoId}`);
-      const curso = await this.getCursoById(cursoId);
-
-      if (curso && curso.personasIds) {
-        const personasIds = curso.personasIds.filter(id => id !== personaId);
-        await updateDoc(cursoDoc, { personasIds });
-      }
-
-    } catch (error) {
-      console.error('Error removiendo persona del curso:', error);
-      throw error;
-    }
-  }
-
-  // Agregar instructor a curso
-  async addInstructorToCurso(cursoId: string, instructorId: string): Promise<void> {
-    try {
-      const cursoDoc = doc(this.firestore, `cursos/${cursoId}`);
-      const curso = await this.getCursoById(cursoId);
-
-      if (curso) {
-        const instructorIds = [...(curso.instructorIds || []), instructorId];
-        await updateDoc(cursoDoc, { instructorIds });
-      }
-
-    } catch (error) {
-      console.error('Error agregando instructor al curso:', error);
-      throw error;
-    }
-  }
-
-  // Remover instructor de curso
-  async removeInstructorFromCurso(cursoId: string, instructorId: string): Promise<void> {
-    try {
-      const cursoDoc = doc(this.firestore, `cursos/${cursoId}`);
-      const curso = await this.getCursoById(cursoId);
-
-      if (curso && curso.instructorIds) {
-        const instructorIds = curso.instructorIds.filter(id => id !== instructorId);
-        await updateDoc(cursoDoc, { instructorIds });
-      }
-
-    } catch (error) {
-      console.error('Error removiendo instructor del curso:', error);
-      throw error;
+  // Remueve una persona de un curso
+  removePersonaFromCurso(cursoId: number, personaId: number): void {
+    const curso = this.cursos.find(c => c.id === cursoId);
+    if (curso) {
+      // Filtra para remover el personaId
+      curso.personasIds = (curso.personasIds || []).filter(id => id !== personaId);
+      this.cursosSubject.next([...this.cursos]);
     }
   }
 }
+
