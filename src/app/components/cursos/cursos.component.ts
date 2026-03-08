@@ -2,7 +2,11 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CursoService } from '../../services/curso.service';
+import { InstructorService } from '../../services/instructor.service';
+import { AuthService } from '../../services/auth.service';
 import { Curso } from '../../models/curso.model';
+import { Instructor } from '../../models/instructor.model';
+import { User } from '../../models/user.model';
 
 @Component({
   selector: 'app-cursos',
@@ -13,71 +17,305 @@ import { Curso } from '../../models/curso.model';
 })
 export class CursosComponent implements OnInit {
   cursos: Curso[] = [];
-  newCurso: Curso = { nombre: '', descripcion: '',  Fecha_inicio: undefined, Fecha_fin: undefined, nom_representante: '', num_represnetantes: "" };
-  editingId: number | null = null;
-  editingCurso: Curso = { nombre: '', descripcion: '',  Fecha_inicio: undefined, Fecha_fin: undefined, nom_representante: '', num_represnetantes: "" };
+  allCursos: Curso[] = [];
+  instructores: Instructor[] = [];
+  companyTags: string[] = [];
   showForm = false;
+  editingId: string | null = null;
+  isAdmin = false;
+  currentUser: User | null = null;
+  selectedInstructors: string[] = [];
+  editingInstructors: string[] = [];
+  searchTerm: string = '';
+  tagSearchTerm: string = '';
 
-  formatDate(date: Date | string | null | undefined): string | null {
-    if (!date) return null;
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+  newCurso: Partial<Curso> = {
+    nombre: '',
+    descripcion: '',
+    Fecha_inicio: undefined,
+    Fecha_fin: undefined,
+    nom_representante: '',
+    num_represnetantes: '',
+    companyTag: '',
+    instructorIds: []
+  };
+
+  editingCurso: Partial<Curso> = {
+    nombre: '',
+    descripcion: '',
+    Fecha_inicio: undefined,
+    Fecha_fin: undefined,
+    nom_representante: '',
+    num_represnetantes: '',
+    companyTag: '',
+    instructorIds: []
+  };
+
+  constructor(
+    private cursoService: CursoService,
+    private instructorService: InstructorService,
+    private authService: AuthService
+  ) {}
+
+  ngOnInit(): void {
+    this.checkAdminStatus();
+    this.loadCurrentUser();
+    this.loadCompanyTags();
+    this.loadCursos();
+    this.loadInstructores();
   }
-  constructor(private cursoService: CursoService) {}
 
-  ngOnInit() {
-    this.cursoService.getCursos().subscribe(cursos => {
-      this.cursos = cursos;
+  private checkAdminStatus() {
+    this.authService.isAdmin().subscribe((isAdmin) => {
+      this.isAdmin = isAdmin;
+    });
+  }
+
+  private loadCurrentUser() {
+    this.authService.currentUserData$.subscribe((userData) => {
+      this.currentUser = userData;
+      this.applyCursoFilter();
+    });
+  }
+
+  loadCursos() {
+    this.cursoService.getCursos().subscribe({
+      next: (cursos) => {
+        this.allCursos = cursos;
+        this.applyCursoFilter();
+      },
+      error: (error) => {
+        console.error('Error cargando cursos:', error);
+      }
+    });
+  }
+
+  loadInstructores() {
+    this.instructorService.getInstructores().subscribe({
+      next: (instructores) => {
+        this.instructores = instructores;
+      },
+      error: (error) => {
+        console.error('Error cargando instructores:', error);
+      }
+    });
+  }
+
+  loadCompanyTags() {
+    this.authService.getCompanyTags().subscribe({
+      next: (tags) => {
+        this.companyTags = tags;
+      },
+      error: (error) => {
+        console.error('Error cargando etiquetas de empresa:', error);
+      }
     });
   }
 
   toggleForm() {
+    if (!this.isAdmin) {
+      alert('No tienes permisos para realizar esta accion');
+      return;
+    }
+
     this.showForm = !this.showForm;
     if (!this.showForm) {
       this.resetForm();
     }
   }
 
-  addCurso() {
-    if (this.newCurso.nombre 
-      && this.newCurso.descripcion
-       && this.newCurso.Fecha_inicio
-        && this.newCurso.Fecha_fin
-         && this.newCurso.nom_representante
-          && this.newCurso.num_represnetantes) {
-      this.cursoService.addCurso({ ...this.newCurso });
+  async addCurso() {
+    if (!this.isAdmin) return;
+
+    if (!this.newCurso.nombre || !this.newCurso.descripcion) {
+      alert('Nombre y descripcion son requeridos');
+      return;
+    }
+
+    if (!this.newCurso.companyTag || !this.newCurso.companyTag.trim()) {
+      alert('La etiqueta de empresa es requerida');
+      return;
+    }
+
+    if (!this.selectedInstructors || this.selectedInstructors.length < 3) {
+      alert('Debes seleccionar minimo 3 instructores para el curso');
+      return;
+    }
+
+    try {
+      const cursoToAdd: Curso = {
+        ...(this.newCurso as Curso),
+        companyTag: this.normalizeCompanyTag(this.newCurso.companyTag),
+        instructorIds: this.selectedInstructors
+      };
+      await this.cursoService.addCurso(cursoToAdd);
       this.resetForm();
+      this.showForm = false;
+      alert('Curso agregado exitosamente');
+    } catch (error) {
+      console.error('Error agregando curso:', error);
+      alert(`Error al agregar curso: ${error}`);
     }
   }
 
   startEdit(curso: Curso) {
-    this.editingId = curso.id || null;
+    if (!this.isAdmin) return;
+
+    this.editingId = curso.idcurso || null;
     this.editingCurso = { ...curso };
+    this.editingInstructors = [...(curso.instructorIds || [])];
     this.showForm = true;
   }
 
-  updateCurso() {
-    if (this.editingId && this.editingCurso.nombre 
-      && this.editingCurso.descripcion 
-      && this.editingCurso.nom_representante) {
-      this.cursoService.updateCurso(this.editingId, this.editingCurso);
+  async updateCurso() {
+    if (!this.isAdmin || !this.editingId) return;
+
+    if (!this.editingCurso.companyTag || !this.editingCurso.companyTag.trim()) {
+      alert('La etiqueta de empresa es requerida');
+      return;
+    }
+
+    if (!this.editingInstructors || this.editingInstructors.length < 3) {
+      alert('Debes seleccionar minimo 3 instructores para el curso');
+      return;
+    }
+
+    try {
+      const cursoToUpdate: Partial<Curso> = {
+        ...this.editingCurso,
+        companyTag: this.normalizeCompanyTag(this.editingCurso.companyTag),
+        instructorIds: this.editingInstructors
+      };
+      await this.cursoService.updateCurso(this.editingId, cursoToUpdate);
       this.resetForm();
+      alert('Curso actualizado exitosamente');
+    } catch (error) {
+      console.error('Error actualizando curso:', error);
+      alert(`Error al actualizar curso: ${error}`);
     }
   }
 
-  deleteCurso(id: number | undefined) {
-    if (id && confirm('¿Estás seguro de eliminar este curso?')) {
-      this.cursoService.deleteCurso(id);
+  async deleteCurso(id: string | undefined) {
+    if (!this.isAdmin || !id) return;
+
+    if (confirm('Estas seguro de eliminar este curso?')) {
+      try {
+        await this.cursoService.deleteCurso(id);
+        alert('Curso eliminado exitosamente');
+      } catch (error) {
+        console.error('Error eliminando curso:', error);
+        alert('Error al eliminar curso');
+      }
     }
   }
 
   resetForm() {
-    this.newCurso = { nombre: '', descripcion: '',  Fecha_inicio: undefined, Fecha_fin: undefined, nom_representante: '', num_represnetantes: '' };
+    this.newCurso = {
+      nombre: '',
+      descripcion: '',
+      Fecha_inicio: undefined,
+      Fecha_fin: undefined,
+      nom_representante: '',
+      num_represnetantes: '',
+      companyTag: '',
+      instructorIds: []
+    };
+
+    this.editingCurso = {
+      nombre: '',
+      descripcion: '',
+      Fecha_inicio: undefined,
+      Fecha_fin: undefined,
+      nom_representante: '',
+      num_represnetantes: '',
+      companyTag: '',
+      instructorIds: []
+    };
+
+    this.selectedInstructors = [];
+    this.editingInstructors = [];
     this.editingId = null;
-    this.editingCurso = { nombre: '', descripcion: '',  Fecha_inicio: undefined, Fecha_fin: undefined, nom_representante: '', num_represnetantes: '' };
     this.showForm = false;
+  }
+
+  getInstructorName(instructorId: string): string {
+    const instructor = this.instructores.find((i) => i.id === instructorId);
+    return instructor ? instructor.nombre : 'Instructor no encontrado';
+  }
+
+  getCurrentInstructors(): string[] {
+    return this.editingId ? this.editingInstructors : this.selectedInstructors;
+  }
+
+  formatDate(date: Date | string | null | undefined): string | null {
+    if (!date) return null;
+    const d = new Date(date);
+    return d.toISOString().split('T')[0];
+  }
+
+  private applyCursoFilter() {
+    if (!this.currentUser) {
+      this.cursos = this.allCursos;
+      return;
+    }
+
+    if (this.currentUser.role !== 'company') {
+      this.cursos = this.allCursos;
+      return;
+    }
+
+    const companyTag = this.normalizeCompanyTag(this.currentUser.companyTag);
+    if (!companyTag) {
+      this.cursos = [];
+      return;
+    }
+
+    this.cursos = this.allCursos.filter(
+      (curso) => this.normalizeCompanyTag(curso.companyTag) === companyTag
+    );
+  }
+
+  private normalizeCompanyTag(tag?: string): string {
+    return (tag || '').trim().toLowerCase();
+  }
+
+  getCompanyTagOptions(currentTag?: string): string[] {
+    const normalizedCurrent = this.normalizeCompanyTag(currentTag);
+    if (!normalizedCurrent) return this.companyTags;
+    return Array.from(new Set([...this.companyTags, normalizedCurrent]));
+  }
+
+  get filteredCursos(): Curso[] {
+    const term = this.normalizeSearch(this.searchTerm);
+    const tagTerm = this.normalizeSearch(this.tagSearchTerm);
+    if (!term && !tagTerm) return this.cursos;
+
+    return this.cursos.filter((curso) => {
+      const target = this.normalizeText([
+        curso.nombre,
+        curso.descripcion,
+        curso.companyTag || '',
+        curso.nom_representante,
+        curso.num_represnetantes
+      ]
+        .join(' '));
+
+      const normalizedTag = this.normalizeSearch(curso.companyTag || '');
+      const matchesGeneral = !term || target.includes(term);
+      const matchesTag = !tagTerm || normalizedTag.includes(tagTerm);
+      return matchesGeneral && matchesTag;
+    });
+  }
+
+  private normalizeSearch(value?: string): string {
+    return this.normalizeText(value || '').trim();
+  }
+
+  private normalizeText(value: string): string {
+    return value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ');
   }
 }

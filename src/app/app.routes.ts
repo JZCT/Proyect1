@@ -6,7 +6,8 @@ import { HomeComponent } from './components/home/home.component';
 import { PersonasComponent } from './components/personas/personas.component';
 import { InstructorComponent } from './components/Instructores/instructores.component';
 import { CursosComponent } from './components/cursos/cursos.component';
-import { UsersComponent } from './components/Usuarios/Usu.component'; // ✅ CORREGIDO
+import { UsersComponent } from './components/Usuarios/Usu.component';
+import { roleGuard } from './guards/role.guard';
 
 export const routes: Routes = [
   {
@@ -15,26 +16,42 @@ export const routes: Routes = [
   },
   {
     path: 'home',
-    component: HomeComponent
+    component: HomeComponent,
+    canActivate: [roleGuard],
+    data: { roles: ['admin', 'company'] }
   },
   {
     path: '',
-    component: CursosGruposComponent
+    component: CursosGruposComponent,
+    canActivate: [roleGuard],
+    data: { roles: ['admin', 'instructor', 'company'] }
   },
   {
     path: 'personas',
-    component: PersonasComponent
+    component: PersonasComponent,
+    canActivate: [roleGuard],
+    data: { roles: ['admin', 'instructor'] }
   },
   {
-    path: 'instructores', // mejor minúsculas
-    component: InstructorComponent
+    path: 'instructores',
+    component: InstructorComponent,
+    canActivate: [roleGuard],
+    data: { roles: ['admin'] }
   },
   {
     path: 'cursos',
-    component: CursosComponent
+    component: CursosComponent,
+    canActivate: [roleGuard],
+    data: { roles: ['admin', 'company'] }
   },
   {
     path: 'usuario',
-    component: UsersComponent   // ✅ CORREGIDO
+    component: UsersComponent,
+    canActivate: [roleGuard],
+    data: { roles: ['admin'] }
+  },
+  {
+    path: '**',
+    redirectTo: ''
   }
 ];

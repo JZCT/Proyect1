@@ -1,10 +1,19 @@
 export interface Persona {
-  id?: number;
+  id?: string;
   nombre: string;
+  curp: string;
   email: string;
-  telefono: string;
-  empresa: string;
-  foto: string;
-  archivos?: string[]; // Nueva propiedad
-  estado: boolean; // Nueva propiedad para estado activo/inactivo
+  telefono?: string;
+  empresa?: string;
+  lugar?: string;
+  foto?: string;
+  clfPractica?: number;
+  clfTeorica?: number;
+  archivos?: Array<{
+    nombre: string;
+    url: string;
+    tipo: string;
+  }>;
+  cursoIds?: string[];
+  createdAt?: Date;
 }

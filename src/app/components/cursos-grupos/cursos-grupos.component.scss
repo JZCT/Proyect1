@@ -1,97 +1,123 @@
-/* =====================================================
-   BASE GLOBAL
-===================================================== */
-* {
-  box-sizing: border-box;
-}
-
 .container-fluid {
-  min-height: 100vh;
-  padding: 30px;
-
-  font-family: Inter, system-ui, sans-serif;
-
-  background:
-    radial-gradient(circle at 0% 0%, #eef2ff 0%, transparent 40%),
-    radial-gradient(circle at 100% 0%, #ecfeff 0%, transparent 40%),
-    #f8fafc;
+  display: grid;
+  gap: 14px;
 }
 
-/* =====================================================
-   HEADER
-===================================================== */
 .header {
-  margin-bottom: 25px;
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
 }
 
 .header h2 {
-  font-size: 28px;
-  font-weight: 700;
-  color: #020617;
+  margin: 0;
+  color: #1f2937;
 }
 
-/* =====================================================
-   LAYOUT PRINCIPAL
-===================================================== */
 .content-wrapper {
   display: grid;
-  grid-template-columns: 1fr 1.2fr;
-  gap: 25px;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
 }
 
-/* =====================================================
-   PANELES
-===================================================== */
 .cursos-panel,
 .grupos-panel {
-  background: rgba(255,255,255,.85);
-  backdrop-filter: blur(14px);
-
-  border-radius: 18px;
-  padding: 22px;
-
-  box-shadow:
-    0 20px 45px rgba(0,0,0,.08);
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
 }
 
-/* HEADER PANEL */
 .panel-header {
+  margin-bottom: 10px;
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   align-items: center;
-  margin-bottom: 18px;
+  gap: 8px;
 }
 
-.panel-header h3 {
-  font-weight: 700;
-  color: #0f172a;
+.panel-header h3,
+.form-section h4 {
+  margin: 0;
+  color: #1f2937;
 }
 
-/* =====================================================
-   BOTONES
-===================================================== */
+.panel-header small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.form-section {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.form {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.form-group {
+  display: grid;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 12px;
+  color: #334155;
+  font-weight: 600;
+}
+
+input,
+textarea,
+select {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 8px;
+  font-size: 13px;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .btn {
   border: none;
   border-radius: 10px;
-  padding: 8px 14px;
-  cursor: pointer;
+  padding: 8px 10px;
+  font-size: 13px;
   font-weight: 600;
-  transition: all .25s ease;
+  cursor: pointer;
 }
 
-.btn:hover {
-  transform: translateY(-2px);
+.btn-primary,
+.btn-info,
+.btn-success {
+  color: #ffffff;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg,#6366f1,#4f46e5);
-  color: white;
-  box-shadow: 0 8px 18px rgba(79,70,229,.25);
+  background: #2563eb;
 }
 
 .btn-success {
-  background: linear-gradient(135deg,#22c55e,#16a34a);
-  color: white;
+  background: #15803d;
 }
 
 .btn-secondary {
@@ -100,192 +126,178 @@
 }
 
 .btn-info {
-  background: #0ea5e9;
-  color: white;
+  background: #0891b2;
 }
 
 .btn-danger {
-  background: #ef4444;
-  color: white;
+  background: #dc2626;
+  color: #ffffff;
 }
 
 .btn-sm {
-  padding: 6px 10px;
-  font-size: 13px;
+  padding: 6px 8px;
+  font-size: 12px;
 }
 
-/* =====================================================
-   FORMULARIOS
-===================================================== */
-.form-section {
-  background: #ffffff;
-  border-radius: 14px;
-  padding: 18px;
-  margin-bottom: 20px;
-
-  box-shadow: 0 10px 25px rgba(0,0,0,.05);
-
-  animation: fadeIn .35s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.form {
+.cursos-list,
+.grupos-list {
   display: grid;
-  gap: 14px;
+  gap: 8px;
 }
 
-.form-group {
+.resultado-filters {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
-.form-group label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #475569;
-}
-
-/* INPUTS */
-.form-group input,
-.form-group textarea,
-.form-group select {
-  border-radius: 10px;
+.instructores-section {
   border: 1px solid #e2e8f0;
-  padding: 10px;
-  font-size: 14px;
-  transition: all .25s ease;
-}
-
-.form-group input:focus,
-.form-group textarea:focus,
-.form-group select:focus {
-  outline: none;
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99,102,241,.15);
-}
-
-/* BOTONES FORM */
-.form-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 8px;
-}
-
-/* =====================================================
-   LISTA CURSOS
-===================================================== */
-.cursos-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.curso-item {
+  border-radius: 12px;
   background: #f8fafc;
-  border-radius: 14px;
-  padding: 14px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
 
+.instructores-section h4 {
+  margin: 0 0 8px;
+  color: #1f2937;
+}
+
+.calificaciones-resumen {
+  margin-bottom: 10px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
-  cursor: pointer;
-  transition: all .25s ease;
-
+.status-badge {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
   border: 1px solid transparent;
 }
 
-.curso-item:hover {
-  background: #eef2ff;
-  transform: translateY(-2px);
+.status-apto {
+  background: #ecfdf3;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.status-no-apto {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.status-sin-evaluar {
+  background: #f8fafc;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.instructores-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.instructor-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 8px;
+}
+
+.instructor-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid #dbe3ef;
+  background: #f1f5f9;
+}
+
+.instructor-data {
+  display: grid;
+}
+
+.instructor-data strong {
+  font-size: 13px;
+  color: #1f2937;
+}
+
+.instructor-data span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.curso-item,
+.grupo-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .curso-item.selected {
-  border: 1px solid #6366f1;
-  background: #eef2ff;
+  border-color: #93c5fd;
+  background: #eff6ff;
 }
 
-.curso-info h5 {
-  margin: 0;
-  font-size: 16px;
-  color: #020617;
-}
-
-.curso-info p {
-  margin: 3px 0;
-  font-size: 13px;
-  color: #64748b;
-}
-
-.curso-actions {
-  display: flex;
-  gap: 6px;
-}
-
-/* =====================================================
-   PERSONAS / GRUPOS
-===================================================== */
-.grupos-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.grupo-item {
-  background: #f1f5f9;
-  border-radius: 12px;
-  padding: 12px;
-
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-
-  transition: .25s;
-}
-
-.grupo-item:hover {
-  background: #e2e8f0;
-}
-
+.curso-info h5,
 .grupo-info h5 {
   margin: 0;
-  color: #020617;
+  font-size: 14px;
+  color: #1f2937;
 }
 
+.curso-info p,
 .grupo-info p {
-  margin: 2px 0;
-  font-size: 13px;
-  color: #475569;
-}
-
-/* =====================================================
-   EMPTY STATE
-===================================================== */
-.empty-state {
-  text-align: center;
-  padding: 35px;
+  margin: 3px 0 0;
+  font-size: 12px;
   color: #64748b;
-  font-style: italic;
 }
 
-/* =====================================================
-   RESPONSIVE
-===================================================== */
-@media (max-width: 1000px) {
+.curso-actions,
+.grupo-actions {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
 
+.calificacion-editor {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.calificacion-editor label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.empty-state {
+  font-size: 13px;
+  color: #64748b;
+  padding: 10px;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
   .content-wrapper {
     grid-template-columns: 1fr;
   }
-
 }

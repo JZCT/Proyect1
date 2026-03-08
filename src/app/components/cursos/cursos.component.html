@@ -1,192 +1,172 @@
 <div class="crud-container">
-
-  <!-- HEADER -->
   <div class="header">
-    <h2>Gestión de Cursos</h2>
-    <button class="btn btn-primary" (click)="toggleForm()">
-      {{ showForm ? 'Cerrar' : 'Agregar Curso' }}
+    <div class="page-title-group">
+      <h2 class="page-title">Gestion de Cursos</h2>
+      <p class="page-subtitle">Registra datos del curso y usa etiqueta de empresa para segmentar vistas.</p>
+    </div>
+    <button *ngIf="isAdmin" class="btn btn-primary" (click)="toggleForm()">
+      {{ showForm ? 'Cerrar' : 'Agregar curso' }}
     </button>
   </div>
 
-  <!-- FORMULARIO -->
-  <div *ngIf="showForm" class="form-section">
-    <h3>{{ editingId ? 'Editar Curso' : 'Nuevo Curso' }}</h3>
+  <div *ngIf="showForm && isAdmin" class="form-section">
+    <h3>{{ editingId ? 'Editar curso' : 'Nuevo curso' }}</h3>
 
-    <form
-      class="form"
-      (ngSubmit)="editingId ? updateCurso() : addCurso()"
-    >
-
-      <!-- Nombre -->
+    <form class="form" (ngSubmit)="editingId ? updateCurso() : addCurso()">
       <div class="form-group">
-        <label for="nombre">Nombre del Curso:</label>
+        <label for="nombre">Nombre del curso</label>
         <input
           type="text"
           id="nombre"
           name="nombre"
           required
           [ngModel]="editingId ? editingCurso.nombre : newCurso.nombre"
-          (ngModelChange)="editingId
-            ? (editingCurso.nombre = $event)
-            : (newCurso.nombre = $event)"
+          (ngModelChange)="editingId ? (editingCurso.nombre = $event) : (newCurso.nombre = $event)"
         />
       </div>
 
-      <!-- Descripción -->
       <div class="form-group">
-        <label for="descripcion">Descripción:</label>
+        <label for="descripcion">Descripcion</label>
         <textarea
           id="descripcion"
           name="descripcion"
           rows="4"
           required
           [ngModel]="editingId ? editingCurso.descripcion : newCurso.descripcion"
-          (ngModelChange)="editingId
-            ? (editingCurso.descripcion = $event)
-            : (newCurso.descripcion = $event)"
+          (ngModelChange)="editingId ? (editingCurso.descripcion = $event) : (newCurso.descripcion = $event)"
         ></textarea>
       </div>
 
-      <!-- Fecha Inicio -->
       <div class="form-group">
-        <label for="Fecha_inicio">Fecha de Inicio:</label>
+        <label for="company_tag">Etiqueta empresa</label>
+        <select
+          id="company_tag"
+          name="company_tag"
+          required
+          [ngModel]="editingId ? editingCurso.companyTag : newCurso.companyTag"
+          (ngModelChange)="editingId ? (editingCurso.companyTag = $event) : (newCurso.companyTag = $event)"
+        >
+          <option value="">Selecciona etiqueta de empresa</option>
+          <option *ngFor="let tag of getCompanyTagOptions(editingId ? editingCurso.companyTag : newCurso.companyTag)" [value]="tag">
+            {{ tag }}
+          </option>
+        </select>
+        <p class="field-help">Estas opciones salen de los usuarios tipo empresa.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="Fecha_inicio">Fecha de inicio</label>
         <input
           type="date"
           id="Fecha_inicio"
           name="Fecha_inicio"
           required
-          [ngModel]="editingId
-            ? formatDate(editingCurso.Fecha_inicio)
-            : formatDate(newCurso.Fecha_inicio)"
-          (ngModelChange)="editingId
-            ? (editingCurso.Fecha_inicio = $event)
-            : (newCurso.Fecha_inicio = $event)"
+          [ngModel]="editingId ? formatDate(editingCurso.Fecha_inicio) : formatDate(newCurso.Fecha_inicio)"
+          (ngModelChange)="editingId ? (editingCurso.Fecha_inicio = $event) : (newCurso.Fecha_inicio = $event)"
         />
       </div>
 
-      <!-- Fecha Fin -->
       <div class="form-group">
-        <label for="fecha_fin">Fecha de Fin:</label>
+        <label for="fecha_fin">Fecha de fin</label>
         <input
           type="date"
           id="fecha_fin"
           name="fecha_fin"
           required
-          [ngModel]="editingId
-            ? (editingCurso.Fecha_fin | date:'yyyy-MM-dd')
-            : (newCurso.Fecha_fin | date:'yyyy-MM-dd')"
-          (ngModelChange)="editingId
-            ? (editingCurso.Fecha_fin = $event)
-            : (newCurso.Fecha_fin = $event)"
+          [ngModel]="editingId ? formatDate(editingCurso.Fecha_fin) : formatDate(newCurso.Fecha_fin)"
+          (ngModelChange)="editingId ? (editingCurso.Fecha_fin = $event) : (newCurso.Fecha_fin = $event)"
         />
       </div>
 
-      <!-- Representante -->
       <div class="form-group">
-        <label for="nom_representante">Representante:</label>
+        <label for="nom_representante">Representante</label>
         <input
           type="text"
           id="nom_representante"
           name="nom_representante"
-          placeholder="Nombre del representante"
           required
-          [ngModel]="editingId
-            ? editingCurso.nom_representante
-            : newCurso.nom_representante"
-          (ngModelChange)="editingId
-            ? (editingCurso.nom_representante = $event)
-            : (newCurso.nom_representante = $event)"
+          [ngModel]="editingId ? editingCurso.nom_representante : newCurso.nom_representante"
+          (ngModelChange)="editingId ? (editingCurso.nom_representante = $event) : (newCurso.nom_representante = $event)"
         />
       </div>
 
-      <!-- Número Representantes -->
       <div class="form-group">
-        <label for="num_representante">
-          Número de Representantes:
-        </label>
+        <label for="num_representante">Telefono representante</label>
         <input
           type="text"
           id="num_representante"
           name="num_representante"
-          placeholder="Número de representantes"
           required
-          [ngModel]="editingId
-            ? editingCurso.num_represnetantes
-            : newCurso.num_represnetantes"
-          (ngModelChange)="editingId
-            ? (editingCurso.num_represnetantes = $event)
-            : (newCurso.num_represnetantes = $event)"
+          [ngModel]="editingId ? editingCurso.num_represnetantes : newCurso.num_represnetantes"
+          (ngModelChange)="editingId ? (editingCurso.num_represnetantes = $event) : (newCurso.num_represnetantes = $event)"
         />
       </div>
 
-      <!-- BOTONES -->
       <div class="form-actions">
-        <button type="submit" class="btn btn-success">
-          {{ editingId ? 'Actualizar' : 'Guardar' }}
-        </button>
-
-        <button
-          type="button"
-          class="btn btn-secondary"
-          (click)="resetForm()"
-        >
-          Cancelar
-        </button>
+        <button type="submit" class="btn btn-success">{{ editingId ? 'Actualizar' : 'Guardar' }}</button>
+        <button type="button" class="btn btn-secondary" (click)="resetForm()">Cancelar</button>
       </div>
-
     </form>
   </div>
 
-  <!-- TABLA -->
   <div class="table-section">
-    <h3>Lista de Cursos</h3>
+    <h3>Lista de cursos ({{ filteredCursos.length }})</h3>
 
-    <div *ngIf="cursos.length === 0" class="empty-state">
-      No hay cursos registrados
+    <div class="form-group">
+      <label for="buscar_curso">Buscar curso</label>
+      <input
+        id="buscar_curso"
+        type="text"
+        placeholder="Nombre, descripcion, empresa o representante..."
+        [(ngModel)]="searchTerm"
+      />
     </div>
 
-    <table *ngIf="cursos.length > 0" class="table">
+    <div class="form-group">
+      <label for="buscar_etiqueta_curso">Buscar por etiqueta</label>
+      <input
+        id="buscar_etiqueta_curso"
+        type="text"
+        placeholder="Ej. empresa-sur"
+        [(ngModel)]="tagSearchTerm"
+      />
+    </div>
+
+    <div *ngIf="currentUser?.role === 'company'" class="empty-state">
+      Mostrando solo cursos asignados a tu empresa.
+    </div>
+
+    <div *ngIf="filteredCursos.length === 0" class="empty-state">No hay cursos para la busqueda actual.</div>
+
+    <table *ngIf="filteredCursos.length > 0" class="table">
       <thead>
         <tr>
-          <th>ID</th>
           <th>Nombre</th>
-          <th>Descripción</th>
-          <th>Fecha de Inicio</th>
-          <th>Fecha Fin</th>
+          <th>Descripcion</th>
+          <th>Empresa</th>
+          <th>Inicio</th>
+          <th>Fin</th>
           <th>Representante</th>
-          <th>Número de Representantes</th>
-          <th>Acciones</th>
+          <th>Telefono</th>
+          <th *ngIf="isAdmin">Acciones</th>
         </tr>
       </thead>
 
       <tbody>
-        <tr *ngFor="let curso of cursos">
-          <td>{{ curso.id }}</td>
+        <tr *ngFor="let curso of filteredCursos">
           <td>{{ curso.nombre }}</td>
           <td>{{ curso.descripcion }}</td>
+          <td>{{ curso.companyTag || '-' }}</td>
           <td>{{ curso.Fecha_inicio | date }}</td>
           <td>{{ curso.Fecha_fin | date }}</td>
           <td>{{ curso.nom_representante }}</td>
           <td>{{ curso.num_represnetantes }}</td>
-
-          <td class="actions">
-            <button
-              class="btn btn-sm btn-info"
-              (click)="startEdit(curso)"
-            >
-              Editar
-            </button>
-
-            <button
-              class="btn btn-sm btn-danger"
-              (click)="deleteCurso(curso.id)"
-            >
-              Eliminar
-            </button>
+          <td class="actions" *ngIf="isAdmin">
+            <button class="btn btn-sm btn-info" (click)="startEdit(curso)">Editar</button>
+            <button class="btn btn-sm btn-danger" (click)="deleteCurso(curso.idcurso)">Eliminar</button>
           </td>
         </tr>
       </tbody>
     </table>
-
   </div>
 </div>

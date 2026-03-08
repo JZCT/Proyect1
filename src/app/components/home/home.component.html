@@ -1,25 +1,20 @@
-<div class="home-content">
-  <section class="hero">
-    <h2>{{ title }}</h2>
-    <p>{{ description }}</p>
-    <button class="cta-button">Conocer Más</button>
+<div class="home-page">
+  <section class="welcome-card">
+    <div class="page-title-group">
+      <h2 class="page-title">{{ title }}</h2>
+      <p class="page-subtitle">{{ description }}</p>
+    </div>
+    <p class="hint-chip">Interfaz simple: primero selecciona modulo, luego usa el buscador.</p>
   </section>
 
-  <section class="features">
-    <h3>Características</h3>
-    <div class="features-grid">
-      <div class="feature-card">
-        <h4>Moderno</h4>
-        <p>Construido con la última versión de Angular</p>
-      </div>
-      <div class="feature-card">
-        <h4>Rápido</h4>
-        <p>Rendimiento optimizado para la mejor experiencia</p>
-      </div>
-      <div class="feature-card">
-        <h4>Responsive</h4>
-        <p>Se adapta perfectamente a cualquier dispositivo</p>
-      </div>
+  <section class="modules">
+    <h3>Vistas principales</h3>
+    <div class="modules-grid">
+      <article class="module-card" *ngFor="let module of visibleModules">
+        <h4>{{ module.title }}</h4>
+        <p>{{ module.description }}</p>
+        <a [routerLink]="module.route">Abrir vista</a>
+      </article>
     </div>
   </section>
 </div>

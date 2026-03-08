@@ -1,6 +1,9 @@
 export interface Instructor {
+  id?: string;
   nombre: string;
   telefono: string;
   foto: string;
-  asignado: boolean;
+  cursosIds?: string[]; // Array de IDs de cursos asignados
+  createdAt?: Date;
+  createdBy?: string;
 }

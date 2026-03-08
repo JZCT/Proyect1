@@ -1,47 +1,90 @@
-<h2>Administración de Usuarios</h2>
+<div class="users-page" *ngIf="isAdmin; else accessDenied">
+  <section class="panel">
+    <div class="page-title-group">
+      <h2 class="page-title">Administracion de Usuarios</h2>
+      <p class="page-subtitle">Crea cuentas por rol y etiqueta de empresa para controlar que puede ver cada usuario.</p>
+    </div>
 
-<div *ngIf="authService.isAdmin(); else noAccess">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Nombre completo</label>
+        <input type="text" placeholder="Ej. Juan Perez" [(ngModel)]="newUser.nombre" [disabled]="loading" />
+      </div>
 
-  <h3>Crear Usuario</h3>
+      <div class="form-group">
+        <label>Correo</label>
+        <input type="email" placeholder="juan@ejemplo.com" [(ngModel)]="newUser.email" [disabled]="loading" />
+      </div>
 
-  <input
-    type="text"
-    placeholder="Nombre"
-    [(ngModel)]="newUser.nombre"
-  />
+      <div class="form-group">
+        <label>Contrasena</label>
+        <input type="password" placeholder="Minimo 6 caracteres" [(ngModel)]="newUser.password" [disabled]="loading" />
+      </div>
 
-  <input
-    type="email"
-    placeholder="Correo"
-    [(ngModel)]="newUser.email"
-  />
+      <div class="form-group">
+        <label>Rol</label>
+        <select [(ngModel)]="newUser.role" (ngModelChange)="onRoleChange()" [disabled]="loading">
+          <option value="">Selecciona un rol</option>
+          <option value="admin">Administrador</option>
+          <option value="company">Empresa</option>
+          <option value="instructor">Instructor</option>
+        </select>
+      </div>
 
-  <select [(ngModel)]="newUser.role">
-    <option *ngFor="let role of roles" [value]="role">
-      {{ role }}
-    </option>
-  </select>
+      <div class="form-group" *ngIf="newUser.role === 'company'">
+        <label>Etiqueta empresa (opcional)</label>
+        <input
+          type="text"
+          placeholder="Ej. empresa-norte"
+          [(ngModel)]="newUser.companyTag"
+          [disabled]="loading"
+        />
+        <p class="field-help">
+          Si la dejas vacia, se genera automaticamente: <strong>{{ autoCompanyTagPreview }}</strong>
+        </p>
+      </div>
+    </div>
 
-  <button (click)="addUser()">Agregar Usuario</button>
+    <p class="panel-note">La etiqueta solo aplica para usuarios del tipo empresa.</p>
 
-  <hr>
+    <button (click)="addUser()" [disabled]="loading" class="btn btn-primary">
+      {{ loading ? 'Creando...' : 'Agregar usuario' }}
+    </button>
+  </section>
 
-  <h3>Lista de Usuarios</h3>
+  <section class="panel">
+    <h3>Usuarios registrados ({{ filteredUsers.length }})</h3>
 
-  <ul>
-    <li *ngFor="let user of users">
-      <strong>{{ user.nombre }}</strong>
-      - {{ user.email }}
-      ({{ user.role }})
+    <div class="form-group">
+      <label>Buscar usuario</label>
+      <input
+        type="text"
+        placeholder="Nombre, correo, rol o etiqueta..."
+        [(ngModel)]="searchTerm"
+        [disabled]="loading"
+      />
+    </div>
 
-      <button (click)="deleteUser(user.id)">
-        Eliminar
-      </button>
-    </li>
-  </ul>
+    <div *ngIf="filteredUsers.length === 0" class="empty-state">No hay usuarios para la busqueda actual.</div>
 
+    <div *ngIf="filteredUsers.length > 0" class="users-list">
+        <div *ngFor="let user of filteredUsers" class="user-item">
+          <div class="user-main">
+            <strong>{{ user.nombre }}</strong>
+            <span>{{ user.email }}</span>
+            <span class="role" [ngClass]="'role-' + user.role">{{ getRoleLabel(user.role) }}</span>
+            <span *ngIf="user.role === 'company' && user.companyTag">Etiqueta: {{ user.companyTag }}</span>
+          </div>
+
+        <button (click)="deleteUser(user.id)" [disabled]="loading" class="btn btn-danger">Eliminar</button>
+      </div>
+    </div>
+  </section>
 </div>
 
-<ng-template #noAccess>
-  <p>No tienes permisos para acceder.</p>
+<ng-template #accessDenied>
+  <div class="panel denied">
+    <h2>Acceso denegado</h2>
+    <p>Solo los administradores pueden gestionar usuarios.</p>
+  </div>
 </ng-template>
