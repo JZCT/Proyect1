@@ -1,6 +1,7 @@
-import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { PersonaService } from '../../services/persona.service';
 import { AuthService } from '../../services/auth.service';
 import { ImportService } from '../../services/import.service';
@@ -8,6 +9,7 @@ import { ReportService } from '../../services/report.service';
 import { Persona } from '../../models/persona.model';
 
 type PersonaArchivo = NonNullable<Persona['archivos']>[number];
+type FilePreviewType = 'image' | 'pdf' | 'text' | 'unsupported';
 
 @Component({
   selector: 'app-personas',
@@ -16,20 +18,32 @@ type PersonaArchivo = NonNullable<Persona['archivos']>[number];
   templateUrl: './personas.component.html',
   styleUrl: './personas.component.scss'
 })
-export class PersonasComponent implements OnInit {
+export class PersonasComponent implements OnInit, OnDestroy {
   @ViewChild('photoInput') photoInput!: ElementRef<HTMLInputElement>;
   @ViewChild('excelInput') excelInput!: ElementRef<HTMLInputElement>;
+  @ViewChild('cameraVideo') cameraVideo?: ElementRef<HTMLVideoElement>;
+  @ViewChild('cameraCanvas') cameraCanvas?: ElementRef<HTMLCanvasElement>;
   private readonly MIN_CALIFICACION_APTO = 80;
   private readonly CURP_REGEX = /^[A-Z0-9]{18}$/;
+  private cameraStream: MediaStream | null = null;
   
   personas: Persona[] = [];
   showForm = false;
   editingId: string | null = null;
   loadingFile = false;
+  cameraActive = false;
+  showPhotoOptions = false;
   isAdmin = false;
   searchTerm: string = '';
+  sortBy: 'nombre' | 'empresa' | 'final' = 'nombre';
+  sortDirection: 'asc' | 'desc' = 'asc';
   selectedPersonaIds = new Set<string>();
   deletingSelected = false;
+  showFilePreview = false;
+  previewFile: PersonaArchivo | null = null;
+  previewType: FilePreviewType = 'unsupported';
+  previewText = '';
+  previewResourceUrl: SafeResourceUrl | null = null;
 
   // Propiedades para carga masiva
   showBulkImport = false;
@@ -79,12 +93,18 @@ export class PersonasComponent implements OnInit {
     private personaService: PersonaService,
     private authService: AuthService,
     private importService: ImportService,
-    private reportService: ReportService
+    private reportService: ReportService,
+    private sanitizer: DomSanitizer
   ) {}
 
   ngOnInit(): void {
     this.checkAdminStatus();
     this.loadPersonas();
+  }
+
+  ngOnDestroy(): void {
+    this.detenerCamara();
+    this.closeArchivoPreview();
   }
 
   private checkAdminStatus() {
@@ -133,7 +153,22 @@ export class PersonasComponent implements OnInit {
       alert('No tienes permisos para realizar esta acción');
       return;
     }
+    this.showPhotoOptions = !this.showPhotoOptions;
+  }
+
+  seleccionarArchivoFoto() {
+    if (!this.isAdmin) return;
+
+    this.showPhotoOptions = false;
+    this.detenerCamara();
     this.photoInput.nativeElement.click();
+  }
+
+  tomarFotoDesdeMenu() {
+    if (!this.isAdmin) return;
+
+    this.showPhotoOptions = false;
+    this.iniciarCamara();
   }
 
   onPhotoSelected(event: any) {
@@ -153,11 +188,96 @@ export class PersonasComponent implements OnInit {
         } else {
           this.newPersona.foto = base64;
         }
-        
+
+        this.showPhotoOptions = false;
+        this.detenerCamara();
         this.loadingFile = false;
       };
       reader.readAsDataURL(file);
     }
+  }
+
+  isCameraSupported(): boolean {
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  }
+
+  async iniciarCamara() {
+    if (!this.isAdmin) return;
+
+    if (!this.isCameraSupported()) {
+      alert('Tu navegador no soporta la camara');
+      return;
+    }
+
+    try {
+      this.detenerCamara();
+      this.cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' },
+        audio: false
+      });
+
+      this.cameraActive = true;
+      requestAnimationFrame(() => this.attachCameraStream());
+    } catch (error) {
+      console.error('Error iniciando camara:', error);
+      alert('No se pudo abrir la camara. Revisa permisos del navegador.');
+    }
+  }
+
+  private attachCameraStream() {
+    if (!this.cameraVideo || !this.cameraStream) return;
+
+    const video = this.cameraVideo.nativeElement;
+    video.srcObject = this.cameraStream;
+    video.play().catch((error) => {
+      console.error('Error reproduciendo camara:', error);
+    });
+  }
+
+  capturarFoto() {
+    if (!this.isAdmin) return;
+    if (!this.cameraVideo || !this.cameraCanvas) return;
+
+    const video = this.cameraVideo.nativeElement;
+    const canvas = this.cameraCanvas.nativeElement;
+
+    if (!video.videoWidth || !video.videoHeight) {
+      alert('La camara aun no esta lista. Intenta de nuevo.');
+      return;
+    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      alert('No se pudo capturar la imagen');
+      return;
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const base64 = canvas.toDataURL('image/png');
+
+    if (this.editingId) {
+      this.editingPersona.foto = base64;
+    } else {
+      this.newPersona.foto = base64;
+    }
+
+    this.detenerCamara();
+  }
+
+  detenerCamara() {
+    if (this.cameraStream) {
+      this.cameraStream.getTracks().forEach(track => track.stop());
+      this.cameraStream = null;
+    }
+
+    if (this.cameraVideo?.nativeElement) {
+      this.cameraVideo.nativeElement.srcObject = null;
+    }
+
+    this.cameraActive = false;
   }
 
   onFilesSelected(event: Event) {
@@ -354,6 +474,9 @@ export class PersonasComponent implements OnInit {
   }
 
   resetForm() {
+    this.showPhotoOptions = false;
+    this.detenerCamara();
+    this.closeArchivoPreview();
     this.revokeObjectUrls(this.newPersona.archivos as PersonaArchivo[] | undefined);
     this.revokeObjectUrls(this.editingPersona.archivos as PersonaArchivo[] | undefined);
 
@@ -397,7 +520,58 @@ export class PersonasComponent implements OnInit {
 
   openArchivo(file: PersonaArchivo): void {
     if (!file?.url) return;
-    window.open(file.url, '_blank', 'noopener,noreferrer');
+
+    this.previewFile = file;
+    this.previewType = this.getPreviewType(file);
+    this.previewText = '';
+    this.previewResourceUrl = null;
+
+    if (this.previewType === 'pdf') {
+      this.previewResourceUrl = this.sanitizer.bypassSecurityTrustResourceUrl(file.url);
+    }
+
+    if (this.previewType === 'text') {
+      this.loadTextPreview(file);
+    }
+
+    this.showFilePreview = true;
+  }
+
+  closeArchivoPreview(): void {
+    this.showFilePreview = false;
+    this.previewFile = null;
+    this.previewType = 'unsupported';
+    this.previewText = '';
+    this.previewResourceUrl = null;
+  }
+
+  private getPreviewType(file: PersonaArchivo): FilePreviewType {
+    const tipo = (file.tipo || '').toLowerCase();
+    const nombre = (file.nombre || '').toLowerCase();
+
+    if (tipo.startsWith('image/')) return 'image';
+    if (tipo.includes('pdf') || nombre.endsWith('.pdf')) return 'pdf';
+
+    const isTextFile =
+      tipo.startsWith('text/') ||
+      tipo.includes('json') ||
+      nombre.endsWith('.txt') ||
+      nombre.endsWith('.csv') ||
+      nombre.endsWith('.json') ||
+      nombre.endsWith('.xml') ||
+      nombre.endsWith('.md');
+
+    return isTextFile ? 'text' : 'unsupported';
+  }
+
+  private async loadTextPreview(file: PersonaArchivo): Promise<void> {
+    try {
+      const response = await fetch(file.url);
+      this.previewText = await response.text();
+    } catch (error) {
+      console.error('Error cargando vista previa de texto:', error);
+      this.previewText = 'No se pudo mostrar la vista previa de este archivo.';
+    }
   }
 
   removeArchivo(index: number): void {
@@ -667,9 +841,7 @@ export class PersonasComponent implements OnInit {
 
   get filteredPersonas(): Persona[] {
     const term = this.normalizeSearch(this.searchTerm);
-    if (!term) return this.personas;
-
-    return this.personas.filter((persona) => {
+    const filtered = this.personas.filter((persona) => {
       const target = this.normalizeText([
         persona.nombre,
         persona.email,
@@ -683,6 +855,8 @@ export class PersonasComponent implements OnInit {
 
       return target.includes(term);
     });
+
+    return filtered.sort((a, b) => this.comparePersonas(a, b));
   }
 
   private normalizeSearch(value?: string): string {
@@ -713,6 +887,27 @@ export class PersonasComponent implements OnInit {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/\s+/g, ' ');
+  }
+
+  private comparePersonas(a: Persona, b: Persona): number {
+    const direction = this.sortDirection === 'asc' ? 1 : -1;
+
+    if (this.sortBy === 'final') {
+      const finalA = this.getCalificacionFinal(a) ?? -1;
+      const finalB = this.getCalificacionFinal(b) ?? -1;
+      return (finalA - finalB) * direction;
+    }
+
+    if (this.sortBy === 'empresa') {
+      const empresaA = this.normalizeText(a.empresa || '');
+      const empresaB = this.normalizeText(b.empresa || '');
+      const result = empresaA.localeCompare(empresaB);
+      if (result !== 0) return result * direction;
+    }
+
+    const nombreA = this.normalizeText(a.nombre || '');
+    const nombreB = this.normalizeText(b.nombre || '');
+    return nombreA.localeCompare(nombreB) * direction;
   }
 
   normalizeCurp(value?: string): string {

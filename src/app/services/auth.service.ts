@@ -98,6 +98,7 @@ export class AuthService {
         email: userData.email,
         role: userData.role || 'company',
         companyTag: userData.role === 'company' ? this.resolveCompanyTag(userData) : '',
+        instructorId: userData.role === 'instructor' ? (userData.instructorId || '').trim() : '',
         uid: userCredential.user.uid,
         createdAt: new Date(),
         assignedCourseIds: userData.assignedCourseIds || []

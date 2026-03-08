@@ -33,28 +33,30 @@
 
       <div *ngIf="bulkPersonas.length > 0" class="modal-section">
         <h4>Vista previa (5 de {{ bulkPersonas.length }})</h4>
-        <table class="table table-compact">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>CURP</th>
-              <th>Email</th>
-              <th>Telefono</th>
-              <th>Empresa</th>
-              <th>Ubicacion</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let p of bulkPersonas.slice(0, 5)">
-              <td>{{ p.nombre }}</td>
-              <td>{{ p.curp || '-' }}</td>
-              <td>{{ p.email }}</td>
-              <td>{{ p.telefono || '-' }}</td>
-              <td>{{ p.empresa || '-' }}</td>
-              <td>{{ p.lugar || '-' }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-scroll">
+          <table class="table table-compact">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>CURP</th>
+                <th>Email</th>
+                <th>Telefono</th>
+                <th>Empresa</th>
+                <th>Ubicacion</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let p of bulkPersonas.slice(0, 5)">
+                <td>{{ p.nombre }}</td>
+                <td>{{ p.curp || '-' }}</td>
+                <td>{{ p.email }}</td>
+                <td>{{ p.telefono || '-' }}</td>
+                <td>{{ p.empresa || '-' }}</td>
+                <td>{{ p.lugar || '-' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
         <div *ngIf="bulkImportProgress > 0" class="progress-bar">
           <div class="progress-fill" [style.width.%]="bulkImportProgress"></div>
@@ -124,8 +126,23 @@
         <button type="button" class="btn btn-primary btn-sm photo-btn" (click)="triggerCamera()">
           {{ loadingFile ? '...' : 'Foto' }}
         </button>
+
+        <div class="photo-options" *ngIf="showPhotoOptions">
+          <button type="button" (click)="seleccionarArchivoFoto()">Subir archivo</button>
+          <button type="button" (click)="tomarFotoDesdeMenu()" [disabled]="!isCameraSupported()">Tomar foto</button>
+        </div>
       </div>
-      <input #photoInput type="file" accept="image/*" capture="user" (change)="onPhotoSelected($event)" hidden>
+      <input #photoInput type="file" accept="image/*" (change)="onPhotoSelected($event)" hidden>
+    </div>
+
+    <div class="camera-box" *ngIf="cameraActive">
+      <video #cameraVideo autoplay playsinline muted></video>
+      <canvas #cameraCanvas class="camera-canvas"></canvas>
+    </div>
+
+    <div class="camera-actions" *ngIf="cameraActive">
+      <button type="button" class="btn btn-primary btn-sm" (click)="capturarFoto()">Capturar foto</button>
+      <button type="button" class="btn btn-secondary btn-sm" (click)="detenerCamara()">Cerrar camara</button>
     </div>
 
     <form (ngSubmit)="editingId ? updatePersona() : addPersona()">
@@ -243,6 +260,31 @@
     </form>
   </div>
 
+  <div *ngIf="showFilePreview" class="modal-overlay" (click)="closeArchivoPreview()">
+    <div class="modal-content file-preview-modal" (click)="$event.stopPropagation()">
+      <div class="file-preview-header">
+        <h4>{{ previewFile?.nombre || 'Vista previa' }}</h4>
+        <button type="button" class="btn btn-secondary btn-sm" (click)="closeArchivoPreview()">Cerrar</button>
+      </div>
+
+      <div class="file-preview-body" *ngIf="previewType === 'image'">
+        <img [src]="previewFile?.url" [alt]="previewFile?.nombre || 'archivo'" />
+      </div>
+
+      <div class="file-preview-body pdf-preview" *ngIf="previewType === 'pdf'">
+        <iframe *ngIf="previewResourceUrl" [src]="previewResourceUrl"></iframe>
+      </div>
+
+      <div class="file-preview-body text-preview" *ngIf="previewType === 'text'">
+        <pre>{{ previewText || 'Cargando vista previa...' }}</pre>
+      </div>
+
+      <div class="file-preview-body empty-state" *ngIf="previewType === 'unsupported'">
+        No hay vista previa integrada para este tipo de archivo.
+      </div>
+    </div>
+  </div>
+
   <div class="table-section">
     <h3>Registros ({{ filteredPersonas.length }})</h3>
     <div class="table-tools" *ngIf="isAdmin && filteredPersonas.length > 0">
@@ -262,76 +304,97 @@
       />
     </div>
 
+    <div class="report-filters">
+      <div class="form-group">
+        <label>Ordenar por</label>
+        <select [(ngModel)]="sortBy" name="personas_sort_by">
+          <option value="nombre">Alfabetico (Nombre)</option>
+          <option value="empresa">Alfabetico (Empresa)</option>
+          <option value="final">Calificacion final</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Direccion</label>
+        <select [(ngModel)]="sortDirection" name="personas_sort_direction">
+          <option value="asc">Menor a mayor / A-Z</option>
+          <option value="desc">Mayor a menor / Z-A</option>
+        </select>
+      </div>
+    </div>
+
     <div *ngIf="filteredPersonas.length === 0" class="empty-state">No hay personas para la busqueda actual.</div>
 
-    <table class="table" *ngIf="filteredPersonas.length > 0">
-      <thead>
-        <tr>
-          <th class="select-col" *ngIf="isAdmin">
-            <input
-              type="checkbox"
-              [checked]="isAllFilteredSelected()"
-              [indeterminate]="isPartiallyFilteredSelected()"
-              (change)="toggleSelectAllFiltered($event)"
-              aria-label="Seleccionar personas visibles"
-            />
-          </th>
-          <th>Perfil</th>
-          <th>Informacion</th>
-          <th>CURP</th>
-          <th>Contacto</th>
-          <th>Ubicacion</th>
-          <th>Practica</th>
-          <th>Teorica</th>
-          <th>Final</th>
-          <th>Resultado</th>
-          <th>Archivos</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let persona of filteredPersonas">
-          <td class="select-col" *ngIf="isAdmin">
-            <input
-              type="checkbox"
-              [checked]="isSelected(persona.id)"
-              (change)="toggleSelection(persona.id, $event)"
-              [attr.aria-label]="'Seleccionar ' + persona.nombre"
-            />
-          </td>
-          <td><img [src]="getFotoUrl(persona.foto)" class="table-avatar"></td>
-          <td>
-            <div class="primary-text">{{ persona.nombre }}</div>
-            <div class="secondary-text">{{ persona.empresa || '-' }}</div>
-          </td>
-          <td>{{ persona.curp || '-' }}</td>
-          <td>
-            <div class="primary-text">{{ persona.email }}</div>
-            <div class="secondary-text">{{ persona.telefono || '-' }}</div>
-          </td>
-          <td><span class="badge">{{ persona.lugar || '-' }}</span></td>
-          <td>{{ formatCalificacion(persona.clfPractica) }}</td>
-          <td>{{ formatCalificacion(persona.clfTeorica) }}</td>
-          <td>{{ formatCalificacion(getCalificacionFinal(persona)) }}</td>
-          <td>
-            <span class="status-badge" [ngClass]="getResultadoClase(persona)">
-              {{ getResultadoTexto(persona) }}
-            </span>
-          </td>
-          <td>
-            <div class="file-badges" *ngIf="persona.archivos && persona.archivos.length > 0; else noFiles">
-              <button type="button" class="file-tag file-link" *ngFor="let f of persona.archivos" (click)="openArchivo(f)">Ver {{ f.nombre }}</button>
-            </div>
-            <ng-template #noFiles><span class="empty-files">Sin archivos</span></ng-template>
-          </td>
-          <td>
-            <div class="actions">
-              <button class="btn btn-info btn-sm" (click)="startEdit(persona)" *ngIf="isAdmin">Editar</button>
-              <button class="btn btn-danger btn-sm" (click)="deletePersona(persona.id)" *ngIf="isAdmin">Eliminar</button>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="table-scroll" *ngIf="filteredPersonas.length > 0">
+      <table class="table">
+        <thead>
+          <tr>
+            <th class="select-col" *ngIf="isAdmin">
+              <input
+                type="checkbox"
+                [checked]="isAllFilteredSelected()"
+                [indeterminate]="isPartiallyFilteredSelected()"
+                (change)="toggleSelectAllFiltered($event)"
+                aria-label="Seleccionar personas visibles"
+              />
+            </th>
+            <th>Perfil</th>
+            <th>Informacion</th>
+            <th>CURP</th>
+            <th>Contacto</th>
+            <th>Ubicacion</th>
+            <th>Practica</th>
+            <th>Teorica</th>
+            <th>Final</th>
+            <th>Resultado</th>
+            <th>Archivos</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let persona of filteredPersonas">
+            <td class="select-col" *ngIf="isAdmin">
+              <input
+                type="checkbox"
+                [checked]="isSelected(persona.id)"
+                (change)="toggleSelection(persona.id, $event)"
+                [attr.aria-label]="'Seleccionar ' + persona.nombre"
+              />
+            </td>
+            <td><img [src]="getFotoUrl(persona.foto)" class="table-avatar"></td>
+            <td>
+              <div class="primary-text">{{ persona.nombre }}</div>
+              <div class="secondary-text">{{ persona.empresa || '-' }}</div>
+            </td>
+            <td>{{ persona.curp || '-' }}</td>
+            <td>
+              <div class="primary-text">{{ persona.email }}</div>
+              <div class="secondary-text">{{ persona.telefono || '-' }}</div>
+            </td>
+            <td><span class="badge">{{ persona.lugar || '-' }}</span></td>
+            <td>{{ formatCalificacion(persona.clfPractica) }}</td>
+            <td>{{ formatCalificacion(persona.clfTeorica) }}</td>
+            <td>{{ formatCalificacion(getCalificacionFinal(persona)) }}</td>
+            <td>
+              <span class="status-badge" [ngClass]="getResultadoClase(persona)">
+                {{ getResultadoTexto(persona) }}
+              </span>
+            </td>
+            <td>
+              <div class="file-badges" *ngIf="persona.archivos && persona.archivos.length > 0; else noFiles">
+                <button type="button" class="file-tag file-link" *ngFor="let f of persona.archivos" (click)="openArchivo(f)">Ver {{ f.nombre }}</button>
+              </div>
+              <ng-template #noFiles><span class="empty-files">Sin archivos</span></ng-template>
+            </td>
+            <td>
+              <div class="actions">
+                <button class="btn btn-info btn-sm" (click)="startEdit(persona)" *ngIf="isAdmin">Editar</button>
+                <button class="btn btn-danger btn-sm" (click)="deletePersona(persona.id)" *ngIf="isAdmin">Eliminar</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>

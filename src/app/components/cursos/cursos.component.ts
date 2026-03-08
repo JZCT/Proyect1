@@ -28,6 +28,8 @@ export class CursosComponent implements OnInit {
   editingInstructors: string[] = [];
   searchTerm: string = '';
   tagSearchTerm: string = '';
+  sortBy: 'nombre' | 'empresa' | 'inicio' | 'fin' = 'nombre';
+  sortDirection: 'asc' | 'desc' = 'asc';
 
   newCurso: Partial<Curso> = {
     nombre: '',
@@ -94,6 +96,7 @@ export class CursosComponent implements OnInit {
     this.instructorService.getInstructores().subscribe({
       next: (instructores) => {
         this.instructores = instructores;
+        this.applyCursoFilter();
       },
       error: (error) => {
         console.error('Error cargando instructores:', error);
@@ -259,24 +262,79 @@ export class CursosComponent implements OnInit {
       return;
     }
 
-    if (this.currentUser.role !== 'company') {
+    if (this.currentUser.role === 'admin') {
       this.cursos = this.allCursos;
       return;
     }
 
-    const companyTag = this.normalizeCompanyTag(this.currentUser.companyTag);
-    if (!companyTag) {
-      this.cursos = [];
+    if (this.currentUser.role === 'company') {
+      const companyTag = this.normalizeCompanyTag(this.currentUser.companyTag);
+      if (!companyTag) {
+        this.cursos = [];
+        return;
+      }
+
+      this.cursos = this.allCursos.filter(
+        (curso) => this.normalizeCompanyTag(curso.companyTag) === companyTag
+      );
       return;
     }
 
-    this.cursos = this.allCursos.filter(
-      (curso) => this.normalizeCompanyTag(curso.companyTag) === companyTag
-    );
+    if (this.currentUser.role === 'instructor') {
+      const assignedByUser = new Set((this.currentUser.assignedCourseIds || []).filter(Boolean));
+      const instructorIds = this.getInstructorIdsForCurrentUser();
+
+      this.cursos = this.allCursos.filter((curso) => {
+        const byUserAssignment = !!curso.idcurso && assignedByUser.has(curso.idcurso);
+        const byInstructorProfile = (curso.instructorIds || []).some((id) => instructorIds.has(id));
+        return byUserAssignment || byInstructorProfile;
+      });
+      return;
+    }
+
+    this.cursos = [];
   }
 
   private normalizeCompanyTag(tag?: string): string {
     return (tag || '').trim().toLowerCase();
+  }
+
+  private getInstructorIdsForCurrentUser(): Set<string> {
+    if (!this.currentUser) return new Set<string>();
+
+    const explicitInstructorId = (this.currentUser.instructorId || '').trim();
+    if (explicitInstructorId) {
+      return new Set([explicitInstructorId]);
+    }
+
+    const normalizedUserName = this.normalizeIdentity(this.currentUser.nombre || '');
+    const normalizedEmailAlias = this.normalizeIdentity(
+      (this.currentUser.email || '').split('@')[0] || ''
+    );
+
+    const ids = this.instructores
+      .filter((instructor) => {
+        const normalizedInstructorName = this.normalizeIdentity(instructor.nombre || '');
+        if (!normalizedInstructorName) return false;
+
+        return (
+          (!!normalizedUserName && normalizedInstructorName === normalizedUserName) ||
+          (!!normalizedEmailAlias && normalizedInstructorName === normalizedEmailAlias)
+        );
+      })
+      .map((instructor) => instructor.id)
+      .filter((id): id is string => !!id);
+
+    return new Set(ids);
+  }
+
+  private normalizeIdentity(value: string): string {
+    return (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
   }
 
   getCompanyTagOptions(currentTag?: string): string[] {
@@ -288,9 +346,7 @@ export class CursosComponent implements OnInit {
   get filteredCursos(): Curso[] {
     const term = this.normalizeSearch(this.searchTerm);
     const tagTerm = this.normalizeSearch(this.tagSearchTerm);
-    if (!term && !tagTerm) return this.cursos;
-
-    return this.cursos.filter((curso) => {
+    const filtered = this.cursos.filter((curso) => {
       const target = this.normalizeText([
         curso.nombre,
         curso.descripcion,
@@ -305,6 +361,8 @@ export class CursosComponent implements OnInit {
       const matchesTag = !tagTerm || normalizedTag.includes(tagTerm);
       return matchesGeneral && matchesTag;
     });
+
+    return [...filtered].sort((a, b) => this.compareCursos(a, b));
   }
 
   private normalizeSearch(value?: string): string {
@@ -317,5 +375,39 @@ export class CursosComponent implements OnInit {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/\s+/g, ' ');
+  }
+
+  private compareCursos(a: Curso, b: Curso): number {
+    const direction = this.sortDirection === 'asc' ? 1 : -1;
+
+    if (this.sortBy === 'inicio') {
+      const inicioA = this.toDateValue(a.Fecha_inicio);
+      const inicioB = this.toDateValue(b.Fecha_inicio);
+      if (inicioA !== inicioB) return (inicioA - inicioB) * direction;
+    }
+
+    if (this.sortBy === 'fin') {
+      const finA = this.toDateValue(a.Fecha_fin);
+      const finB = this.toDateValue(b.Fecha_fin);
+      if (finA !== finB) return (finA - finB) * direction;
+    }
+
+    if (this.sortBy === 'empresa') {
+      const empresaA = this.normalizeSearch(a.companyTag || '');
+      const empresaB = this.normalizeSearch(b.companyTag || '');
+      const compareEmpresa = empresaA.localeCompare(empresaB);
+      if (compareEmpresa !== 0) return compareEmpresa * direction;
+    }
+
+    const nombreA = this.normalizeSearch(a.nombre || '');
+    const nombreB = this.normalizeSearch(b.nombre || '');
+    return nombreA.localeCompare(nombreB) * direction;
+  }
+
+  private toDateValue(value: unknown): number {
+    if (!value) return 0;
+    const date = new Date(value as string | Date);
+    const time = date.getTime();
+    return Number.isNaN(time) ? 0 : time;
   }
 }

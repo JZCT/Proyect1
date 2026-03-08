@@ -24,6 +24,8 @@ export class InstructorComponent implements OnInit, OnDestroy {
   isAdmin = false;
   loadingAssignment = false;
   searchTerm = '';
+  sortBy: 'nombre' | 'cursos' = 'nombre';
+  sortDirection: 'asc' | 'desc' = 'asc';
 
   selectedCursoByInstructor: Record<string, string> = {};
 
@@ -343,9 +345,7 @@ export class InstructorComponent implements OnInit, OnDestroy {
 
   get filteredInstructores(): Instructor[] {
     const term = this.normalizeSearch(this.searchTerm);
-    if (!term) return this.instructores;
-
-    return this.instructores.filter((instructor) => {
+    const filtered = this.instructores.filter((instructor) => {
       const cursos = (instructor.cursosIds || [])
         .map((id) => this.getCursoNombre(id))
         .join(' ');
@@ -359,6 +359,8 @@ export class InstructorComponent implements OnInit, OnDestroy {
 
       return target.includes(term);
     });
+
+    return [...filtered].sort((a, b) => this.compareInstructores(a, b));
   }
 
   private normalizeSearch(value?: string): string {
@@ -371,5 +373,19 @@ export class InstructorComponent implements OnInit, OnDestroy {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/\s+/g, ' ');
+  }
+
+  private compareInstructores(a: Instructor, b: Instructor): number {
+    const direction = this.sortDirection === 'asc' ? 1 : -1;
+
+    if (this.sortBy === 'cursos') {
+      const cursosA = a.cursosIds?.length || 0;
+      const cursosB = b.cursosIds?.length || 0;
+      if (cursosA !== cursosB) return (cursosA - cursosB) * direction;
+    }
+
+    const nombreA = this.normalizeSearch(a.nombre || '');
+    const nombreB = this.normalizeSearch(b.nombre || '');
+    return nombreA.localeCompare(nombreB) * direction;
   }
 }

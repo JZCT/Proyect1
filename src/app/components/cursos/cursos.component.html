@@ -132,41 +132,63 @@
       />
     </div>
 
+    <div class="filters-inline">
+      <div class="form-group">
+        <label for="orden_curso_por">Ordenar por</label>
+        <select id="orden_curso_por" [(ngModel)]="sortBy" name="curso_sort_by">
+          <option value="nombre">Alfabetico (Nombre)</option>
+          <option value="empresa">Alfabetico (Etiqueta)</option>
+          <option value="inicio">Fecha inicio</option>
+          <option value="fin">Fecha fin</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="orden_curso_direccion">Direccion</label>
+        <select id="orden_curso_direccion" [(ngModel)]="sortDirection" name="curso_sort_direction">
+          <option value="asc">Menor a mayor / A-Z</option>
+          <option value="desc">Mayor a menor / Z-A</option>
+        </select>
+      </div>
+    </div>
+
     <div *ngIf="currentUser?.role === 'company'" class="empty-state">
       Mostrando solo cursos asignados a tu empresa.
     </div>
 
     <div *ngIf="filteredCursos.length === 0" class="empty-state">No hay cursos para la busqueda actual.</div>
 
-    <table *ngIf="filteredCursos.length > 0" class="table">
-      <thead>
-        <tr>
-          <th>Nombre</th>
-          <th>Descripcion</th>
-          <th>Empresa</th>
-          <th>Inicio</th>
-          <th>Fin</th>
-          <th>Representante</th>
-          <th>Telefono</th>
-          <th *ngIf="isAdmin">Acciones</th>
-        </tr>
-      </thead>
+    <div *ngIf="filteredCursos.length > 0" class="table-scroll">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Descripcion</th>
+            <th>Empresa</th>
+            <th>Inicio</th>
+            <th>Fin</th>
+            <th>Representante</th>
+            <th>Telefono</th>
+            <th *ngIf="isAdmin">Acciones</th>
+          </tr>
+        </thead>
 
-      <tbody>
-        <tr *ngFor="let curso of filteredCursos">
-          <td>{{ curso.nombre }}</td>
-          <td>{{ curso.descripcion }}</td>
-          <td>{{ curso.companyTag || '-' }}</td>
-          <td>{{ curso.Fecha_inicio | date }}</td>
-          <td>{{ curso.Fecha_fin | date }}</td>
-          <td>{{ curso.nom_representante }}</td>
-          <td>{{ curso.num_represnetantes }}</td>
-          <td class="actions" *ngIf="isAdmin">
-            <button class="btn btn-sm btn-info" (click)="startEdit(curso)">Editar</button>
-            <button class="btn btn-sm btn-danger" (click)="deleteCurso(curso.idcurso)">Eliminar</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+        <tbody>
+          <tr *ngFor="let curso of filteredCursos">
+            <td>{{ curso.nombre }}</td>
+            <td>{{ curso.descripcion }}</td>
+            <td>{{ curso.companyTag || '-' }}</td>
+            <td>{{ curso.Fecha_inicio | date }}</td>
+            <td>{{ curso.Fecha_fin | date }}</td>
+            <td>{{ curso.nom_representante }}</td>
+            <td>{{ curso.num_represnetantes }}</td>
+            <td class="actions" *ngIf="isAdmin">
+              <button class="btn btn-sm btn-info" (click)="startEdit(curso)">Editar</button>
+              <button class="btn btn-sm btn-danger" (click)="deleteCurso(curso.idcurso)">Eliminar</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>

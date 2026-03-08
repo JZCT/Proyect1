@@ -40,6 +40,22 @@
     <div class="buscador-box">
       <h2>Buscar Instructor</h2>
       <input type="text" placeholder="Nombre, telefono o curso..." [(ngModel)]="searchTerm">
+      <div class="sort-tools">
+        <div class="field">
+          <label>Ordenar por</label>
+          <select [(ngModel)]="sortBy" name="instructor_sort_by">
+            <option value="nombre">Alfabetico (Nombre)</option>
+            <option value="cursos">Cantidad de cursos</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Direccion</label>
+          <select [(ngModel)]="sortDirection" name="instructor_sort_direction">
+            <option value="asc">Menor a mayor / A-Z</option>
+            <option value="desc">Mayor a menor / Z-A</option>
+          </select>
+        </div>
+      </div>
       <p class="panel-note">La lista se actualiza mientras escribes.</p>
     </div>
 

@@ -2,7 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
+import { InstructorService } from '../../services/instructor.service';
 import { User } from '../../models/user.model';
+import { Instructor } from '../../models/instructor.model';
 
 @Component({
   selector: 'app-users',
@@ -13,6 +15,7 @@ import { User } from '../../models/user.model';
 })
 export class UsersComponent implements OnInit {
   users: User[] = [];
+  instructores: Instructor[] = [];
   isAdmin: boolean = false;
   currentUser: User | null = null;
   loading: boolean = false;
@@ -23,7 +26,8 @@ export class UsersComponent implements OnInit {
     email: '',
     password: '',
     role: '',
-    companyTag: ''
+    companyTag: '',
+    instructorId: ''
   };
 
   // Roles disponibles
@@ -33,12 +37,16 @@ export class UsersComponent implements OnInit {
     { value: 'company', label: 'Empresa' }
   ];
 
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private instructorService: InstructorService
+  ) {}
 
   ngOnInit(): void {
     this.checkAdminStatus();
     this.getCurrentUser();
     this.loadUsers();
+    this.loadInstructores();
   }
 
   private checkAdminStatus() {
@@ -76,6 +84,17 @@ export class UsersComponent implements OnInit {
     });
   }
 
+  private loadInstructores() {
+    this.instructorService.getInstructores().subscribe({
+      next: (instructores) => {
+        this.instructores = instructores;
+      },
+      error: (error) => {
+        console.error('Error cargando instructores:', error);
+      }
+    });
+  }
+
   async addUser() {
     // Validaciones
     if (!this.newUser.nombre || !this.newUser.nombre.trim()) {
@@ -95,6 +114,11 @@ export class UsersComponent implements OnInit {
 
     if (!this.newUser.role || !this.newUser.role.trim()) {
       alert('Por favor selecciona un rol');
+      return;
+    }
+
+    if (this.newUser.role === 'instructor' && !this.newUser.instructorId) {
+      alert('Selecciona el perfil de instructor para este usuario');
       return;
     }
 
@@ -118,6 +142,15 @@ export class UsersComponent implements OnInit {
       } else {
         this.newUser.companyTag = '';
       }
+
+      if (this.newUser.role !== 'instructor') {
+        this.newUser.instructorId = '';
+        this.newUser.assignedCourseIds = [];
+      } else {
+        const instructor = this.instructores.find((item) => item.id === this.newUser.instructorId);
+        this.newUser.assignedCourseIds = [...(instructor?.cursosIds || [])];
+      }
+
       await this.authService.addUser(this.newUser as User);
       alert('✅ Usuario agregado exitosamente');
       this.resetForm();
@@ -159,13 +192,19 @@ export class UsersComponent implements OnInit {
       email: '',
       password: '',
       role: '',
-      companyTag: ''
+      companyTag: '',
+      instructorId: ''
     };
   }
 
   onRoleChange() {
     if (this.newUser.role !== 'company') {
       this.newUser.companyTag = '';
+    }
+
+    if (this.newUser.role !== 'instructor') {
+      this.newUser.instructorId = '';
+      this.newUser.assignedCourseIds = [];
     }
   }
 
@@ -189,6 +228,12 @@ export class UsersComponent implements OnInit {
     return role ? role.label : roleValue;
   }
 
+  getInstructorNameById(instructorId?: string): string {
+    if (!instructorId) return 'Sin vincular';
+    const instructor = this.instructores.find((item) => item.id === instructorId);
+    return instructor?.nombre || 'Sin vincular';
+  }
+
   get filteredUsers(): User[] {
     const term = this.normalizeSearch(this.searchTerm);
     if (!term) return this.users;
@@ -198,7 +243,8 @@ export class UsersComponent implements OnInit {
         user.nombre,
         user.email,
         user.role,
-        user.companyTag || ''
+        user.companyTag || '',
+        this.getInstructorNameById(user.instructorId)
       ]
         .join(' '));
 

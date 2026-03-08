@@ -33,12 +33,12 @@ export class PersonaService {
   // Agregar persona
   async addPersona(persona: Persona): Promise<void> {
     try {
-      const newPersona = {
+      const newPersona = this.sanitizeForFirestore({
         ...persona,
         createdAt: new Date(),
         cursoIds: persona.cursoIds || []
-      };
-      await addDoc(this.personasCollection, newPersona);
+      }) as Record<string, unknown>;
+      await addDoc(this.personasCollection, newPersona as any);
     } catch (error) {
       console.error('Error agregando persona:', error);
       throw error;
@@ -49,7 +49,9 @@ export class PersonaService {
   async updatePersona(id: string, persona: Partial<Persona>): Promise<void> {
     try {
       const personaDoc = doc(this.firestore, `personas/${id}`);
-      await updateDoc(personaDoc, { ...persona });
+      const payload = this.sanitizeForFirestore({ ...persona }) as Record<string, unknown>;
+      if (Object.keys(payload).length === 0) return;
+      await updateDoc(personaDoc, payload as any);
     } catch (error) {
       console.error('Error actualizando persona:', error);
       throw error;
@@ -159,5 +161,32 @@ export class PersonaService {
       console.error('Error obteniendo persona:', error);
       return null;
     }
+  }
+
+  private sanitizeForFirestore(value: unknown): unknown {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    if (value instanceof Date) return value;
+
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => this.sanitizeForFirestore(item))
+        .filter((item) => item !== undefined);
+    }
+
+    if (typeof value === 'object') {
+      const sanitizedObject: Record<string, unknown> = {};
+
+      for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+        const sanitizedValue = this.sanitizeForFirestore(nestedValue);
+        if (sanitizedValue !== undefined) {
+          sanitizedObject[key] = sanitizedValue;
+        }
+      }
+
+      return sanitizedObject;
+    }
+
+    return value;
   }
 }

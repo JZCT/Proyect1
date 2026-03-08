@@ -46,8 +46,12 @@ export class CursosGruposComponent implements OnInit {
   selectedPersonaToAdd: string | null = null;
   cursoSearchTerm: string = '';
   cursoTagSearchTerm: string = '';
+  cursoSortBy: 'nombre' | 'empresa' | 'inicio' | 'fin' = 'nombre';
+  cursoSortDirection: 'asc' | 'desc' = 'asc';
   personaSearchTerm: string = '';
   personaDisponibleSearchTerm: string = '';
+  personaSortBy: 'nombre' | 'empresa' | 'final' = 'nombre';
+  personaSortDirection: 'asc' | 'desc' = 'asc';
   resultadoFilter: 'all' | 'apto' | 'noApto' | 'sinEvaluar' = 'all';
   savingCalificaciones: Record<string, boolean> = {};
 
@@ -156,6 +160,7 @@ export class CursosGruposComponent implements OnInit {
     this.instructorService.getInstructores().subscribe({
       next: (instructores) => {
         this.instructores = instructores;
+        this.applyCursoFilter();
         if (this.selectedCurso) this.updateInstructoresEnCurso();
       },
       error: (error) => {
@@ -210,6 +215,15 @@ export class CursosGruposComponent implements OnInit {
     const assignedInstructorIds = this.selectedCurso.instructorIds || [];
     this.instructoresEnCurso = this.instructores.filter((instructor) =>
       assignedInstructorIds.includes(instructor.id || '')
+    );
+  }
+
+  getInstructoresByCurso(curso: Curso): Instructor[] {
+    const instructorIds = curso.instructorIds || [];
+    if (instructorIds.length === 0) return [];
+
+    return this.instructores.filter((instructor) =>
+      instructorIds.includes(instructor.id || '')
     );
   }
 
@@ -448,22 +462,41 @@ export class CursosGruposComponent implements OnInit {
       return;
     }
 
-    if (this.currentUser.role !== 'company') {
+    if (this.currentUser.role === 'admin') {
       this.cursos = this.allCursos;
       this.syncSelectedCurso();
       return;
     }
 
-    const companyTag = this.normalizeCompanyTag(this.currentUser.companyTag);
-    if (!companyTag) {
-      this.cursos = [];
+    if (this.currentUser.role === 'company') {
+      const companyTag = this.normalizeCompanyTag(this.currentUser.companyTag);
+      if (!companyTag) {
+        this.cursos = [];
+        this.syncSelectedCurso();
+        return;
+      }
+
+      this.cursos = this.allCursos.filter(
+        (curso) => this.normalizeCompanyTag(curso.companyTag) === companyTag
+      );
       this.syncSelectedCurso();
       return;
     }
 
-    this.cursos = this.allCursos.filter(
-      (curso) => this.normalizeCompanyTag(curso.companyTag) === companyTag
-    );
+    if (this.currentUser.role === 'instructor') {
+      const assignedByUser = new Set((this.currentUser.assignedCourseIds || []).filter(Boolean));
+      const instructorIds = this.getInstructorIdsForCurrentUser();
+
+      this.cursos = this.allCursos.filter((curso) => {
+        const byUserAssignment = !!curso.idcurso && assignedByUser.has(curso.idcurso);
+        const byInstructorProfile = (curso.instructorIds || []).some((id) => instructorIds.has(id));
+        return byUserAssignment || byInstructorProfile;
+      });
+      this.syncSelectedCurso();
+      return;
+    }
+
+    this.cursos = [];
     this.syncSelectedCurso();
   }
 
@@ -491,6 +524,44 @@ export class CursosGruposComponent implements OnInit {
     return (tag || '').trim().toLowerCase();
   }
 
+  private getInstructorIdsForCurrentUser(): Set<string> {
+    if (!this.currentUser) return new Set<string>();
+
+    const explicitInstructorId = (this.currentUser.instructorId || '').trim();
+    if (explicitInstructorId) {
+      return new Set([explicitInstructorId]);
+    }
+
+    const normalizedUserName = this.normalizeIdentity(this.currentUser.nombre || '');
+    const normalizedEmailAlias = this.normalizeIdentity(
+      (this.currentUser.email || '').split('@')[0] || ''
+    );
+
+    const ids = this.instructores
+      .filter((instructor) => {
+        const normalizedInstructorName = this.normalizeIdentity(instructor.nombre || '');
+        if (!normalizedInstructorName) return false;
+
+        return (
+          (!!normalizedUserName && normalizedInstructorName === normalizedUserName) ||
+          (!!normalizedEmailAlias && normalizedInstructorName === normalizedEmailAlias)
+        );
+      })
+      .map((instructor) => instructor.id)
+      .filter((id): id is string => !!id);
+
+    return new Set(ids);
+  }
+
+  private normalizeIdentity(value: string): string {
+    return (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
   getCompanyTagOptions(currentTag?: string): string[] {
     const normalizedCurrent = this.normalizeCompanyTag(currentTag);
     if (!normalizedCurrent) return this.companyTags;
@@ -500,9 +571,7 @@ export class CursosGruposComponent implements OnInit {
   get filteredCursosList(): Curso[] {
     const term = this.normalizeSearch(this.cursoSearchTerm);
     const tagTerm = this.normalizeSearch(this.cursoTagSearchTerm);
-    if (!term && !tagTerm) return this.cursos;
-
-    return this.cursos.filter((curso) => {
+    const filtered = this.cursos.filter((curso) => {
       const target = this.normalizeText([
         curso.nombre,
         curso.descripcion,
@@ -517,24 +586,28 @@ export class CursosGruposComponent implements OnInit {
       const matchesTag = !tagTerm || normalizedTag.includes(tagTerm);
       return matchesGeneral && matchesTag;
     });
+
+    return [...filtered].sort((a, b) => this.compareCursos(a, b));
   }
 
   get filteredPersonasEnCurso(): Persona[] {
     const term = this.normalizeSearch(this.personaSearchTerm);
-    return this.personasEnCurso.filter((persona) => {
+    const filtered = this.personasEnCurso.filter((persona) => {
       const matchesSearch = !term || this.getPersonaSearchTarget(persona).includes(term);
       const matchesResultado = this.matchesResultadoFilter(persona);
       return matchesSearch && matchesResultado;
     });
+
+    return [...filtered].sort((a, b) => this.comparePersonas(a, b));
   }
 
   get filteredPersonasDisponibles(): Persona[] {
     const term = this.normalizeSearch(this.personaDisponibleSearchTerm);
-    if (!term) return this.personasDisponibles;
-
-    return this.personasDisponibles.filter((persona) =>
-      this.getPersonaSearchTarget(persona).includes(term)
+    const filtered = this.personasDisponibles.filter((persona) =>
+      !term || this.getPersonaSearchTarget(persona).includes(term)
     );
+
+    return [...filtered].sort((a, b) => this.comparePersonas(a, b));
   }
 
   private getPersonaSearchTarget(persona: Persona): string {
@@ -585,5 +658,60 @@ export class CursosGruposComponent implements OnInit {
   private normalizeScoreForEdit(value: unknown): number | null {
     const score = this.getValidScore(value);
     return score === null ? null : Math.round(score * 10) / 10;
+  }
+
+  private compareCursos(a: Curso, b: Curso): number {
+    const direction = this.cursoSortDirection === 'asc' ? 1 : -1;
+
+    if (this.cursoSortBy === 'inicio') {
+      const inicioA = this.toDateValue(a.Fecha_inicio);
+      const inicioB = this.toDateValue(b.Fecha_inicio);
+      if (inicioA !== inicioB) return (inicioA - inicioB) * direction;
+    }
+
+    if (this.cursoSortBy === 'fin') {
+      const finA = this.toDateValue(a.Fecha_fin);
+      const finB = this.toDateValue(b.Fecha_fin);
+      if (finA !== finB) return (finA - finB) * direction;
+    }
+
+    if (this.cursoSortBy === 'empresa') {
+      const empresaA = this.normalizeSearch(a.companyTag || '');
+      const empresaB = this.normalizeSearch(b.companyTag || '');
+      const compareEmpresa = empresaA.localeCompare(empresaB);
+      if (compareEmpresa !== 0) return compareEmpresa * direction;
+    }
+
+    const nombreA = this.normalizeSearch(a.nombre || '');
+    const nombreB = this.normalizeSearch(b.nombre || '');
+    return nombreA.localeCompare(nombreB) * direction;
+  }
+
+  private comparePersonas(a: Persona, b: Persona): number {
+    const direction = this.personaSortDirection === 'asc' ? 1 : -1;
+
+    if (this.personaSortBy === 'final') {
+      const finalA = this.getCalificacionFinal(a) ?? -1;
+      const finalB = this.getCalificacionFinal(b) ?? -1;
+      if (finalA !== finalB) return (finalA - finalB) * direction;
+    }
+
+    if (this.personaSortBy === 'empresa') {
+      const empresaA = this.normalizeSearch(a.empresa || '');
+      const empresaB = this.normalizeSearch(b.empresa || '');
+      const compareEmpresa = empresaA.localeCompare(empresaB);
+      if (compareEmpresa !== 0) return compareEmpresa * direction;
+    }
+
+    const nombreA = this.normalizeSearch(a.nombre || '');
+    const nombreB = this.normalizeSearch(b.nombre || '');
+    return nombreA.localeCompare(nombreB) * direction;
+  }
+
+  private toDateValue(value: unknown): number {
+    if (!value) return 0;
+    const date = new Date(value as string | Date);
+    const time = date.getTime();
+    return Number.isNaN(time) ? 0 : time;
   }
 }

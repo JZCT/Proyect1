@@ -43,9 +43,22 @@
           Si la dejas vacia, se genera automaticamente: <strong>{{ autoCompanyTagPreview }}</strong>
         </p>
       </div>
+
+      <div class="form-group" *ngIf="newUser.role === 'instructor'">
+        <label>Perfil de instructor</label>
+        <select [(ngModel)]="newUser.instructorId" [disabled]="loading">
+          <option value="">Selecciona un instructor</option>
+          <option *ngFor="let instructor of instructores" [value]="instructor.id">
+            {{ instructor.nombre }}{{ instructor.telefono ? ' - ' + instructor.telefono : '' }}
+          </option>
+        </select>
+        <p class="field-help" *ngIf="instructores.length === 0">
+          No hay instructores registrados. Crea primero un instructor para vincular el usuario.
+        </p>
+      </div>
     </div>
 
-    <p class="panel-note">La etiqueta solo aplica para usuarios del tipo empresa.</p>
+    <p class="panel-note">Empresa usa etiqueta; instructor debe vincularse a un perfil de instructor.</p>
 
     <button (click)="addUser()" [disabled]="loading" class="btn btn-primary">
       {{ loading ? 'Creando...' : 'Agregar usuario' }}
@@ -74,6 +87,7 @@
             <span>{{ user.email }}</span>
             <span class="role" [ngClass]="'role-' + user.role">{{ getRoleLabel(user.role) }}</span>
             <span *ngIf="user.role === 'company' && user.companyTag">Etiqueta: {{ user.companyTag }}</span>
+            <span *ngIf="user.role === 'instructor'">Instructor: {{ getInstructorNameById(user.instructorId) }}</span>
           </div>
 
         <button (click)="deleteUser(user.id)" [disabled]="loading" class="btn btn-danger">Eliminar</button>

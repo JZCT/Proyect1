@@ -6,8 +6,8 @@
 .header,
 .form-section,
 .table-section {
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 14px;
   padding: 14px;
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
@@ -23,7 +23,7 @@
 .form-section h3,
 .table-section h3 {
   margin: 0;
-  color: #1f2937;
+  color: var(--text);
 }
 
 .header {
@@ -45,13 +45,28 @@
 
 .form-group label {
   font-size: 12px;
-  color: #334155;
+  color: var(--text-soft);
   font-weight: 600;
+}
+
+.table-section .form-group input,
+.table-section .form-group select {
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 9px;
+  font-size: 14px;
+}
+
+.table-section .form-group input:focus,
+.table-section .form-group select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 .form input,
 .form textarea {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-strong);
   border-radius: 10px;
   padding: 9px;
   font-size: 14px;
@@ -60,7 +75,7 @@
 .form input:focus,
 .form textarea:focus {
   outline: none;
-  border-color: #2563eb;
+  border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
@@ -81,29 +96,29 @@
 .btn-primary,
 .btn-success,
 .btn-info {
-  color: #ffffff;
+  color: var(--surface);
 }
 
 .btn-primary {
-  background: #2563eb;
+  background: var(--primary);
 }
 
 .btn-success {
-  background: #15803d;
+  background: var(--secondary);
 }
 
 .btn-secondary {
-  background: #e2e8f0;
-  color: #334155;
+  background: var(--surface-elevated);
+  color: var(--text-soft);
 }
 
 .btn-danger {
-  background: #dc2626;
-  color: #ffffff;
+  background: var(--danger);
+  color: var(--surface);
 }
 
 .btn-info {
-  background: #0891b2;
+  background: var(--info);
 }
 
 .btn-sm {
@@ -112,22 +127,32 @@
 }
 
 .table {
-  margin-top: 10px;
+  margin-top: 0;
   width: 100%;
   border-collapse: collapse;
 }
 
+.table-scroll {
+  margin-top: 10px;
+}
+
+.filters-inline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
 .table th,
 .table td {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--surface-elevated);
   padding: 10px;
   font-size: 13px;
   text-align: left;
 }
 
 .table th {
-  color: #334155;
-  background: #f8fafc;
+  color: var(--text-soft);
+  background: var(--surface-soft);
 }
 
 .actions {
@@ -138,7 +163,7 @@
 .empty-state {
   margin-top: 10px;
   font-size: 13px;
-  color: #64748b;
+  color: var(--muted);
 }
 
 @media (max-width: 768px) {
@@ -153,3 +178,4 @@
     overflow-x: auto;
   }
 }
+

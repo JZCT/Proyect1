@@ -1,15 +1,26 @@
 :root {
-  --bg: #f5f7fb;
+  --brand-1: #0048cf;
+  --brand-2: #172555;
+  --brand-3: #0083fb;
+  --brand-4: #bdd9f3;
+  --brand-5: #00c6f2;
+  --brand-6: #2c47a1;
+
+  --bg: #e8f3ff;
   --surface: #ffffff;
-  --surface-soft: #f8fafc;
-  --border: #dbe3ef;
-  --text: #1f2937;
-  --muted: #64748b;
-  --primary: #2563eb;
-  --primary-strong: #1d4ed8;
+  --surface-soft: #edf6ff;
+  --surface-elevated: #e3efff;
+  --border: #a9c8e8;
+  --border-strong: #86aed8;
+  --text: var(--brand-2);
+  --text-soft: var(--brand-6);
+  --muted: #4e6ba6;
+  --primary: var(--brand-1);
+  --primary-strong: var(--brand-2);
+  --secondary: var(--brand-3);
+  --accent: var(--brand-5);
+  --info: var(--brand-6);
   --danger: #dc2626;
-  --success: #15803d;
-  --warning: #d97706;
   --radius: 12px;
   --shadow-sm: 0 4px 14px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 12px 24px rgba(15, 23, 42, 0.08);
@@ -30,7 +41,7 @@ body {
 
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: var(--bg);
+  background: linear-gradient(180deg, var(--brand-4) 0%, var(--bg) 48%, #f6fbff 100%);
   color: var(--text);
   line-height: 1.35;
 }
@@ -74,9 +85,9 @@ app-root {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #fff7ed;
-  color: #9a3412;
-  border: 1px solid #fed7aa;
+  background: rgba(0, 198, 242, 0.14);
+  color: var(--brand-2);
+  border: 1px solid rgba(0, 198, 242, 0.5);
   border-radius: 999px;
   padding: 3px 10px;
   font-size: 11px;
@@ -87,4 +98,62 @@ app-root {
   border: 0;
   border-top: 1px solid var(--border);
   margin: 12px 0;
+}
+
+.btn-primary {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+}
+
+.btn-success {
+  background: var(--secondary) !important;
+  color: #ffffff !important;
+}
+
+.btn-info {
+  background: var(--info) !important;
+  color: #ffffff !important;
+}
+
+.btn-danger {
+  background: var(--danger) !important;
+  color: #ffffff !important;
+}
+
+.btn-secondary,
+.btn-light {
+  background: var(--surface-elevated) !important;
+  color: var(--text-soft) !important;
+  border: 1px solid var(--border);
+}
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.table-scroll .table {
+  min-width: 980px;
+  margin: 0;
+}
+
+.table-scroll .table.table-compact {
+  min-width: 720px;
+}
+
+.table-scroll .table th,
+.table-scroll .table td {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+img,
+video,
+canvas,
+iframe {
+  max-width: 100%;
 }

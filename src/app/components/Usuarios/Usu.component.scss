@@ -8,8 +8,8 @@
 }
 
 .panel {
-  background: #ffffff;
-  border: 1px solid #dbe3ef;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 14px;
   padding: 16px;
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
@@ -18,7 +18,7 @@
 h2,
 h3 {
   margin: 0 0 12px;
-  color: #1f2937;
+  color: var(--text);
 }
 
 .form-grid {
@@ -36,13 +36,13 @@ h3 {
 
 label {
   font-size: 12px;
-  color: #334155;
+  color: var(--text-soft);
   font-weight: 600;
 }
 
 input,
 select {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-strong);
   border-radius: 10px;
   padding: 10px;
   font-size: 14px;
@@ -51,7 +51,7 @@ select {
 input:focus,
 select:focus {
   outline: none;
-  border-color: #2563eb;
+  border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
@@ -64,13 +64,13 @@ select:focus {
 }
 
 .btn-primary {
-  background: #2563eb;
-  color: #ffffff;
+  background: var(--primary);
+  color: var(--surface);
 }
 
 .btn-danger {
-  background: #dc2626;
-  color: #ffffff;
+  background: var(--danger);
+  color: var(--surface);
 }
 
 .btn:disabled {
@@ -84,9 +84,9 @@ select:focus {
 }
 
 .user-item {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--surface-elevated);
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--surface-soft);
   padding: 10px;
   display: flex;
   justify-content: space-between;
@@ -102,12 +102,13 @@ select:focus {
 }
 
 .user-main strong {
-  color: #1f2937;
+  color: var(--text);
 }
 
 .user-main span {
-  color: #64748b;
+  color: var(--muted);
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .role {
@@ -118,23 +119,23 @@ select:focus {
 }
 
 .role-admin {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: #172555;
+  color: #ffffff;
 }
 
 .role-instructor {
-  background: #dcfce7;
-  color: #166534;
+  background: #00c6f2;
+  color: #172555;
 }
 
 .role-company {
-  background: #ffedd5;
-  color: #9a3412;
+  background: #bdd9f3;
+  color: #2c47a1;
 }
 
 .empty-state {
   font-size: 13px;
-  color: #64748b;
+  color: var(--muted);
 }
 
 .panel-note {
@@ -147,7 +148,7 @@ select:focus {
 
 .denied p {
   margin: 0;
-  color: #b91c1c;
+  color: var(--primary-strong);
 }
 
 @media (max-width: 700px) {
@@ -156,3 +157,4 @@ select:focus {
     align-items: flex-start;
   }
 }
+

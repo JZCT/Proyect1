@@ -134,6 +134,26 @@
             />
           </div>
 
+          <div class="filters-inline">
+            <div class="form-group">
+              <label>Ordenar cursos por</label>
+              <select [(ngModel)]="cursoSortBy" name="curso_list_sort_by">
+                <option value="nombre">Alfabetico (Nombre)</option>
+                <option value="empresa">Alfabetico (Etiqueta)</option>
+                <option value="inicio">Fecha inicio</option>
+                <option value="fin">Fecha fin</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Direccion</label>
+              <select [(ngModel)]="cursoSortDirection" name="curso_list_sort_direction">
+                <option value="asc">Menor a mayor / A-Z</option>
+                <option value="desc">Mayor a menor / Z-A</option>
+              </select>
+            </div>
+          </div>
+
           <div *ngIf="filteredCursosList.length === 0" class="empty-state">No hay cursos para la busqueda actual.</div>
 
           <div
@@ -148,6 +168,19 @@
               <p>Empresa: {{ curso.companyTag || '-' }}</p>
               <p>Inicio: {{ curso.Fecha_inicio | date }} | Fin: {{ curso.Fecha_fin | date }}</p>
               <p>Representante: {{ curso.nom_representante }} | Telefono: {{ curso.num_represnetantes }}</p>
+
+              <ng-container *ngIf="getInstructoresByCurso(curso) as cursoInstructores">
+                <div class="curso-instructores-avatars" *ngIf="cursoInstructores.length > 0">
+                  <img
+                    *ngFor="let instructor of cursoInstructores"
+                    class="curso-instructor-avatar"
+                    [src]="instructor.foto || defaultInstructorImg"
+                    [alt]="instructor.nombre"
+                    [title]="instructor.nombre"
+                    (error)="onInstructorImgError($event)"
+                  />
+                </div>
+              </ng-container>
             </div>
 
             <div class="curso-actions" *ngIf="user.role === 'admin'">
@@ -184,6 +217,7 @@
                 class="instructor-avatar"
                 [src]="instructor.foto || defaultInstructorImg"
                 [alt]="instructor.nombre"
+                [title]="instructor.nombre"
                 (error)="onInstructorImgError($event)"
               />
               <div class="instructor-data">
@@ -226,6 +260,25 @@
               [(ngModel)]="personaSearchTerm"
               name="persona_curso_search"
             />
+          </div>
+
+          <div class="filters-inline">
+            <div class="form-group">
+              <label>Ordenar personas por</label>
+              <select [(ngModel)]="personaSortBy" name="persona_curso_sort_by">
+                <option value="nombre">Alfabetico (Nombre)</option>
+                <option value="empresa">Alfabetico (Empresa)</option>
+                <option value="final">Calificacion final</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Direccion</label>
+              <select [(ngModel)]="personaSortDirection" name="persona_curso_sort_direction">
+                <option value="asc">Menor a mayor / A-Z</option>
+                <option value="desc">Mayor a menor / Z-A</option>
+              </select>
+            </div>
           </div>
 
           <div class="resultado-filters">

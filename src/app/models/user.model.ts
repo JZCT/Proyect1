@@ -5,6 +5,7 @@ export interface User {
   password: string;
   role: string;
   companyTag?: string;
+  instructorId?: string;
   uid?: string;
   assignedCourseIds?: string[];
   createdAt?: Date;
