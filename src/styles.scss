@@ -1,4 +1,26 @@
-html, body {
+:root {
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-soft: #f8fafc;
+  --border: #dbe3ef;
+  --text: #1f2937;
+  --muted: #64748b;
+  --primary: #2563eb;
+  --primary-strong: #1d4ed8;
+  --danger: #dc2626;
+  --success: #15803d;
+  --warning: #d97706;
+  --radius: 12px;
+  --shadow-sm: 0 4px 14px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
   height: 100%;
   width: 100%;
   margin: 0;
@@ -6,46 +28,63 @@ html, body {
   overflow-x: hidden;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  transition: background 0.3s ease, color 0.3s ease;
-}
-
-// Estilos para pantallas normales (no login)
-body:not(.login-page) {
-  background-color: #c2c2c200;
-  color: #333;
-}
-
-// Estilos para pantalla de login
-body.login-page {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #000;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.35;
 }
 
 app-root {
-  display: flex;
-  flex-direction: column;
+  display: block;
   min-height: 100vh;
-  width: 100%;
 }
 
-app-root.login-page {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.page-title-group {
+  display: grid;
+  gap: 3px;
 }
 
-app-root.login-page main {
-  width: 100%;
-  padding: 0;
-  max-width: 100%;
+.page-title {
   margin: 0;
+  font-size: 21px;
+  letter-spacing: -0.2px;
+  color: var(--text);
+}
+
+.page-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.panel-note {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.field-help {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.hint-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.soft-divider {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 12px 0;
 }

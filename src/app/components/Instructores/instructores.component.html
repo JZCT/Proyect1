@@ -1,82 +1,96 @@
 <div class="contenedor">
-
-  <!-- ===== FORMULARIO ===== -->
   <div class="formulario">
-
-    <h2>
-      {{ editIndex !== null ? 'Editar Instructor' : 'Nuevo Instructor' }}
-    </h2>
-
-    <input
-      type="text"
-      placeholder="Nombre"
-      [(ngModel)]="nuevoInstructor.nombre">
-
-    <input
-      type="text"
-      placeholder="Teléfono"
-      [(ngModel)]="nuevoInstructor.telefono">
-
-    <label class="check">
-      <input type="checkbox" [(ngModel)]="nuevoInstructor.asignado">
-      Asignado
-    </label>
-
-    <!-- Imagen -->
-    <input type="file" accept="image/*"
-      (change)="seleccionarImagen($event)">
-
-    <img
-      class="preview"
-      [src]="nuevoInstructor.foto || defaultImg"
-      (error)="onImgError($event)">
-
-    <div class="acciones-form">
-      <button (click)="guardarInstructor()" class="guardar">
-        💾 Guardar
-      </button>
-
-      <button (click)="cancelar()" class="cancelar">
-        ❌ Cancelar
-      </button>
+    <div class="page-title-group">
+      <h2 class="page-title">{{ editIndex !== null ? 'Editar Instructor' : 'Nuevo Instructor' }}</h2>
+      <p class="page-subtitle">Captura datos basicos y asigna cursos desde la misma vista.</p>
     </div>
 
-  </div>
+    <input type="text" placeholder="Nombre" [(ngModel)]="nuevoInstructor.nombre">
+    <input type="text" placeholder="Telefono" [(ngModel)]="nuevoInstructor.telefono">
 
-  <!-- ===== LISTA ===== -->
-  <div class="grid">
+    <div class="foto-wrapper">
+      <img class="preview" [src]="nuevoInstructor.foto || defaultImg" (error)="onImgError($event)">
+      <button type="button" class="foto-trigger" (click)="togglePhotoOptions()">Foto</button>
 
-    <article
-      class="card"
-      *ngFor="let instructor of instructores; let i = index">
-
-      <img
-        class="avatar"
-        [src]="instructor.foto || defaultImg"
-        (error)="onImgError($event)">
-
-      <div class="info">
-        <h3>{{ instructor.nombre }}</h3>
-        <p>📞 {{ instructor.telefono }}</p>
-
-        <span
-          class="badge"
-          [ngClass]="{
-            'asignado': instructor.asignado,
-            'sin-asignar': !instructor.asignado
-          }">
-
-          {{ instructor.asignado ? 'Asignado' : 'Sin asignar' }}
-        </span>
+      <div class="photo-options" *ngIf="showPhotoOptions">
+        <button type="button" (click)="seleccionarArchivoFoto()">Subir archivo</button>
+        <button type="button" (click)="tomarFotoDesdeMenu()" [disabled]="!isCameraSupported()">Tomar foto</button>
       </div>
 
-      <div class="acciones">
-        <button (click)="editarInstructor(i)">✏️</button>
-        <button (click)="eliminarInstructor(i)">🗑️</button>
-      </div>
+      <input #photoInput type="file" accept="image/*" (change)="seleccionarImagen($event)" hidden>
+    </div>
 
-    </article>
+    <div class="camera-box" *ngIf="cameraActive">
+      <video #cameraVideo autoplay playsinline muted></video>
+      <canvas #cameraCanvas class="camera-canvas"></canvas>
+    </div>
 
+    <div class="camera-actions" *ngIf="cameraActive">
+      <button type="button" class="btn-capture" (click)="capturarFoto()">Capturar foto</button>
+      <button type="button" class="btn-stop" (click)="detenerCamara()">Cerrar camara</button>
+    </div>
+
+    <div class="acciones-form">
+      <button (click)="guardarInstructor()" class="guardar">Guardar</button>
+      <button (click)="cancelar()" class="cancelar">Cancelar</button>
+    </div>
   </div>
 
+  <div class="panel-derecho">
+    <div class="buscador-box">
+      <h2>Buscar Instructor</h2>
+      <input type="text" placeholder="Nombre, telefono o curso..." [(ngModel)]="searchTerm">
+      <p class="panel-note">La lista se actualiza mientras escribes.</p>
+    </div>
+
+    <div class="grid">
+      <p *ngIf="filteredInstructores.length === 0" class="empty-grid">No hay instructores para la busqueda actual.</p>
+      <article class="card" *ngFor="let instructor of filteredInstructores; let i = index">
+        <img class="avatar" [src]="instructor.foto || defaultImg" (error)="onImgError($event)">
+
+        <div class="info">
+          <h3>{{ instructor.nombre }}</h3>
+          <p>{{ instructor.telefono }}</p>
+
+          <div class="cursos-info">
+            <strong>Cursos asignados:</strong>
+            <span class="badge">{{ instructor.cursosIds?.length || 0 }}</span>
+
+            <ul class="cursos-list" *ngIf="instructor.cursosIds && instructor.cursosIds.length > 0">
+              <li *ngFor="let cursoId of instructor.cursosIds">{{ getCursoNombre(cursoId) }}</li>
+            </ul>
+
+            <p *ngIf="!instructor.cursosIds || instructor.cursosIds.length === 0" class="sin-cursos">
+              Sin cursos asignados
+            </p>
+          </div>
+
+          <div class="curso-assign" *ngIf="isAdmin && instructor.id">
+            <label>Curso:</label>
+            <select [(ngModel)]="selectedCursoByInstructor[instructor.id]">
+              <option value="">Selecciona un curso</option>
+              <option *ngFor="let curso of cursos" [value]="curso.idcurso">
+                {{ curso.nombre }}
+              </option>
+            </select>
+
+            <div class="assign-status" *ngIf="getSelectedCursoId(instructor) as selectedCursoId">
+              <span class="badge" [ngClass]="isCursoAsignado(instructor, selectedCursoId) ? 'asignado' : 'sin-asignar'">
+                {{ getEstadoAsignacion(instructor, selectedCursoId) }}
+              </span>
+
+              <button type="button" class="btn-assign" (click)="toggleAsignacionCurso(instructor)" [disabled]="loadingAssignment">
+                {{ getAccionAsignacion(instructor, selectedCursoId) }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="acciones">
+          <button (click)="editarInstructor(instructor)">Editar</button>
+          <button (click)="eliminarInstructor(instructor)">Eliminar</button>
+        </div>
+      </article>
+    </div>
+  </div>
 </div>

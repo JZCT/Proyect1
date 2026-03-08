@@ -1,109 +1,334 @@
 <div class="crud-container">
   <div class="header">
-    <h2>Gestión de Personas</h2>
-    <button class="btn btn-primary" (click)="toggleForm()">
-      {{ showForm ? 'Cerrar' : 'Agregar Persona' }}
-    </button>
+    <div class="page-title-group">
+      <h2 class="page-title">Gestion de Personas</h2>
+      <p class="page-subtitle">Registro claro de participantes con CURP obligatoria, foto, archivos y calificaciones.</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-success" (click)="triggerBulkImport()" *ngIf="isAdmin" title="Importar desde Excel">Carga masiva</button>
+      <button class="btn btn-info" (click)="toggleReports()" *ngIf="isAdmin" title="Generar reportes">Reportes</button>
+      <button class="btn btn-primary" (click)="toggleForm()" *ngIf="isAdmin">{{ showForm ? 'Cerrar' : 'Agregar persona' }}</button>
+    </div>
+  </div>
+
+  <input
+    #excelInput
+    type="file"
+    accept=".xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    (change)="onExcelSelected($event)"
+    hidden
+  >
+
+  <div *ngIf="showBulkImport" class="modal-overlay" (click)="cancelBulkImport()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <h3>Importar personas desde Excel</h3>
+
+      <div class="modal-section">
+        <p>Descargar plantilla: <a href="javascript:void(0)" (click)="downloadTemplate()">clic aqui</a></p>
+        <p class="selected-file" *ngIf="selectedExcelFileName">Archivo: {{ selectedExcelFileName }}</p>
+        <button class="btn btn-primary btn-sm" (click)="triggerBulkImport()">Seleccionar archivo Excel</button>
+      </div>
+
+      <div *ngIf="bulkImportError" class="alert alert-danger">{{ bulkImportError }}</div>
+
+      <div *ngIf="bulkPersonas.length > 0" class="modal-section">
+        <h4>Vista previa (5 de {{ bulkPersonas.length }})</h4>
+        <table class="table table-compact">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>CURP</th>
+              <th>Email</th>
+              <th>Telefono</th>
+              <th>Empresa</th>
+              <th>Ubicacion</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of bulkPersonas.slice(0, 5)">
+              <td>{{ p.nombre }}</td>
+              <td>{{ p.curp || '-' }}</td>
+              <td>{{ p.email }}</td>
+              <td>{{ p.telefono || '-' }}</td>
+              <td>{{ p.empresa || '-' }}</td>
+              <td>{{ p.lugar || '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div *ngIf="bulkImportProgress > 0" class="progress-bar">
+          <div class="progress-fill" [style.width.%]="bulkImportProgress"></div>
+          <span class="progress-text">{{ bulkImportProgress }}%</span>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-success" (click)="confirmBulkImport()" [disabled]="bulkImportLoading">
+            {{ bulkImportLoading ? 'Importando...' : 'Importar ' + bulkPersonas.length + ' personas' }}
+          </button>
+          <button class="btn btn-secondary" (click)="cancelBulkImport()" [disabled]="bulkImportLoading">Cancelar</button>
+        </div>
+      </div>
+
+      <div *ngIf="bulkPersonas.length === 0 && !bulkImportLoading" class="modal-section text-center">
+        Selecciona un archivo Excel para comenzar.
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="showReports" class="reports-section">
+    <h3>Reportes</h3>
+
+    <div class="report-filters">
+      <div class="form-group">
+        <label>Tipo de reporte</label>
+        <select [(ngModel)]="reportFilter.tipo" name="tipoReporte">
+          <option value="all">Todos</option>
+          <option value="empresa">Por empresa</option>
+          <option value="lugar">Por ubicacion</option>
+        </select>
+      </div>
+
+      <div class="form-group" *ngIf="reportFilter.tipo === 'empresa'">
+        <label>Empresa</label>
+        <select [(ngModel)]="reportFilter.empresa" name="empresaFilter">
+          <option value="">Seleccionar empresa...</option>
+          <option *ngFor="let e of empresas" [value]="e">{{ e }}</option>
+        </select>
+      </div>
+
+      <div class="form-group" *ngIf="reportFilter.tipo === 'lugar'">
+        <label>Ubicacion</label>
+        <select [(ngModel)]="reportFilter.lugar" name="lugarFilter">
+          <option value="">Seleccionar ubicacion...</option>
+          <option *ngFor="let l of lugares" [value]="l">{{ l }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="report-actions">
+      <button class="btn btn-primary" (click)="generateReport()">Ver</button>
+      <button class="btn btn-secondary" (click)="exportReportCSV()">CSV</button>
+      <button class="btn btn-secondary" (click)="exportReportExcel()">Excel</button>
+      <button class="btn btn-secondary" (click)="exportReportPDF()">PDF</button>
+      <button class="btn btn-light" (click)="showReports = false">Cerrar</button>
+    </div>
   </div>
 
   <div *ngIf="showForm" class="form-section">
-    <h3>{{ editingId ? 'Editar Persona' : 'Nueva Persona' }}</h3>
-    
-    <div class="photo-preview-container">
-      <img [src]="getFotoUrl(editingId ? editingPersona.foto : newPersona.foto)" 
-           alt="Vista previa" class="photo-preview">
+    <h3>{{ editingId ? 'Editar persona' : 'Nueva persona' }}</h3>
+    <p class="hint-chip">Dato obligatorio: CURP valida de 18 caracteres.</p>
+
+    <div class="photo-preview-wrapper">
+      <div class="photo-box">
+        <img [src]="getFotoUrl(editingId ? editingPersona.foto : newPersona.foto)" class="main-preview">
+        <button type="button" class="btn btn-primary btn-sm photo-btn" (click)="triggerCamera()">
+          {{ loadingFile ? '...' : 'Foto' }}
+        </button>
+      </div>
+      <input #photoInput type="file" accept="image/*" capture="user" (change)="onPhotoSelected($event)" hidden>
     </div>
 
-    <form (ngSubmit)="editingId ? updatePersona() : addPersona()" class="form">
+    <form (ngSubmit)="editingId ? updatePersona() : addPersona()">
       <div class="form-grid">
         <div class="form-group">
-          <label for="nombre">Nombre:</label>
-          <input type="text" id="nombre" name="nombre" required
-            [ngModel]="editingId ? editingPersona.nombre : newPersona.nombre"
-            (ngModelChange)="editingId ? (editingPersona.nombre = $event) : (newPersona.nombre = $event)" />
+          <label>Nombre completo</label>
+          <input type="text" [ngModel]="editingId ? editingPersona.nombre : newPersona.nombre" (ngModelChange)="editingId ? editingPersona.nombre = $event : newPersona.nombre = $event" name="nombre" required />
         </div>
 
         <div class="form-group">
-          <label for="foto">URL de la Foto:</label>
-          <input type="text" id="foto" name="foto" placeholder="https://ejemplo.com/foto.jpg"
-            [ngModel]="editingId ? editingPersona.foto : newPersona.foto"
-            (ngModelChange)="editingId ? (editingPersona.foto = $event) : (newPersona.foto = $event)" />
+          <label>CURP</label>
+          <input
+            type="text"
+            maxlength="18"
+            placeholder="18 caracteres"
+            [ngModel]="editingId ? editingPersona.curp : newPersona.curp"
+            (ngModelChange)="editingId ? editingPersona.curp = normalizeCurp($event) : newPersona.curp = normalizeCurp($event)"
+            name="curp"
+            required
+          />
+          <p class="field-help">Solo letras y numeros. El sistema la guarda en mayusculas.</p>
         </div>
 
         <div class="form-group">
-          <label for="email">Email:</label>
-          <input type="email" id="email" name="email" required
-            [ngModel]="editingId ? editingPersona.email : newPersona.email"
-            (ngModelChange)="editingId ? (editingPersona.email = $event) : (newPersona.email = $event)" />
+          <label>Email</label>
+          <input type="email" [ngModel]="editingId ? editingPersona.email : newPersona.email" (ngModelChange)="editingId ? editingPersona.email = $event : newPersona.email = $event" name="email" required />
         </div>
 
         <div class="form-group">
-          <label for="empresa">Empresa:</label>
-          <input type="text" id="empresa" name="empresa" required
-            [ngModel]="editingId ? editingPersona.empresa : newPersona.empresa"
-            (ngModelChange)="editingId ? (editingPersona.empresa = $event) : (newPersona.empresa = $event)" />
+          <label>Telefono</label>
+          <input type="tel" [ngModel]="editingId ? editingPersona.telefono : newPersona.telefono" (ngModelChange)="editingId ? editingPersona.telefono = $event : newPersona.telefono = $event" name="telefono" />
         </div>
 
         <div class="form-group">
-          <label for="telefono">Teléfono:</label>
-          <input type="tel" id="telefono" name="telefono" required
-            [ngModel]="editingId ? editingPersona.telefono : newPersona.telefono"
-            (ngModelChange)="editingId ? (editingPersona.telefono = $event) : (newPersona.telefono = $event)" />
+          <label>Empresa</label>
+          <input type="text" [ngModel]="editingId ? editingPersona.empresa : newPersona.empresa" (ngModelChange)="editingId ? editingPersona.empresa = $event : newPersona.empresa = $event" name="empresa" />
         </div>
 
         <div class="form-group">
-          <label for="archivos">Adjuntar Archivos:</label>
-          <input type="file" (change)="onFilesSelected($event)" class="file-input" multiple />
-          <div class="file-list-preview" *ngIf="(editingId ? editingPersona.archivos : newPersona.archivos)?.length">
-            <small>Seleccionados: {{ (editingId ? editingPersona.archivos : newPersona.archivos)?.join(', ') }}</small>
+          <label>Ubicacion</label>
+          <input type="text" [ngModel]="editingId ? editingPersona.lugar : newPersona.lugar" (ngModelChange)="editingId ? editingPersona.lugar = $event : newPersona.lugar = $event" name="lugar" />
+        </div>
+
+        <div class="form-group">
+          <label>Calf. practica (0-100)</label>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            [ngModel]="editingId ? editingPersona.clfPractica : newPersona.clfPractica"
+            (ngModelChange)="editingId ? editingPersona.clfPractica = $event : newPersona.clfPractica = $event"
+            name="clf_practica"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Calf. teorica (0-100)</label>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            [ngModel]="editingId ? editingPersona.clfTeorica : newPersona.clfTeorica"
+            (ngModelChange)="editingId ? editingPersona.clfTeorica = $event : newPersona.clfTeorica = $event"
+            name="clf_teorica"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Resultado</label>
+          <div class="status-preview">
+            <span class="status-badge" [ngClass]="getResultadoClase(editingId ? editingPersona : newPersona)">
+              {{ getResultadoTexto(editingId ? editingPersona : newPersona) }}
+            </span>
+            <small>Final: {{ formatCalificacion(getCalificacionFinal(editingId ? editingPersona : newPersona)) }}</small>
           </div>
+        </div>
+
+        <div class="form-group files-group">
+          <label>Documentos adicionales</label>
+          <input type="file" (change)="onFilesSelected($event)" multiple class="file-input" />
+
+          <div class="file-preview-grid" *ngIf="getCurrentArchivos().length > 0; else noFilesSelected">
+            <div class="file-preview-card" *ngFor="let file of getCurrentArchivos(); let i = index">
+              <div class="file-thumb">
+                <img *ngIf="isImageFile(file.tipo); else genericFileThumb" [src]="file.url" [alt]="file.nombre">
+                <ng-template #genericFileThumb>
+                  <span>ARCHIVO</span>
+                </ng-template>
+              </div>
+
+              <div class="file-meta">
+                <div class="file-name">{{ file.nombre }}</div>
+                <div class="file-type">{{ file.tipo || 'tipo no disponible' }}</div>
+              </div>
+
+              <div class="file-preview-actions">
+                <button type="button" class="btn btn-info btn-sm" (click)="openArchivo(file)">Ver</button>
+                <button type="button" class="btn btn-danger btn-sm" (click)="removeArchivo(i)">Quitar</button>
+              </div>
+            </div>
+          </div>
+
+          <ng-template #noFilesSelected>
+            <div class="empty-files">Sin archivos seleccionados.</div>
+          </ng-template>
         </div>
       </div>
 
       <div class="form-actions">
-        <button type="submit" class="btn btn-success">{{ editingId ? 'Actualizar' : 'Guardar' }}</button>
+        <button type="submit" class="btn btn-success" [disabled]="loadingFile">{{ editingId ? 'Actualizar' : 'Guardar' }}</button>
         <button type="button" class="btn btn-secondary" (click)="resetForm()">Cancelar</button>
       </div>
     </form>
   </div>
 
   <div class="table-section">
-    <h3>Lista de Personas</h3>
-    <div *ngIf="personas.length === 0" class="empty-state">
-      No hay personas registradas
+    <h3>Registros ({{ filteredPersonas.length }})</h3>
+    <div class="table-tools" *ngIf="isAdmin && filteredPersonas.length > 0">
+      <button type="button" class="btn btn-light btn-sm" (click)="selectVisible()">Seleccionar visibles</button>
+      <button type="button" class="btn btn-light btn-sm" (click)="clearSelection()" [disabled]="selectedCount === 0">Limpiar seleccion</button>
+      <button type="button" class="btn btn-danger btn-sm" (click)="deleteSelectedPersonas()" [disabled]="selectedCount === 0 || deletingSelected">
+        {{ deletingSelected ? 'Eliminando...' : 'Eliminar seleccionadas (' + selectedCount + ')' }}
+      </button>
     </div>
-    <table *ngIf="personas.length > 0" class="table">
+
+    <div class="form-group">
+      <label>Buscar persona</label>
+      <input
+        type="text"
+        placeholder="Nombre, correo, empresa, ubicacion o resultado..."
+        [(ngModel)]="searchTerm"
+      />
+    </div>
+
+    <div *ngIf="filteredPersonas.length === 0" class="empty-state">No hay personas para la busqueda actual.</div>
+
+    <table class="table" *ngIf="filteredPersonas.length > 0">
       <thead>
         <tr>
-          <th>Foto</th>
-          <th>Nombre</th>
-          <th>Email / Empresa</th>
+          <th class="select-col" *ngIf="isAdmin">
+            <input
+              type="checkbox"
+              [checked]="isAllFilteredSelected()"
+              [indeterminate]="isPartiallyFilteredSelected()"
+              (change)="toggleSelectAllFiltered($event)"
+              aria-label="Seleccionar personas visibles"
+            />
+          </th>
+          <th>Perfil</th>
+          <th>Informacion</th>
+          <th>CURP</th>
+          <th>Contacto</th>
+          <th>Ubicacion</th>
+          <th>Practica</th>
+          <th>Teorica</th>
+          <th>Final</th>
+          <th>Resultado</th>
           <th>Archivos</th>
           <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let persona of personas">
+        <tr *ngFor="let persona of filteredPersonas">
+          <td class="select-col" *ngIf="isAdmin">
+            <input
+              type="checkbox"
+              [checked]="isSelected(persona.id)"
+              (change)="toggleSelection(persona.id, $event)"
+              [attr.aria-label]="'Seleccionar ' + persona.nombre"
+            />
+          </td>
+          <td><img [src]="getFotoUrl(persona.foto)" class="table-avatar"></td>
           <td>
-            <img [src]="getFotoUrl(persona.foto)" class="table-avatar" alt="User">
+            <div class="primary-text">{{ persona.nombre }}</div>
+            <div class="secondary-text">{{ persona.empresa || '-' }}</div>
+          </td>
+          <td>{{ persona.curp || '-' }}</td>
+          <td>
+            <div class="primary-text">{{ persona.email }}</div>
+            <div class="secondary-text">{{ persona.telefono || '-' }}</div>
+          </td>
+          <td><span class="badge">{{ persona.lugar || '-' }}</span></td>
+          <td>{{ formatCalificacion(persona.clfPractica) }}</td>
+          <td>{{ formatCalificacion(persona.clfTeorica) }}</td>
+          <td>{{ formatCalificacion(getCalificacionFinal(persona)) }}</td>
+          <td>
+            <span class="status-badge" [ngClass]="getResultadoClase(persona)">
+              {{ getResultadoTexto(persona) }}
+            </span>
           </td>
           <td>
-            <strong>{{ persona.nombre }}</strong><br>
-            <small>{{ persona.telefono }}</small>
-          </td>
-          <td>
-            {{ persona.email }}<br>
-            <small class="text-muted">{{ persona.empresa }}</small>
-          </td>
-          <td>
-            <div class="files-container">
-              <span *ngFor="let f of persona.archivos" class="file-tag">📄 {{ f }}</span>
-              <span *ngIf="!persona.archivos?.length" class="text-muted small">---</span>
+            <div class="file-badges" *ngIf="persona.archivos && persona.archivos.length > 0; else noFiles">
+              <button type="button" class="file-tag file-link" *ngFor="let f of persona.archivos" (click)="openArchivo(f)">Ver {{ f.nombre }}</button>
             </div>
+            <ng-template #noFiles><span class="empty-files">Sin archivos</span></ng-template>
           </td>
-          <td class="actions">
-            <button class="btn btn-sm btn-info" (click)="startEdit(persona)">Editar</button>
-            <button class="btn btn-sm btn-danger" (click)="deletePersona(persona.id)">Eliminar</button>
+          <td>
+            <div class="actions">
+              <button class="btn btn-info btn-sm" (click)="startEdit(persona)" *ngIf="isAdmin">Editar</button>
+              <button class="btn btn-danger btn-sm" (click)="deletePersona(persona.id)" *ngIf="isAdmin">Eliminar</button>
+            </div>
           </td>
         </tr>
       </tbody>

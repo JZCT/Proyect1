@@ -1,102 +1,64 @@
-.home-content {
-  animation: fadeIn 0.5s ease-in;
-}
-
-.hero {
-  text-align: center;
-  padding: 3rem 0;
-  margin-bottom: 3rem;
-
-  h2 {
-    font-size: 2.5rem;
-    color: #2c3e50;
-    margin-bottom: 1rem;
-  }
-
-  p {
-    font-size: 1.2rem;
-    color: #666;
-    margin-bottom: 2rem;
-  }
-
-  .cta-button {
-    background-color: #3498db;
-    color: white;
-    border: none;
-    padding: 1rem 2rem;
-    font-size: 1rem;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-
-    &:hover {
-      background-color: #2980b9;
-    }
-  }
-}
-
-.features {
-  h3 {
-    font-size: 2rem;
-    text-align: center;
-    margin-bottom: 2rem;
-    color: #2c3e50;
-  }
-}
-
-.features-grid {
+.home-page {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 2rem;
+  gap: 16px;
 }
 
-.feature-card {
-  background: white;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-
-  h4 {
-    color: #3498db;
-    margin-bottom: 1rem;
-    font-size: 1.3rem;
-  }
-
-  p {
-    color: #666;
-    line-height: 1.6;
-  }
-
-  &:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  }
+.welcome-card,
+.modules {
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.welcome-card h2,
+.modules h3 {
+  margin: 0 0 8px;
+  color: #1f2937;
 }
 
-@media (max-width: 768px) {
-  .hero {
-    h2 {
-      font-size: 1.8rem;
-    }
+.welcome-card p {
+  margin: 0;
+  color: #64748b;
+}
 
-    p {
-      font-size: 1rem;
-    }
-  }
+.modules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
 
-  .features {
-    h3 {
-      font-size: 1.5rem;
-    }
-  }
+.module-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  background: #f8fafc;
+  display: grid;
+  gap: 8px;
+}
+
+.module-card h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.module-card p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.module-card a {
+  display: inline-flex;
+  width: fit-content;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  border-radius: 999px;
+  padding: 4px 10px;
 }
