@@ -142,6 +142,13 @@
   gap: 10px;
 }
 
+.report-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .table th,
 .table td {
   border-top: 1px solid var(--surface-elevated);

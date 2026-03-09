@@ -112,6 +112,15 @@
   <div class="table-section">
     <h3>Lista de cursos ({{ filteredCursos.length }})</h3>
 
+    <div class="report-actions" *ngIf="canExportReports">
+      <button class="btn btn-secondary btn-sm" (click)="exportCursosExcel()" [disabled]="exportingReport || filteredCursos.length === 0">
+        {{ exportingReport ? 'Generando...' : 'Exportar Excel' }}
+      </button>
+      <button class="btn btn-secondary btn-sm" (click)="exportCursosPDF()" [disabled]="exportingReport || filteredCursos.length === 0">
+        {{ exportingReport ? 'Generando...' : 'Exportar PDF' }}
+      </button>
+    </div>
+
     <div class="form-group">
       <label for="buscar_curso">Buscar curso</label>
       <input

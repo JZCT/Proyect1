@@ -30,7 +30,7 @@ export const routes: Routes = [
     path: 'personas',
     component: PersonasComponent,
     canActivate: [roleGuard],
-    data: { roles: ['admin', 'instructor'] }
+    data: { roles: ['admin', 'instructor', 'company'] }
   },
   {
     path: 'instructores',

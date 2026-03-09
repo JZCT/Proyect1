@@ -6,7 +6,9 @@ import { PersonaService } from '../../services/persona.service';
 import { AuthService } from '../../services/auth.service';
 import { ImportService } from '../../services/import.service';
 import { ReportService } from '../../services/report.service';
+import { NotificationService } from '../../services/notification.service';
 import { Persona } from '../../models/persona.model';
+import { User } from '../../models/user.model';
 
 type PersonaArchivo = NonNullable<Persona['archivos']>[number];
 type FilePreviewType = 'image' | 'pdf' | 'text' | 'unsupported';
@@ -28,12 +30,15 @@ export class PersonasComponent implements OnInit, OnDestroy {
   private cameraStream: MediaStream | null = null;
   
   personas: Persona[] = [];
+  allPersonas: Persona[] = [];
   showForm = false;
   editingId: string | null = null;
   loadingFile = false;
   cameraActive = false;
   showPhotoOptions = false;
   isAdmin = false;
+  canGenerateReports = false;
+  currentUser: User | null = null;
   searchTerm: string = '';
   sortBy: 'nombre' | 'empresa' | 'final' = 'nombre';
   sortDirection: 'asc' | 'desc' = 'asc';
@@ -94,11 +99,13 @@ export class PersonasComponent implements OnInit, OnDestroy {
     private authService: AuthService,
     private importService: ImportService,
     private reportService: ReportService,
+    private notificationService: NotificationService,
     private sanitizer: DomSanitizer
   ) {}
 
   ngOnInit(): void {
     this.checkAdminStatus();
+    this.loadCurrentUser();
     this.loadPersonas();
   }
 
@@ -113,18 +120,51 @@ export class PersonasComponent implements OnInit, OnDestroy {
     });
   }
 
+  private loadCurrentUser() {
+    this.authService.currentUserData$.subscribe((userData) => {
+      this.currentUser = userData;
+      this.canGenerateReports = userData?.role === 'admin' || userData?.role === 'company';
+      this.applyPersonaVisibility();
+    });
+  }
+
   loadPersonas() {
     this.personaService.getPersonas().subscribe({
       next: (personas) => {
-        this.personas = personas;
-        this.syncSelectionWithCurrentData();
-        this.updateFilterOptions();
+        this.allPersonas = personas;
+        this.applyPersonaVisibility();
         console.log('Personas cargadas:', personas);
       },
       error: (error) => {
         console.error('Error cargando personas:', error);
       }
     });
+  }
+
+  private applyPersonaVisibility() {
+    if (this.currentUser?.role === 'company') {
+      const companyTag = this.normalizeCompanyTag(this.currentUser.companyTag || '');
+      this.personas = companyTag
+        ? this.allPersonas.filter((persona) =>
+          this.normalizeCompanyTag(persona.empresa || '') === companyTag
+        )
+        : [];
+
+      this.reportFilter.tipo = 'empresa';
+      this.reportFilter.empresa = this.getCompanyEmpresaName();
+      this.reportFilter.lugar = '';
+    } else {
+      this.personas = [...this.allPersonas];
+    }
+
+    this.syncSelectionWithCurrentData();
+    this.updateFilterOptions();
+  }
+
+  private getCompanyEmpresaName(): string {
+    const withEmpresa = this.personas.find((persona) => (persona.empresa || '').trim());
+    if (withEmpresa?.empresa) return withEmpresa.empresa.trim();
+    return (this.currentUser?.companyTag || '').trim();
   }
 
   private updateFilterOptions() {
@@ -139,7 +179,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
   toggleForm() {
     if (!this.isAdmin) {
-      alert('No tienes permisos para realizar esta acción');
+      this.showMessage('No tienes permisos para realizar esta acción');
       return;
     }
     this.showForm = !this.showForm;
@@ -150,7 +190,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
   triggerCamera() {
     if (!this.isAdmin) {
-      alert('No tienes permisos para realizar esta acción');
+      this.showMessage('No tienes permisos para realizar esta acción');
       return;
     }
     this.showPhotoOptions = !this.showPhotoOptions;
@@ -171,17 +211,18 @@ export class PersonasComponent implements OnInit, OnDestroy {
     this.iniciarCamara();
   }
 
-  onPhotoSelected(event: any) {
+  onPhotoSelected(event: Event) {
     if (!this.isAdmin) return;
 
-    const file = event.target.files[0];
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (file) {
       this.loadingFile = true;
       
       // Convertir a base64 para almacenar (en producción usarías Firebase Storage)
       const reader = new FileReader();
-      reader.onload = (e: any) => {
-        const base64 = e.target.result;
+      reader.onload = (loadEvent: ProgressEvent<FileReader>) => {
+        const base64 = loadEvent.target?.result as string;
         
         if (this.editingId) {
           this.editingPersona.foto = base64;
@@ -205,7 +246,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
     if (!this.isAdmin) return;
 
     if (!this.isCameraSupported()) {
-      alert('Tu navegador no soporta la camara');
+      this.showMessage('Tu navegador no soporta la camara');
       return;
     }
 
@@ -220,7 +261,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
       requestAnimationFrame(() => this.attachCameraStream());
     } catch (error) {
       console.error('Error iniciando camara:', error);
-      alert('No se pudo abrir la camara. Revisa permisos del navegador.');
+      this.showMessage('No se pudo abrir la camara. Revisa permisos del navegador.');
     }
   }
 
@@ -242,7 +283,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
     const canvas = this.cameraCanvas.nativeElement;
 
     if (!video.videoWidth || !video.videoHeight) {
-      alert('La camara aun no esta lista. Intenta de nuevo.');
+      this.showMessage('La camara aun no esta lista. Intenta de nuevo.');
       return;
     }
 
@@ -251,7 +292,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
     const context = canvas.getContext('2d');
     if (!context) {
-      alert('No se pudo capturar la imagen');
+      this.showMessage('No se pudo capturar la imagen');
       return;
     }
 
@@ -319,18 +360,18 @@ export class PersonasComponent implements OnInit, OnDestroy {
     if (!this.isAdmin) return;
 
     if (!this.newPersona.nombre || !this.newPersona.email) {
-      alert('Nombre y email son requeridos');
+      this.showMessage('Nombre y email son requeridos');
       return;
     }
 
     const newCurp = this.normalizeCurp(this.newPersona.curp);
     if (!newCurp) {
-      alert('CURP es requerida');
+      this.showMessage('CURP es requerida');
       return;
     }
 
     if (!this.isValidCurp(newCurp)) {
-      alert('CURP no es valida. Debe tener 18 caracteres alfanumericos');
+      this.showMessage('CURP no es valida. Debe tener 18 caracteres alfanumericos');
       return;
     }
 
@@ -341,7 +382,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
       this.showForm = false;
     } catch (error) {
       console.error('Error agregando persona:', error);
-      alert('Error al agregar persona');
+      this.showMessage('Error al agregar persona');
     }
   }
 
@@ -361,12 +402,12 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
     const editCurp = this.normalizeCurp(this.editingPersona.curp);
     if (!editCurp) {
-      alert('CURP es requerida');
+      this.showMessage('CURP es requerida');
       return;
     }
 
     if (!this.isValidCurp(editCurp)) {
-      alert('CURP no es valida. Debe tener 18 caracteres alfanumericos');
+      this.showMessage('CURP no es valida. Debe tener 18 caracteres alfanumericos');
       return;
     }
 
@@ -379,7 +420,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
       this.resetForm();
     } catch (error) {
       console.error('Error actualizando persona:', error);
-      alert('Error al actualizar persona');
+      this.showMessage('Error al actualizar persona');
     }
   }
 
@@ -392,7 +433,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
         this.selectedPersonaIds.delete(id);
       } catch (error) {
         console.error('Error eliminando persona:', error);
-        alert('Error al eliminar persona');
+        this.showMessage('Error al eliminar persona');
       }
     }
   }
@@ -464,10 +505,10 @@ export class PersonasComponent implements OnInit, OnDestroy {
     try {
       await this.personaService.deletePersonas(idsToDelete);
       this.clearSelection();
-      alert(`Se eliminaron ${idsToDelete.length} personas`);
+      this.showMessage(`Se eliminaron ${idsToDelete.length} personas`);
     } catch (error) {
       console.error('Error eliminando personas seleccionadas:', error);
-      alert('Error al eliminar personas seleccionadas');
+      this.showMessage('Error al eliminar personas seleccionadas');
     } finally {
       this.deletingSelected = false;
     }
@@ -650,7 +691,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
   triggerBulkImport() {
     if (!this.isAdmin) {
-      alert('No tienes permisos para realizar esta accion');
+      this.showMessage('No tienes permisos para realizar esta accion');
       return;
     }
 
@@ -718,7 +759,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
       this.loadPersonas();
       this.bulkPersonas = [];
       this.showBulkImport = false;
-      alert(`✅ Se importaron exitosamente ${this.bulkImportProgress === 100 ? 'todas' : 'la mayoría de'} las personas`);
+      this.showMessage(`✅ Se importaron exitosamente ${this.bulkImportProgress === 100 ? 'todas' : 'la mayoría de'} las personas`);
     } catch (error: any) {
       this.bulkImportError = error.message || 'Error durante la importación masiva';
       console.error('Error en importación masiva:', error);
@@ -742,7 +783,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
       await this.importService.generateTemplate();
     } catch (error) {
       console.error('Error generando plantilla:', error);
-      alert('Error al generar plantilla');
+      this.showMessage('Error al generar plantilla');
     } finally {
       this.bulkImportLoading = false;
     }
@@ -751,91 +792,80 @@ export class PersonasComponent implements OnInit, OnDestroy {
   // ==================== REPORTES ====================
 
   toggleReports() {
-    if (!this.isAdmin) {
-      alert('No tienes permisos para generar reportes');
+    if (!this.canGenerateReports) {
+      this.showMessage('No tienes permisos para generar reportes');
       return;
     }
     this.showReports = !this.showReports;
   }
 
+  private buildReportFilter(): { empresa?: string; lugar?: string } {
+    if (this.currentUser?.role === 'company') {
+      const empresa = this.getCompanyEmpresaName();
+      return empresa ? { empresa } : {};
+    }
+
+    const filter: { empresa?: string; lugar?: string } = {};
+
+    if (this.reportFilter.tipo === 'empresa' && this.reportFilter.empresa) {
+      filter.empresa = this.reportFilter.empresa;
+    } else if (this.reportFilter.tipo === 'lugar' && this.reportFilter.lugar) {
+      filter.lugar = this.reportFilter.lugar;
+    }
+
+    return filter;
+  }
+
   async generateReport() {
-    if (!this.isAdmin) return;
+    if (!this.canGenerateReports) return;
 
     try {
-      const filter: any = {};
-      
-      if (this.reportFilter.tipo === 'empresa' && this.reportFilter.empresa) {
-        filter.empresa = this.reportFilter.empresa;
-      } else if (this.reportFilter.tipo === 'lugar' && this.reportFilter.lugar) {
-        filter.lugar = this.reportFilter.lugar;
-      }
-
+      const filter = this.buildReportFilter();
       const reportData = this.reportService.generateReportData(this.personas, filter);
       
-      alert(`📊 Reporte generado: ${reportData.totalPersonas} personas`);
+      this.showMessage(`📊 Reporte generado: ${reportData.totalPersonas} personas`);
     } catch (error: any) {
       console.error('Error generando reporte:', error);
-      alert('Error al generar reporte');
+      this.showMessage('Error al generar reporte');
     }
   }
 
   async exportReportCSV() {
-    if (!this.isAdmin) return;
+    if (!this.canGenerateReports) return;
 
     try {
-      const filter: any = {};
-      
-      if (this.reportFilter.tipo === 'empresa' && this.reportFilter.empresa) {
-        filter.empresa = this.reportFilter.empresa;
-      } else if (this.reportFilter.tipo === 'lugar' && this.reportFilter.lugar) {
-        filter.lugar = this.reportFilter.lugar;
-      }
-
+      const filter = this.buildReportFilter();
       const reportData = this.reportService.generateReportData(this.personas, filter);
       this.reportService.exportToCSV(reportData);
     } catch (error: any) {
       console.error('Error exportando CSV:', error);
-      alert('Error al exportar reporte');
+      this.showMessage('Error al exportar reporte');
     }
   }
 
   async exportReportExcel() {
-    if (!this.isAdmin) return;
+    if (!this.canGenerateReports) return;
 
     try {
-      const filter: any = {};
-      
-      if (this.reportFilter.tipo === 'empresa' && this.reportFilter.empresa) {
-        filter.empresa = this.reportFilter.empresa;
-      } else if (this.reportFilter.tipo === 'lugar' && this.reportFilter.lugar) {
-        filter.lugar = this.reportFilter.lugar;
-      }
-
+      const filter = this.buildReportFilter();
       const reportData = this.reportService.generateReportData(this.personas, filter);
       await this.reportService.exportToExcel(reportData);
     } catch (error: any) {
       console.error('Error exportando Excel:', error);
-      alert('Error al exportar reporte');
+      this.showMessage('Error al exportar reporte');
     }
   }
 
   async exportReportPDF() {
-    if (!this.isAdmin) return;
+    if (!this.canGenerateReports) return;
 
     try {
-      const filter: any = {};
-      
-      if (this.reportFilter.tipo === 'empresa' && this.reportFilter.empresa) {
-        filter.empresa = this.reportFilter.empresa;
-      } else if (this.reportFilter.tipo === 'lugar' && this.reportFilter.lugar) {
-        filter.lugar = this.reportFilter.lugar;
-      }
-
+      const filter = this.buildReportFilter();
       const reportData = this.reportService.generateReportData(this.personas, filter);
       await this.reportService.exportToPDF(reportData);
     } catch (error: any) {
       console.error('Error exportando PDF:', error);
-      alert('Error al exportar reporte');
+      this.showMessage('Error al exportar reporte');
     }
   }
 
@@ -910,6 +940,10 @@ export class PersonasComponent implements OnInit, OnDestroy {
     return nombreA.localeCompare(nombreB) * direction;
   }
 
+  private showMessage(message: unknown): void {
+    this.notificationService.notifyFromAlert(message);
+  }
+
   normalizeCurp(value?: string): string {
     return (value || '')
       .toUpperCase()
@@ -917,10 +951,21 @@ export class PersonasComponent implements OnInit, OnDestroy {
       .trim();
   }
 
+  private normalizeCompanyTag(value: string): string {
+    return (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .trim();
+  }
+
   private isValidCurp(value?: string): boolean {
     return this.CURP_REGEX.test(this.normalizeCurp(value));
   }
 }
+
 
 
 

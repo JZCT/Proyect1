@@ -7,6 +7,8 @@ import { CursoService } from '../../services/curso.service';
 import { InstructorService } from '../../services/instructor.service';
 import { PersonaService } from '../../services/persona.service';
 import { AuthService } from '../../services/auth.service';
+import { ReportData, ReportService } from '../../services/report.service';
+import { NotificationService } from '../../services/notification.service';
 
 import { Curso } from '../../models/curso.model';
 import { Instructor } from '../../models/instructor.model';
@@ -54,6 +56,7 @@ export class CursosGruposComponent implements OnInit {
   personaSortDirection: 'asc' | 'desc' = 'asc';
   resultadoFilter: 'all' | 'apto' | 'noApto' | 'sinEvaluar' = 'all';
   savingCalificaciones: Record<string, boolean> = {};
+  exportingCursoReport = false;
 
   showCursoForm = false;
 
@@ -83,7 +86,9 @@ export class CursosGruposComponent implements OnInit {
     private cursoService: CursoService,
     private instructorService: InstructorService,
     private personaService: PersonaService,
-    private authService: AuthService
+    private authService: AuthService,
+    private reportService: ReportService,
+    private notificationService: NotificationService
   ) {
     this.currentUser$ = this.authService.currentUserData$;
   }
@@ -130,6 +135,10 @@ export class CursosGruposComponent implements OnInit {
     if (!this.selectedCurso || !this.currentUser) return false;
 
     return this.isAdmin() || this.isInstructor();
+  }
+
+  canExportCursoReport(): boolean {
+    return !!this.selectedCurso && !!this.currentUser;
   }
 
   loadCursos() {
@@ -263,12 +272,13 @@ export class CursosGruposComponent implements OnInit {
           personasIds: []
         });
         this.resetCursoForm();
+        this.notificationService.success('Curso agregado exitosamente');
       } catch (error) {
         console.error('Error agregando curso:', error);
-        alert('Error al agregar curso');
+        this.notificationService.error('Error al agregar curso');
       }
     } else {
-      alert('Completa todos los campos, incluyendo etiqueta de empresa');
+      this.notificationService.warning('Completa todos los campos, incluyendo etiqueta de empresa');
     }
   }
 
@@ -285,7 +295,7 @@ export class CursosGruposComponent implements OnInit {
 
     if (this.editingCursoId) {
       if (!this.editingCurso.companyTag || !this.editingCurso.companyTag.trim()) {
-        alert('La etiqueta de empresa es requerida');
+        this.notificationService.warning('La etiqueta de empresa es requerida');
         return;
       }
 
@@ -295,9 +305,10 @@ export class CursosGruposComponent implements OnInit {
           companyTag: this.normalizeCompanyTag(this.editingCurso.companyTag)
         } as Curso);
         this.resetCursoForm();
+        this.notificationService.success('Curso actualizado exitosamente');
       } catch (error) {
         console.error('Error actualizando curso:', error);
-        alert('Error al actualizar curso');
+        this.notificationService.error('Error al actualizar curso');
       }
     }
   }
@@ -311,9 +322,10 @@ export class CursosGruposComponent implements OnInit {
         this.selectedCurso = null;
         this.personasEnCurso = [];
         this.instructoresEnCurso = [];
+        this.notificationService.success('Curso eliminado exitosamente');
       } catch (error) {
         console.error('Error eliminando curso:', error);
-        alert('Error al eliminar curso');
+        this.notificationService.error('Error al eliminar curso');
       }
     }
   }
@@ -346,14 +358,20 @@ export class CursosGruposComponent implements OnInit {
   async addPersonaToCurso(personaId: string | null) {
     if (!this.selectedCurso || !personaId) return;
     if (!this.canManagePersonas()) return;
+    if (this.isPersonaAsignada(personaId)) {
+      this.notificationService.warning('Esta persona ya esta asignada al curso');
+      this.selectNextPersonaPendiente();
+      return;
+    }
 
     try {
       await this.cursoService.addPersonaToCurso(this.selectedCurso.idcurso || '', personaId);
       this.updatePersonasEnCurso();
-      this.selectedPersonaToAdd = null;
+      this.selectNextPersonaPendiente();
+      this.notificationService.success('Persona asignada al curso');
     } catch (error) {
       console.error('Error agregando persona al curso:', error);
-      alert('Error al agregar persona al curso');
+      this.notificationService.error('Error al agregar persona al curso');
     }
   }
 
@@ -364,15 +382,56 @@ export class CursosGruposComponent implements OnInit {
     try {
       await this.cursoService.removePersonaFromCurso(this.selectedCurso.idcurso || '', personaId);
       this.updatePersonasEnCurso();
+      this.notificationService.info('Persona removida del curso');
     } catch (error) {
       console.error('Error removiendo persona del curso:', error);
-      alert('Error al remover persona del curso');
+      this.notificationService.error('Error al remover persona del curso');
     }
   }
 
-  async removeInstructorFromCurso(instructorId: string | undefined) {
-    if (!this.selectedCurso || !instructorId) return;
-    if (!this.canManagePersonas()) return;
+  async exportCursoReportExcel() {
+    if (!this.canExportCursoReport() || this.exportingCursoReport) return;
+
+    try {
+      this.exportingCursoReport = true;
+      await this.reportService.exportToExcel(this.buildCursoReportData());
+      this.notificationService.success('Reporte en Excel generado');
+    } catch (error) {
+      console.error('Error exportando reporte por curso (Excel):', error);
+      this.notificationService.error('Error al exportar reporte por curso en Excel');
+    } finally {
+      this.exportingCursoReport = false;
+    }
+  }
+
+  async exportCursoReportPDF() {
+    if (!this.canExportCursoReport() || this.exportingCursoReport) return;
+
+    try {
+      this.exportingCursoReport = true;
+      await this.reportService.exportToPDF(this.buildCursoReportData());
+      this.notificationService.success('Reporte en PDF generado');
+    } catch (error) {
+      console.error('Error exportando reporte por curso (PDF):', error);
+      this.notificationService.error('Error al exportar reporte por curso en PDF');
+    } finally {
+      this.exportingCursoReport = false;
+    }
+  }
+
+  private buildCursoReportData(): ReportData {
+    const cursoNombre = this.selectedCurso?.nombre || 'Curso sin nombre';
+    const instructorName = this.instructoresEnCurso.map((item) => item.nombre).join(', ');
+    const personas = this.personasEnCurso;
+
+    return {
+      title: `Reporte de Personas - Curso: ${cursoNombre}`,
+      generatedAt: new Date(),
+      totalPersonas: personas.length,
+      personas,
+      empresa: this.selectedCurso?.companyTag || '',
+      instructorName
+    };
   }
 
   onCalificacionChange(persona: Persona, field: 'clfPractica' | 'clfTeorica', value: unknown) {
@@ -398,7 +457,7 @@ export class CursosGruposComponent implements OnInit {
       this.updateResumenCalificaciones();
     } catch (error) {
       console.error('Error guardando calificaciones:', error);
-      alert('No se pudieron guardar las calificaciones');
+      this.notificationService.error('No se pudieron guardar las calificaciones');
     } finally {
       this.savingCalificaciones[persona.id] = false;
     }
@@ -610,6 +669,38 @@ export class CursosGruposComponent implements OnInit {
     return [...filtered].sort((a, b) => this.comparePersonas(a, b));
   }
 
+  get filteredPersonasAsignacion(): Persona[] {
+    const term = this.normalizeSearch(this.personaDisponibleSearchTerm);
+    const filtered = this.personas.filter((persona) =>
+      !term || this.getPersonaSearchTarget(persona).includes(term)
+    );
+
+    return [...filtered].sort((a, b) => this.comparePersonas(a, b));
+  }
+
+  isPersonaAsignada(personaId: string | null | undefined): boolean {
+    if (!personaId || !this.selectedCurso) return false;
+    return (this.selectedCurso.personasIds || []).includes(personaId);
+  }
+
+  get personasAsignadasEnBusqueda(): number {
+    return this.filteredPersonasAsignacion.filter((persona) => this.isPersonaAsignada(persona.id)).length;
+  }
+
+  get personasPendientesEnBusqueda(): number {
+    return this.filteredPersonasAsignacion.length - this.personasAsignadasEnBusqueda;
+  }
+
+  getPersonaAsignacionLabel(persona: Persona): string {
+    const marca = this.isPersonaAsignada(persona.id) ? '[x]' : '[ ]';
+    return `${marca} ${persona.nombre} (${persona.email})`;
+  }
+
+  private selectNextPersonaPendiente(): void {
+    const siguiente = this.filteredPersonasAsignacion.find((persona) => !this.isPersonaAsignada(persona.id));
+    this.selectedPersonaToAdd = siguiente?.id || null;
+  }
+
   private getPersonaSearchTarget(persona: Persona): string {
     return this.normalizeText([
       persona.nombre,
@@ -715,3 +806,4 @@ export class CursosGruposComponent implements OnInit {
     return Number.isNaN(time) ? 0 : time;
   }
 }
+

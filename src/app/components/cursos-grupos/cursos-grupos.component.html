@@ -194,6 +194,24 @@
       <div class="grupos-panel">
         <div *ngIf="selectedCurso" class="panel-header">
           <h3>Personas en {{ selectedCurso.nombre }}</h3>
+          <div class="report-actions" *ngIf="canExportCursoReport()">
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
+              (click)="exportCursoReportExcel()"
+              [disabled]="exportingCursoReport"
+            >
+              {{ exportingCursoReport ? 'Generando...' : 'Excel' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
+              (click)="exportCursoReportPDF()"
+              [disabled]="exportingCursoReport"
+            >
+              {{ exportingCursoReport ? 'Generando...' : 'PDF' }}
+            </button>
+          </div>
         </div>
 
         <div *ngIf="!selectedCurso" class="empty-state">Selecciona un curso para gestionar personas.</div>
@@ -241,13 +259,30 @@
             />
           </div>
 
+          <div class="assign-progress">
+            <span class="status-badge status-apto">Asignadas: {{ personasAsignadasEnBusqueda }}</span>
+            <span class="status-badge status-sin-evaluar">Pendientes: {{ personasPendientesEnBusqueda }}</span>
+          </div>
+
           <div class="form-group">
-            <label>Personas disponibles</label>
+            <label>Personas (palomita = ya asignada)</label>
             <select [(ngModel)]="selectedPersonaToAdd" name="persona_select">
               <option [ngValue]="null">Seleccionar</option>
-              <option *ngFor="let p of filteredPersonasDisponibles" [ngValue]="p.id">{{ p.nombre }} ({{ p.email }})</option>
+              <option
+                *ngFor="let p of filteredPersonasAsignacion"
+                [ngValue]="p.id"
+                [disabled]="isPersonaAsignada(p.id)"
+              >
+                {{ getPersonaAsignacionLabel(p) }}
+              </option>
             </select>
-            <button class="btn btn-sm btn-primary" (click)="addPersonaToCurso(selectedPersonaToAdd)">Agregar</button>
+            <button
+              class="btn btn-sm btn-primary"
+              (click)="addPersonaToCurso(selectedPersonaToAdd)"
+              [disabled]="!selectedPersonaToAdd || isPersonaAsignada(selectedPersonaToAdd)"
+            >
+              Agregar
+            </button>
           </div>
         </div>
 
