@@ -39,7 +39,7 @@ export class HomeComponent {
       title: 'Personas',
       description: 'Registro individual, CURP obligatoria, carga masiva y reportes.',
       route: '/personas',
-      roles: ['admin', 'instructor']
+      roles: ['admin', 'instructor', 'company']
     },
     {
       title: 'Usuarios',

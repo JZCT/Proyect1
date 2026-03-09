@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { CursoService } from '../../services/curso.service';
 import { InstructorService } from '../../services/instructor.service';
 import { AuthService } from '../../services/auth.service';
+import { ReportService } from '../../services/report.service';
+import { NotificationService } from '../../services/notification.service';
 import { Curso } from '../../models/curso.model';
 import { Instructor } from '../../models/instructor.model';
 import { User } from '../../models/user.model';
@@ -30,6 +32,7 @@ export class CursosComponent implements OnInit {
   tagSearchTerm: string = '';
   sortBy: 'nombre' | 'empresa' | 'inicio' | 'fin' = 'nombre';
   sortDirection: 'asc' | 'desc' = 'asc';
+  exportingReport = false;
 
   newCurso: Partial<Curso> = {
     nombre: '',
@@ -56,7 +59,9 @@ export class CursosComponent implements OnInit {
   constructor(
     private cursoService: CursoService,
     private instructorService: InstructorService,
-    private authService: AuthService
+    private authService: AuthService,
+    private reportService: ReportService,
+    private notificationService: NotificationService
   ) {}
 
   ngOnInit(): void {
@@ -117,7 +122,7 @@ export class CursosComponent implements OnInit {
 
   toggleForm() {
     if (!this.isAdmin) {
-      alert('No tienes permisos para realizar esta accion');
+      this.notificationService.warning('No tienes permisos para realizar esta accion');
       return;
     }
 
@@ -131,17 +136,17 @@ export class CursosComponent implements OnInit {
     if (!this.isAdmin) return;
 
     if (!this.newCurso.nombre || !this.newCurso.descripcion) {
-      alert('Nombre y descripcion son requeridos');
+      this.notificationService.warning('Nombre y descripcion son requeridos');
       return;
     }
 
     if (!this.newCurso.companyTag || !this.newCurso.companyTag.trim()) {
-      alert('La etiqueta de empresa es requerida');
+      this.notificationService.warning('La etiqueta de empresa es requerida');
       return;
     }
 
     if (!this.selectedInstructors || this.selectedInstructors.length < 3) {
-      alert('Debes seleccionar minimo 3 instructores para el curso');
+      this.notificationService.warning('Debes seleccionar minimo 3 instructores para el curso');
       return;
     }
 
@@ -154,10 +159,10 @@ export class CursosComponent implements OnInit {
       await this.cursoService.addCurso(cursoToAdd);
       this.resetForm();
       this.showForm = false;
-      alert('Curso agregado exitosamente');
+      this.notificationService.success('Curso agregado exitosamente');
     } catch (error) {
       console.error('Error agregando curso:', error);
-      alert(`Error al agregar curso: ${error}`);
+      this.notificationService.error('Error al agregar curso');
     }
   }
 
@@ -174,12 +179,12 @@ export class CursosComponent implements OnInit {
     if (!this.isAdmin || !this.editingId) return;
 
     if (!this.editingCurso.companyTag || !this.editingCurso.companyTag.trim()) {
-      alert('La etiqueta de empresa es requerida');
+      this.notificationService.warning('La etiqueta de empresa es requerida');
       return;
     }
 
     if (!this.editingInstructors || this.editingInstructors.length < 3) {
-      alert('Debes seleccionar minimo 3 instructores para el curso');
+      this.notificationService.warning('Debes seleccionar minimo 3 instructores para el curso');
       return;
     }
 
@@ -191,10 +196,10 @@ export class CursosComponent implements OnInit {
       };
       await this.cursoService.updateCurso(this.editingId, cursoToUpdate);
       this.resetForm();
-      alert('Curso actualizado exitosamente');
+      this.notificationService.success('Curso actualizado exitosamente');
     } catch (error) {
       console.error('Error actualizando curso:', error);
-      alert(`Error al actualizar curso: ${error}`);
+      this.notificationService.error('Error al actualizar curso');
     }
   }
 
@@ -204,10 +209,10 @@ export class CursosComponent implements OnInit {
     if (confirm('Estas seguro de eliminar este curso?')) {
       try {
         await this.cursoService.deleteCurso(id);
-        alert('Curso eliminado exitosamente');
+        this.notificationService.success('Curso eliminado exitosamente');
       } catch (error) {
         console.error('Error eliminando curso:', error);
-        alert('Error al eliminar curso');
+        this.notificationService.error('Error al eliminar curso');
       }
     }
   }
@@ -341,6 +346,51 @@ export class CursosComponent implements OnInit {
     const normalizedCurrent = this.normalizeCompanyTag(currentTag);
     if (!normalizedCurrent) return this.companyTags;
     return Array.from(new Set([...this.companyTags, normalizedCurrent]));
+  }
+
+  get canExportReports(): boolean {
+    return this.currentUser?.role === 'admin' || this.currentUser?.role === 'company';
+  }
+
+  async exportCursosExcel(): Promise<void> {
+    if (!this.canExportReports || this.exportingReport) return;
+
+    try {
+      this.exportingReport = true;
+      await this.reportService.exportCursosToExcel(this.filteredCursos, {
+        title: this.getCursosReportTitle(),
+        companyTag: this.currentUser?.role === 'company' ? this.currentUser.companyTag : undefined
+      });
+    } catch (error) {
+      console.error('Error exportando cursos a Excel:', error);
+      this.notificationService.error('Error al exportar reporte de cursos a Excel');
+    } finally {
+      this.exportingReport = false;
+    }
+  }
+
+  async exportCursosPDF(): Promise<void> {
+    if (!this.canExportReports || this.exportingReport) return;
+
+    try {
+      this.exportingReport = true;
+      await this.reportService.exportCursosToPDF(this.filteredCursos, {
+        title: this.getCursosReportTitle(),
+        companyTag: this.currentUser?.role === 'company' ? this.currentUser.companyTag : undefined
+      });
+    } catch (error) {
+      console.error('Error exportando cursos a PDF:', error);
+      this.notificationService.error('Error al exportar reporte de cursos a PDF');
+    } finally {
+      this.exportingReport = false;
+    }
+  }
+
+  private getCursosReportTitle(): string {
+    if (this.currentUser?.role === 'company' && this.currentUser.companyTag) {
+      return `Reporte de Cursos - Empresa: ${this.currentUser.companyTag}`;
+    }
+    return 'Reporte General de Cursos';
   }
 
   get filteredCursos(): Curso[] {

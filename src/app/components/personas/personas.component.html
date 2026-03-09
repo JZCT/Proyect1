@@ -6,7 +6,7 @@
     </div>
     <div class="header-actions">
       <button class="btn btn-success" (click)="triggerBulkImport()" *ngIf="isAdmin" title="Importar desde Excel">Carga masiva</button>
-      <button class="btn btn-info" (click)="toggleReports()" *ngIf="isAdmin" title="Generar reportes">Reportes</button>
+      <button class="btn btn-info" (click)="toggleReports()" *ngIf="canGenerateReports" title="Generar reportes">Reportes</button>
       <button class="btn btn-primary" (click)="toggleForm()" *ngIf="isAdmin">{{ showForm ? 'Cerrar' : 'Agregar persona' }}</button>
     </div>
   </div>
@@ -83,7 +83,7 @@
     <div class="report-filters">
       <div class="form-group">
         <label>Tipo de reporte</label>
-        <select [(ngModel)]="reportFilter.tipo" name="tipoReporte">
+        <select [(ngModel)]="reportFilter.tipo" name="tipoReporte" [disabled]="currentUser?.role === 'company'">
           <option value="all">Todos</option>
           <option value="empresa">Por empresa</option>
           <option value="lugar">Por ubicacion</option>

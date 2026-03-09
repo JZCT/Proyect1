@@ -43,6 +43,12 @@
   gap: 8px;
 }
 
+.report-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
 .panel-header h3,
 .form-section h4 {
   margin: 0;
@@ -159,6 +165,13 @@ select:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.assign-progress {
+  margin-bottom: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .instructores-section {
