@@ -8,8 +8,10 @@ import {
   collectionData,
   deleteDoc,
   doc,
+  DocumentData,
   getDoc,
   getDocs,
+  QueryDocumentSnapshot,
   query,
   updateDoc,
   where
@@ -119,7 +121,10 @@ export class InstructorService {
 
       const q = query(this.instructoresCollection, where('cursosIds', 'array-contains', cursoId));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((snapshot) => ({ id: snapshot.id, ...snapshot.data() } as Instructor));
+      return querySnapshot.docs.map((snapshot: QueryDocumentSnapshot<DocumentData>) => ({
+        id: snapshot.id,
+        ...snapshot.data()
+      } as Instructor));
     } catch (error) {
       console.error('Error obteniendo instructores del curso:', error);
       return [];

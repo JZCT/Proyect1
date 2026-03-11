@@ -71,6 +71,27 @@ Ejecutar pruebas unitarias:
 npm test
 ```
 
+## Migracion Firebase
+
+Para no depender del frontend al crear el primer admin o copiar datos entre proyectos, el repo incluye dos comandos:
+
+```bash
+npm run bootstrap:admin -- --dest-key RUTA_DESTINO.json --email admin@empresa.com --password admin123! --nombre "Administrador"
+```
+
+Ese comando crea o actualiza el usuario en Firebase Auth y su documento en `users/{uid}` del proyecto destino.
+
+Para copiar colecciones de Firestore entre dos proyectos:
+
+```bash
+npm run migrate:firestore -- --source-key RUTA_ORIGEN.json --dest-key RUTA_DESTINO.json --collections users,cursos,instructores,personas,usuarios
+```
+
+Notas:
+- Usa cuentas de servicio JSON, no el `firebaseConfig` del frontend.
+- Los JSON de cuentas de servicio quedaron ignorados en `.gitignore`.
+- Este flujo copia Firestore; la migracion completa de Authentication con passwords requiere un paso aparte.
+
 ## Herramientas Utilizadas
 
 - **Angular 17** - Framework principal

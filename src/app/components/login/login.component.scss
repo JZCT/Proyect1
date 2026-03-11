@@ -57,14 +57,20 @@ label {
   color: #b91c1c;
 }
 
-.alert {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
-  border-radius: 10px;
-  padding: 10px;
-  font-size: 12px;
-  margin-bottom: 14px;
+.btn-link {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #2563eb;
+  font-weight: 600;
+  padding: 0 0 14px;
+  text-align: right;
+  cursor: pointer;
+}
+
+.btn-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn-submit {

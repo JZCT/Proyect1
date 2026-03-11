@@ -18,12 +18,38 @@ export interface ReportData {
   instructorName?: string;
 }
 
+interface ReportMetadataItem {
+  label: string;
+  value: string;
+}
+
+interface ReportSummaryItem {
+  label: string;
+  value: string | number;
+  tone?: 'neutral' | 'success' | 'danger' | 'muted';
+}
+
+interface PdfDocumentOptions {
+  title: string;
+  subtitle: string;
+  documentCode: string;
+  generatedAt: Date;
+  metadata: ReportMetadataItem[];
+  summary: ReportSummaryItem[];
+  tableHeaders: string[];
+  tableRowsHtml: string;
+  emptyMessage: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class ReportService {
   private xlsxLoader: Promise<any> | null = null;
   private readonly xlsxScriptId = 'xlsx-cdn-script';
+  private readonly reportBrand = 'Sistema de Capacitacion';
+  private readonly reportArea = 'Control documental y seguimiento';
+  private readonly reportLogoUrl = `${window.location.origin}/assets/cecaptalogo.png`;
 
   constructor() {}
 
@@ -252,51 +278,31 @@ export class ReportService {
         )
         .join('');
 
-      const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>${this.escapeHtml(title)}</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
-          .header-info { margin-bottom: 20px; color: #666; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th { background-color: #007bff; color: white; padding: 10px; text-align: left; font-size: 12px; }
-          td { border-bottom: 1px solid #ddd; padding: 8px; font-size: 12px; }
-          tr:nth-child(even) { background-color: #f7f9fc; }
-          .summary { margin-top: 20px; padding: 10px; background-color: #f0f0f0; border-radius: 5px; }
-        </style>
-      </head>
-      <body>
-        <h1>${this.escapeHtml(title)}</h1>
-        <div class="header-info">
-          <p><strong>Generado:</strong> ${generatedAt.toLocaleString()}</p>
-          ${options?.companyTag ? `<p><strong>Empresa:</strong> ${this.escapeHtml(options.companyTag)}</p>` : ''}
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Descripcion</th>
-              <th>Etiqueta Empresa</th>
-              <th>Inicio</th>
-              <th>Fin</th>
-              <th>Representante</th>
-              <th>Telefono</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${cursosTable}
-          </tbody>
-        </table>
-        <div class="summary">
-          <strong>Total de cursos:</strong> ${cursos.length}
-        </div>
-      </body>
-      </html>
-      `;
+      const html = this.buildPdfDocument({
+        title,
+        subtitle: 'Relacion oficial de cursos registrados en el sistema para consulta y control interno.',
+        documentCode: 'RPT-CUR',
+        generatedAt,
+        metadata: [
+          { label: 'Fecha de emision', value: generatedAt.toLocaleString() },
+          { label: 'Empresa', value: options?.companyTag || 'Todas las empresas' },
+          { label: 'Total de registros', value: String(cursos.length) }
+        ],
+        summary: [
+          { label: 'Total de cursos', value: cursos.length, tone: 'neutral' }
+        ],
+        tableHeaders: [
+          'Nombre',
+          'Descripcion',
+          'Etiqueta Empresa',
+          'Inicio',
+          'Fin',
+          'Representante',
+          'Telefono'
+        ],
+        tableRowsHtml: cursosTable,
+        emptyMessage: 'No hay cursos para mostrar en este reporte.'
+      });
 
       const blob = new Blob([html], { type: 'text/html' });
       const url = window.URL.createObjectURL(blob);
@@ -329,9 +335,9 @@ export class ReportService {
     const personasTable = reportData.personas
       .map((persona) => `
         <tr>
-          <td>${this.escapeHtml(persona.nombre)}</td>
+          <td>${this.escapeHtml(persona.nombre || '')}</td>
           <td>${this.escapeHtml(persona.curp || '')}</td>
-          <td>${this.escapeHtml(persona.email)}</td>
+          <td>${this.escapeHtml(persona.email || '')}</td>
           <td>${this.escapeHtml(persona.telefono || '')}</td>
           <td>${this.escapeHtml(persona.empresa || '')}</td>
           <td>${this.escapeHtml(persona.lugar || '-')}</td>
@@ -344,69 +350,504 @@ export class ReportService {
       `)
       .join('');
 
+    return this.buildPdfDocument({
+      title: reportData.title,
+      subtitle: 'Resumen consolidado de participantes, evaluaciones y asignaciones registradas en la plataforma.',
+      documentCode: 'RPT-PER',
+      generatedAt: reportData.generatedAt,
+      metadata: [
+        { label: 'Fecha de emision', value: reportData.generatedAt.toLocaleString() },
+        { label: 'Empresa', value: reportData.empresa || 'Todas las empresas' },
+        { label: 'Ubicacion', value: reportData.lugar || 'Todas las ubicaciones' },
+        { label: 'Instructor', value: reportData.instructorName || 'No especificado' }
+      ],
+      summary: [
+        { label: 'Total de personas', value: reportData.totalPersonas, tone: 'neutral' },
+        { label: 'Aptos', value: resumen.aptos, tone: 'success' },
+        { label: 'No aptos', value: resumen.noAptos, tone: 'danger' },
+        { label: 'Sin evaluar', value: resumen.sinEvaluar, tone: 'muted' }
+      ],
+      tableHeaders: [
+        'Nombre',
+        'CURP',
+        'Email',
+        'Telefono',
+        'Empresa',
+        'Ubicacion',
+        'Practica',
+        'Teorica',
+        'Final',
+        'Resultado',
+        'Cursos'
+      ],
+      tableRowsHtml: personasTable,
+      emptyMessage: 'No hay personas para mostrar con los filtros seleccionados.'
+    });
+  }
+
+  private buildPdfDocument(options: PdfDocumentOptions): string {
+    const metadata = options.metadata
+      .filter((item) => item.value && item.value.trim())
+      .map(
+        (item) => `
+          <div class="meta-card">
+            <span class="meta-card__label">${this.escapeHtml(item.label)}</span>
+            <span class="meta-card__value">${this.escapeHtml(item.value)}</span>
+          </div>
+        `
+      )
+      .join('');
+
+    const summary = options.summary
+      .map(
+        (item) => `
+          <div class="summary-card summary-card--${item.tone || 'neutral'}">
+            <span class="summary-card__label">${this.escapeHtml(item.label)}</span>
+            <strong class="summary-card__value">${this.escapeHtml(String(item.value))}</strong>
+          </div>
+        `
+      )
+      .join('');
+
+    const headers = options.tableHeaders
+      .map((header) => `<th>${this.escapeHtml(header)}</th>`)
+      .join('');
+
+    const rows = options.tableRowsHtml.trim()
+      ? options.tableRowsHtml
+      : `
+        <tr class="empty-row">
+          <td colspan="${options.tableHeaders.length}">${this.escapeHtml(options.emptyMessage)}</td>
+        </tr>
+      `;
+
     return `
       <!DOCTYPE html>
-      <html>
+      <html lang="es">
       <head>
         <meta charset="UTF-8">
-        <title>${this.escapeHtml(reportData.title)}</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
-          .header-info { margin-bottom: 20px; color: #666; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th { background-color: #007bff; color: white; padding: 12px; text-align: left; }
-          td { border-bottom: 1px solid #ddd; padding: 10px; }
-          tr:hover { background-color: #f5f5f5; }
-          .summary { margin-top: 20px; padding: 10px; background-color: #f0f0f0; border-radius: 5px; }
-          .footer { margin-top: 30px; text-align: right; color: #999; font-size: 12px; }
-        </style>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${this.escapeHtml(options.title)}</title>
+        <style>${this.getPdfStyles()}</style>
       </head>
       <body>
-        <h1>${this.escapeHtml(reportData.title)}</h1>
-        <div class="header-info">
-          <p><strong>Generado:</strong> ${reportData.generatedAt.toLocaleString()}</p>
-          ${reportData.empresa ? `<p><strong>Empresa:</strong> ${this.escapeHtml(reportData.empresa)}</p>` : ''}
-          ${reportData.lugar ? `<p><strong>Ubicacion:</strong> ${this.escapeHtml(reportData.lugar)}</p>` : ''}
-          ${reportData.instructorName ? `<p><strong>Instructor:</strong> ${this.escapeHtml(reportData.instructorName)}</p>` : ''}
-        </div>
+        <main class="sheet">
+          <header class="letterhead">
+            <div class="letterhead__topline">
+              <div class="letterhead__identity">
+                <div class="logo-slot">
+                  ${
+                    this.reportLogoUrl
+                      ? `<img src="${this.escapeHtml(this.reportLogoUrl)}" alt="Logo de la empresa" class="logo-slot__image" />`
+                      : `<div class="logo-slot__placeholder">Espacio para logo de la empresa</div>`
+                  }
+                </div>
+                <div>
+                <p class="brand-kicker">${this.escapeHtml(this.reportArea)}</p>
+                <div class="brand-name">${this.escapeHtml(this.reportBrand)}</div>
+                </div>
+              </div>
+              <div class="doc-pill">
+                <span>Documento</span>
+                <strong>${this.escapeHtml(options.documentCode)}</strong>
+              </div>
+            </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>CURP</th>
-              <th>Email</th>
-              <th>Telefono</th>
-              <th>Empresa</th>
-              <th>Ubicacion</th>
-              <th>Practica</th>
-              <th>Teorica</th>
-              <th>Final</th>
-              <th>Resultado</th>
-              <th>Cursos</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${personasTable}
-          </tbody>
-        </table>
+            <div class="letterhead__body">
+              <div class="title-block">
+                <p class="section-tag">Reporte institucional</p>
+                <h1>${this.escapeHtml(options.title)}</h1>
+                <p class="subtitle">${this.escapeHtml(options.subtitle)}</p>
+              </div>
+              <div class="meta-grid">
+                ${metadata}
+              </div>
+            </div>
+          </header>
 
-        <div class="summary">
-          <strong>Total de personas:</strong> ${reportData.totalPersonas}
-          <br />
-          <strong>Aptos:</strong> ${resumen.aptos}
-          <br />
-          <strong>No aptos:</strong> ${resumen.noAptos}
-          <br />
-          <strong>Sin evaluar:</strong> ${resumen.sinEvaluar}
-        </div>
+          <section class="content">
+            <div class="summary-grid">
+              ${summary}
+            </div>
 
-        <div class="footer">
-          <p>Reporte generado automaticamente - ${new Date().toLocaleString()}</p>
-        </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>${headers}</tr>
+                </thead>
+                <tbody>
+                  ${rows}
+                </tbody>
+              </table>
+            </div>
+
+            <footer class="footer">
+              <div class="footer__note">
+                Documento emitido automaticamente para consulta y respaldo interno.
+              </div>
+              <div class="footer__date">
+                ${this.escapeHtml(options.generatedAt.toLocaleString())}
+              </div>
+            </footer>
+          </section>
+        </main>
       </body>
       </html>
+    `;
+  }
+
+  private getPdfStyles(): string {
+    return `
+      :root {
+        --ink: #17324d;
+        --muted: #607084;
+        --paper: #ffffff;
+        --canvas: #edf3f7;
+        --line: #d8e1e8;
+        --accent: #0f766e;
+        --accent-deep: #0f172a;
+        --accent-soft: #d7f3ee;
+        --success: #dff7e8;
+        --danger: #fde6e2;
+        --neutral: #eef4f9;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      @page {
+        margin: 14mm;
+      }
+
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--ink);
+        font-family: "Segoe UI", Tahoma, sans-serif;
+      }
+
+      .sheet {
+        max-width: 1180px;
+        margin: 0 auto;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12);
+      }
+
+      .letterhead {
+        position: relative;
+        overflow: hidden;
+        padding: 24px 28px 22px;
+        color: #ffffff;
+        background:
+          radial-gradient(circle at top right, rgba(255, 255, 255, 0.14), transparent 34%),
+          linear-gradient(135deg, #0f172a 0%, #164e63 42%, #0f766e 100%);
+      }
+
+      .letterhead::after {
+        content: "";
+        position: absolute;
+        right: -48px;
+        bottom: -72px;
+        width: 220px;
+        height: 220px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .letterhead__topline,
+      .letterhead__body,
+      .content,
+      .summary-grid,
+      .footer {
+        position: relative;
+        z-index: 1;
+      }
+
+      .letterhead__topline {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: flex-start;
+      }
+
+      .letterhead__identity {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+      }
+
+      .brand-kicker,
+      .section-tag,
+      .meta-card__label,
+      .summary-card__label,
+      .doc-pill span {
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        font-size: 10px;
+      }
+
+      .brand-kicker {
+        opacity: 0.76;
+        margin-bottom: 6px;
+      }
+
+      .brand-name {
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+      }
+
+      .logo-slot {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 138px;
+        min-width: 138px;
+        height: 92px;
+        padding: 10px;
+        border-radius: 18px;
+        border: 1px dashed rgba(255, 255, 255, 0.48);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .logo-slot__image {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        display: block;
+      }
+
+      .logo-slot__placeholder {
+        text-align: center;
+        font-size: 11px;
+        line-height: 1.45;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(255, 255, 255, 0.88);
+      }
+
+      .doc-pill {
+        min-width: 160px;
+        padding: 10px 14px;
+        text-align: right;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      .doc-pill span {
+        display: block;
+        opacity: 0.75;
+      }
+
+      .doc-pill strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 18px;
+        letter-spacing: 0.04em;
+      }
+
+      .letterhead__body {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+        gap: 20px;
+        margin-top: 18px;
+      }
+
+      .title-block h1 {
+        margin: 8px 0 10px;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 31px;
+        line-height: 1.08;
+      }
+
+      .section-tag {
+        color: rgba(255, 255, 255, 0.76);
+      }
+
+      .subtitle {
+        margin: 0;
+        max-width: 760px;
+        color: rgba(255, 255, 255, 0.86);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        align-content: end;
+      }
+
+      .meta-card {
+        padding: 11px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      .meta-card__label {
+        display: block;
+        margin-bottom: 5px;
+        opacity: 0.74;
+      }
+
+      .meta-card__value {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.35;
+        word-break: break-word;
+      }
+
+      .content {
+        padding: 22px 28px 28px;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .summary-card {
+        padding: 14px 16px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: var(--neutral);
+      }
+
+      .summary-card--success {
+        background: var(--success);
+        border-color: #b9e8cb;
+      }
+
+      .summary-card--danger {
+        background: var(--danger);
+        border-color: #f5c3bc;
+      }
+
+      .summary-card--muted {
+        background: #f3f4f6;
+        border-color: #e5e7eb;
+      }
+
+      .summary-card__label {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--muted);
+      }
+
+      .summary-card__value {
+        font-size: 25px;
+        line-height: 1;
+      }
+
+      .table-wrap {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      thead th {
+        padding: 12px 10px;
+        background: var(--accent);
+        color: #ffffff;
+        text-align: left;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      tbody td {
+        padding: 10px;
+        border-top: 1px solid #e7edf2;
+        font-size: 12px;
+        vertical-align: top;
+      }
+
+      tbody tr:nth-child(even) {
+        background: #f8fafc;
+      }
+
+      .empty-row td {
+        padding: 24px 16px;
+        text-align: center;
+        color: var(--muted);
+        font-style: italic;
+      }
+
+      .footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-end;
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .footer__note {
+        max-width: 70%;
+      }
+
+      .footer__date {
+        white-space: nowrap;
+        font-weight: 600;
+      }
+
+      @media print {
+        body {
+          background: #ffffff;
+        }
+
+        .sheet {
+          border: none;
+          box-shadow: none;
+        }
+      }
+
+      @media (max-width: 920px) {
+        .letterhead__body {
+          grid-template-columns: 1fr;
+        }
+
+        .meta-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .doc-pill {
+          text-align: left;
+        }
+
+        .letterhead__identity {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .footer {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .footer__note,
+        .footer__date {
+          max-width: none;
+          white-space: normal;
+        }
+      }
     `;
   }
 

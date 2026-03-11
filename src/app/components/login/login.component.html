@@ -37,9 +37,9 @@
       </div>
     </div>
 
-    <div class="alert" *ngIf="errorMessage">
-      {{ errorMessage }}
-    </div>
+    <button type="button" class="btn-link" [disabled]="loading" (click)="recoverPassword()">
+      Olvide mi contrasena
+    </button>
 
     <button type="submit" class="btn-submit" [disabled]="loginForm.invalid || loading">
       {{ loading ? 'Cargando...' : 'Entrar' }}

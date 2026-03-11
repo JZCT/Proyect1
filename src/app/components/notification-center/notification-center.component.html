@@ -1,8 +1,9 @@
 <div class="toast-stack" *ngIf="notifications$ | async as notifications" aria-live="polite" aria-atomic="true">
   <div class="toast" *ngFor="let notification of notifications" [ngClass]="'toast-' + notification.type">
+    <span class="toast-accent" aria-hidden="true"></span>
     <span class="toast-message">{{ notification.message }}</span>
     <button type="button" class="toast-close" (click)="dismiss(notification.id)" aria-label="Cerrar notificacion">
-      ×
+      x
     </button>
   </div>
 </div>

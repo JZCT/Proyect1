@@ -1,8 +1,9 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormGroup, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
-import { AuthService } from '../../services/auth.service';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
+import { NotificationService } from '../../services/notification.service';
 
 @Component({
   selector: 'app-login',
@@ -12,25 +13,26 @@ import { Router } from '@angular/router';
   styleUrl: './login.component.scss'
 })
 export class LoginComponent {
-  // Cambiado de profileForm a loginForm para consistencia
   loginForm = new FormGroup({
     email: new FormControl('', [Validators.required, Validators.email]),
     password: new FormControl('', [Validators.required, Validators.minLength(6)])
   });
 
-  errorMessage: string = '';
-  loading: boolean = false;
+  loading = false;
 
-  constructor(private authService: AuthService, private router: Router) {}
+  constructor(
+    private authService: AuthService,
+    private router: Router,
+    private notificationService: NotificationService
+  ) {}
 
   async login() {
     if (this.loginForm.invalid) {
-      this.errorMessage = 'Por favor completa todos los campos correctamente';
+      this.notificationService.warning('Por favor completa todos los campos correctamente');
       return;
     }
 
     this.loading = true;
-    this.errorMessage = '';
 
     const email = this.loginForm.get('email')?.value || '';
     const password = this.loginForm.get('password')?.value || '';
@@ -39,24 +41,61 @@ export class LoginComponent {
       const credential = await this.authService.login(email, password);
       const userData = await this.authService.getUserData(credential.user.uid);
       const targetRoute = userData?.role === 'instructor' ? '/' : '/home';
+
+      this.notificationService.success('Sesion iniciada correctamente');
       this.router.navigate([targetRoute]);
     } catch (error: any) {
       console.error('Error de login:', error);
+
       switch (error.code) {
         case 'auth/user-not-found':
-          this.errorMessage = 'Usuario no encontrado';
+          this.notificationService.error('Usuario no encontrado');
           break;
         case 'auth/wrong-password':
-          this.errorMessage = 'Contraseña incorrecta';
+          this.notificationService.error('Contrasena incorrecta');
           break;
         case 'auth/invalid-email':
-          this.errorMessage = 'Email inválido';
+          this.notificationService.error('Email invalido');
           break;
         case 'auth/user-disabled':
-          this.errorMessage = 'Usuario deshabilitado';
+          this.notificationService.error('Usuario deshabilitado');
           break;
         default:
-          this.errorMessage = 'Error al iniciar sesión. Intenta de nuevo.';
+          this.notificationService.error('Error al iniciar sesion. Intenta de nuevo.');
+      }
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  async recoverPassword() {
+    const emailControl = this.loginForm.get('email');
+    emailControl?.markAsTouched();
+
+    if (!emailControl?.value || emailControl.invalid) {
+      this.notificationService.warning('Escribe un email valido para recuperar la contrasena');
+      return;
+    }
+
+    this.loading = true;
+
+    try {
+      await this.authService.resetPassword(emailControl.value);
+      this.notificationService.info(
+        'Si el correo existe, recibiras un enlace para restablecer la contrasena.'
+      );
+    } catch (error: any) {
+      console.error('Error enviando recuperacion de contrasena:', error);
+
+      switch (error.code) {
+        case 'auth/invalid-email':
+          this.notificationService.error('Email invalido');
+          break;
+        case 'auth/too-many-requests':
+          this.notificationService.warning('Demasiados intentos. Espera un momento e intenta de nuevo.');
+          break;
+        default:
+          this.notificationService.error('No se pudo enviar el correo de recuperacion.');
       }
     } finally {
       this.loading = false;
