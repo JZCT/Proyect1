@@ -10,7 +10,13 @@ import {
   where,
   getDocs
 } from '@angular/fire/firestore';
-import { Auth, signInWithEmailAndPassword, signOut, user } from '@angular/fire/auth';
+import {
+  Auth,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut,
+  user
+} from '@angular/fire/auth';
 import { from, map, Observable, of, switchMap } from 'rxjs';
 import { deleteApp, initializeApp } from 'firebase/app';
 import {
@@ -137,6 +143,10 @@ export class AuthService {
 
   login(email: string, password: string) {
     return signInWithEmailAndPassword(this.auth, email, password);
+  }
+
+  resetPassword(email: string) {
+    return sendPasswordResetEmail(this.auth, email.trim());
   }
 
   logout() {
