@@ -63,6 +63,23 @@ npm run build
 
 Los archivos compilados se generarán en la carpeta `dist/cecaptains/`
 
+## WordPress
+
+Para dejar la aplicacion lista para incrustarse dentro de una pagina de WordPress:
+
+```bash
+npm run build:wordpress:embed
+```
+
+Ese comando:
+- genera el build compatible con WordPress
+- crea `dist/cecaptains/wordpress/cecapta-page-snippet.html`
+- crea `dist/cecaptains/wordpress/cecapta-shortcode.php`
+
+Recomendacion:
+- usa `cecapta-shortcode.php` si quieres integracion mas estable en WordPress
+- usa `cecapta-page-snippet.html` si prefieres pegarlo en un bloque HTML manual
+
 ## Testing
 
 Ejecutar pruebas unitarias:

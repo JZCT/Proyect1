@@ -14,6 +14,7 @@ import { Curso } from '../../models/curso.model';
 import { Instructor } from '../../models/instructor.model';
 import { Persona } from '../../models/persona.model';
 import { User } from '../../models/user.model';
+import { resolveAppAssetUrl } from '../../utils/asset-url.util';
 
 @Component({
   selector: 'app-cursos-grupos',
@@ -43,7 +44,7 @@ export class CursosGruposComponent implements OnInit {
     sinEvaluar: 0
   };
   instructoresEnCurso: Instructor[] = [];
-  defaultInstructorImg = 'assets/default-avatar.png';
+  defaultInstructorImg = resolveAppAssetUrl('assets/default-avatar.png');
 
   selectedPersonaToAdd: string | null = null;
   cursoSearchTerm: string = '';

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Persona } from '../models/persona.model';
 import { Curso } from '../models/curso.model';
+import { resolveAppAssetUrl } from '../utils/asset-url.util';
 
 export interface ReportFilter {
   empresa?: string;
@@ -49,7 +50,7 @@ export class ReportService {
   private readonly xlsxScriptId = 'xlsx-cdn-script';
   private readonly reportBrand = 'Sistema de Capacitacion';
   private readonly reportArea = 'Control documental y seguimiento';
-  private readonly reportLogoUrl = `${window.location.origin}/assets/cecaptalogo.png`;
+  private readonly reportLogoUrl = resolveAppAssetUrl('assets/cecaptalogo.png');
 
   constructor() {}
 

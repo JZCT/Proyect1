@@ -5,6 +5,7 @@ import { AuthService } from './services/auth.service';
 import { filter } from 'rxjs';
 import { NotificationService } from './services/notification.service';
 import { NotificationCenterComponent } from './components/notification-center/notification-center.component';
+import './utils/asset-url.util';
 
 @Component({
   selector: 'app-root',
@@ -17,20 +18,23 @@ export class AppComponent {
   title = 'CecaptaINS - Sistema de Gestion';
   currentUser$ = this.authService.currentUserData$;
   @HostBinding('class.login-page') isLoginPage: boolean = false;
+  @HostBinding('class.embed-mode') isEmbedMode: boolean = false;
 
   constructor(
     private authService: AuthService,
     private router: Router,
     private notificationService: NotificationService
   ) {
+    this.isEmbedMode = this.detectEmbedMode();
     window.alert = (message?: unknown) => {
       this.notificationService.notifyFromAlert(message);
     };
 
+    this.updateRouteState(this.router.url);
     this.router.events
       .pipe(filter(event => event instanceof NavigationEnd))
-      .subscribe(() => {
-        this.isLoginPage = this.router.url === '/login';
+      .subscribe((event) => {
+        this.updateRouteState((event as NavigationEnd).urlAfterRedirects);
       });
   }
 
@@ -44,5 +48,25 @@ export class AppComponent {
       console.error('Error al cerrar sesion:', error);
       this.notificationService.error('No se pudo cerrar sesion. Intenta de nuevo.');
     }
+  }
+
+  private updateRouteState(url: string) {
+    this.isLoginPage = url === '/login';
+  }
+
+  private detectEmbedMode(): boolean {
+    const globalMode = typeof window !== 'undefined'
+      ? String(window.CECAPTA_EMBED_MODE || '').trim().toLowerCase()
+      : '';
+
+    if (globalMode === 'wordpress') {
+      return true;
+    }
+
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return new URLSearchParams(window.location.search).get('embed') === 'wordpress';
   }
 }

@@ -9,6 +9,7 @@ import { ReportService } from '../../services/report.service';
 import { NotificationService } from '../../services/notification.service';
 import { Persona } from '../../models/persona.model';
 import { User } from '../../models/user.model';
+import { resolveAppAssetUrl } from '../../utils/asset-url.util';
 
 type PersonaArchivo = NonNullable<Persona['archivos']>[number];
 type FilePreviewType = 'image' | 'pdf' | 'text' | 'unsupported';
@@ -353,7 +354,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   getFotoUrl(foto: string | undefined): string {
-    return foto || 'assets/default-avatar.png';
+    return foto || resolveAppAssetUrl('assets/default-avatar.png');
   }
 
   async addPersona() {

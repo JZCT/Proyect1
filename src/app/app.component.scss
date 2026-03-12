@@ -115,6 +115,20 @@
   justify-content: center;
 }
 
+:host.embed-mode .layout {
+  min-height: auto;
+}
+
+:host.embed-mode .app-main {
+  max-width: none;
+  padding: 0;
+}
+
+:host.embed-mode.login-page .app-main {
+  max-width: 480px;
+  padding: 24px 0;
+}
+
 @media (max-width: 900px) {
   .user-block {
     width: 100%;

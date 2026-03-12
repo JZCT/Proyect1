@@ -1,0 +1,38 @@
+
+> cecaptains-angular@1.0.0 start
+> ng serve
+
+
+Initial chunk files   | Names         |  Raw size
+vendor.js             | vendor        |   4.69 MB | 
+main.js               | main          | 571.06 kB | 
+polyfills.js          | polyfills     | 262.57 kB | 
+styles.css, styles.js | styles        | 152.83 kB | 
+runtime.js            | runtime       |   6.50 kB | 
+
+                      | Initial total |   5.66 MB
+
+Build at: 2026-03-11T15:30:36.298Z - Hash: f2afa1c30ed54026 - Time: 9595ms
+
+** Angular Live Development Server is listening on localhost:4200, open your browser on http://localhost:4200/ **
+
+
+√ Compiled successfully.
+
+
+
+5 unchanged chunks
+
+Build at: 2026-03-11T15:30:38.795Z - Hash: f2afa1c30ed54026 - Time: 2137ms
+
+√ Compiled successfully.
+
+Initial chunk files | Names   |  Raw size
+main.js             | main    | 571.06 kB | 
+runtime.js          | runtime |   6.50 kB | 
+
+3 unchanged chunks
+
+Build at: 2026-03-11T15:30:39.387Z - Hash: 5c00fffd6e0d4c42 - Time: 554ms
+
+√ Compiled successfully.

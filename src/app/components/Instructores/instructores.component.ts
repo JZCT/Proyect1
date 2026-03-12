@@ -6,6 +6,7 @@ import { CursoService } from '../../services/curso.service';
 import { AuthService } from '../../services/auth.service';
 import { Instructor } from '../../models/instructor.model';
 import { Curso } from '../../models/curso.model';
+import { resolveAppAssetUrl } from '../../utils/asset-url.util';
 
 @Component({
   selector: 'app-instructor',
@@ -15,7 +16,7 @@ import { Curso } from '../../models/curso.model';
   styleUrls: ['./instructores.component.scss']
 })
 export class InstructorComponent implements OnInit, OnDestroy {
-  defaultImg = 'assets/default-avatar.png';
+  defaultImg = resolveAppAssetUrl('assets/default-avatar.png');
 
   instructores: Instructor[] = [];
   cursos: Curso[] = [];

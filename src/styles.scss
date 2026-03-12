@@ -26,62 +26,65 @@
   --shadow-md: 0 12px 24px rgba(15, 23, 42, 0.08);
 }
 
-* {
+body.cecapta-standalone {
+  margin: 0;
+  min-height: 100vh;
+}
+
+app-root,
+app-root *,
+app-root *::before,
+app-root *::after {
   box-sizing: border-box;
 }
 
-html,
-body {
-  height: 100%;
+app-root {
+  display: block;
   width: 100%;
-  margin: 0;
-  padding: 0;
+  min-height: 100vh;
   overflow-x: hidden;
-}
-
-body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(180deg, var(--brand-4) 0%, var(--bg) 48%, #f6fbff 100%);
   color: var(--text);
   line-height: 1.35;
 }
 
-app-root {
-  display: block;
+body.cecapta-standalone app-root {
+  width: 100%;
   min-height: 100vh;
 }
 
-.page-title-group {
+app-root .page-title-group {
   display: grid;
   gap: 3px;
 }
 
-.page-title {
+app-root .page-title {
   margin: 0;
   font-size: 21px;
   letter-spacing: -0.2px;
   color: var(--text);
 }
 
-.page-subtitle {
+app-root .page-subtitle {
   margin: 0;
   font-size: 13px;
   color: var(--muted);
 }
 
-.panel-note {
+app-root .panel-note {
   font-size: 12px;
   color: var(--muted);
   margin: 0;
 }
 
-.field-help {
+app-root .field-help {
   margin: 0;
   font-size: 11px;
   color: var(--muted);
 }
 
-.hint-chip {
+app-root .hint-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -94,40 +97,40 @@ app-root {
   font-weight: 600;
 }
 
-.soft-divider {
+app-root .soft-divider {
   border: 0;
   border-top: 1px solid var(--border);
   margin: 12px 0;
 }
 
-.btn-primary {
+app-root .btn-primary {
   background: var(--primary) !important;
   color: #ffffff !important;
 }
 
-.btn-success {
+app-root .btn-success {
   background: var(--secondary) !important;
   color: #ffffff !important;
 }
 
-.btn-info {
+app-root .btn-info {
   background: var(--info) !important;
   color: #ffffff !important;
 }
 
-.btn-danger {
+app-root .btn-danger {
   background: var(--danger) !important;
   color: #ffffff !important;
 }
 
-.btn-secondary,
-.btn-light {
+app-root .btn-secondary,
+app-root .btn-light {
   background: var(--surface-elevated) !important;
   color: var(--text-soft) !important;
   border: 1px solid var(--border);
 }
 
-.table-scroll {
+app-root .table-scroll {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
@@ -136,24 +139,24 @@ app-root {
   background: var(--surface);
 }
 
-.table-scroll .table {
+app-root .table-scroll .table {
   min-width: 980px;
   margin: 0;
 }
 
-.table-scroll .table.table-compact {
+app-root .table-scroll .table.table-compact {
   min-width: 720px;
 }
 
-.table-scroll .table th,
-.table-scroll .table td {
+app-root .table-scroll .table th,
+app-root .table-scroll .table td {
   white-space: nowrap;
   vertical-align: middle;
 }
 
-img,
-video,
-canvas,
-iframe {
+app-root img,
+app-root video,
+app-root canvas,
+app-root iframe {
   max-width: 100%;
 }
