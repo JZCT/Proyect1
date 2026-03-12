@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, HostListener, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CursoService } from '../../services/curso.service';
@@ -23,7 +23,10 @@ export class CursosComponent implements OnInit {
   instructores: Instructor[] = [];
   companyTags: string[] = [];
   showForm = false;
+  showInstructorDropdown = false;
   editingId: string | null = null;
+  activeActionMenuId: string | null = null;
+  selectedCourseDetail: Curso | null = null;
   isAdmin = false;
   currentUser: User | null = null;
   selectedInstructors: string[] = [];
@@ -70,6 +73,33 @@ export class CursosComponent implements OnInit {
     this.loadCompanyTags();
     this.loadCursos();
     this.loadInstructores();
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    this.closeFloatingMenus();
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (this.showInstructorDropdown) {
+      this.showInstructorDropdown = false;
+      return;
+    }
+
+    if (this.activeActionMenuId) {
+      this.activeActionMenuId = null;
+      return;
+    }
+
+    if (this.selectedCourseDetail) {
+      this.closeCursoDetail();
+      return;
+    }
+
+    if (this.showForm) {
+      this.resetForm();
+    }
   }
 
   private checkAdminStatus() {
@@ -126,10 +156,27 @@ export class CursosComponent implements OnInit {
       return;
     }
 
-    this.showForm = !this.showForm;
-    if (!this.showForm) {
+    if (this.showForm) {
       this.resetForm();
+      return;
     }
+
+    this.closeFloatingMenus();
+    this.selectedCourseDetail = null;
+    this.editingId = null;
+    this.editingCurso = {
+      nombre: '',
+      descripcion: '',
+      Fecha_inicio: undefined,
+      Fecha_fin: undefined,
+      nom_representante: '',
+      num_represnetantes: '',
+      companyTag: '',
+      instructorIds: []
+    };
+    this.selectedInstructors = [];
+    this.editingInstructors = [];
+    this.showForm = true;
   }
 
   async addCurso() {
@@ -158,7 +205,6 @@ export class CursosComponent implements OnInit {
       };
       await this.cursoService.addCurso(cursoToAdd);
       this.resetForm();
-      this.showForm = false;
       this.notificationService.success('Curso agregado exitosamente');
     } catch (error) {
       console.error('Error agregando curso:', error);
@@ -169,9 +215,12 @@ export class CursosComponent implements OnInit {
   startEdit(curso: Curso) {
     if (!this.isAdmin) return;
 
+    this.closeFloatingMenus();
+    this.selectedCourseDetail = null;
     this.editingId = curso.idcurso || null;
     this.editingCurso = { ...curso };
     this.editingInstructors = [...(curso.instructorIds || [])];
+    this.showInstructorDropdown = false;
     this.showForm = true;
   }
 
@@ -206,6 +255,7 @@ export class CursosComponent implements OnInit {
   async deleteCurso(id: string | undefined) {
     if (!this.isAdmin || !id) return;
 
+    this.closeFloatingMenus();
     if (confirm('Estas seguro de eliminar este curso?')) {
       try {
         await this.cursoService.deleteCurso(id);
@@ -243,7 +293,71 @@ export class CursosComponent implements OnInit {
     this.selectedInstructors = [];
     this.editingInstructors = [];
     this.editingId = null;
+    this.showInstructorDropdown = false;
     this.showForm = false;
+  }
+
+  toggleActionMenu(cursoId: string | undefined, event: MouseEvent) {
+    event.stopPropagation();
+    if (!cursoId) return;
+
+    this.showInstructorDropdown = false;
+    this.activeActionMenuId = this.activeActionMenuId === cursoId ? null : cursoId;
+  }
+
+  openCursoDetail(curso: Curso, event?: MouseEvent) {
+    event?.stopPropagation();
+    this.closeFloatingMenus();
+    this.selectedCourseDetail = curso;
+  }
+
+  closeCursoDetail() {
+    this.selectedCourseDetail = null;
+  }
+
+  toggleInstructorDropdown(event: MouseEvent) {
+    event.stopPropagation();
+    this.activeActionMenuId = null;
+    this.showInstructorDropdown = !this.showInstructorDropdown;
+  }
+
+  toggleInstructorSelection(instructorId: string | undefined) {
+    if (!instructorId) return;
+
+    const selections = this.editingId ? this.editingInstructors : this.selectedInstructors;
+    const index = selections.indexOf(instructorId);
+
+    if (index >= 0) {
+      selections.splice(index, 1);
+    } else {
+      selections.push(instructorId);
+    }
+  }
+
+  removeInstructorSelection(instructorId: string) {
+    const selections = this.editingId ? this.editingInstructors : this.selectedInstructors;
+    const index = selections.indexOf(instructorId);
+    if (index >= 0) {
+      selections.splice(index, 1);
+    }
+  }
+
+  isInstructorSelected(instructorId: string | undefined): boolean {
+    if (!instructorId) return false;
+    return this.getCurrentInstructors().includes(instructorId);
+  }
+
+  getInstructorSummary(instructorIds?: string[]): string {
+    if (!instructorIds?.length) return 'Sin instructores';
+
+    return instructorIds
+      .map((id) => this.getInstructorName(id))
+      .slice(0, 2)
+      .join(', ');
+  }
+
+  getAvailableInstructores(): Instructor[] {
+    return this.instructores.filter((instructor) => !!instructor.id);
   }
 
   getInstructorName(instructorId: string): string {
@@ -459,5 +573,10 @@ export class CursosComponent implements OnInit {
     const date = new Date(value as string | Date);
     const time = date.getTime();
     return Number.isNaN(time) ? 0 : time;
+  }
+
+  private closeFloatingMenus() {
+    this.activeActionMenuId = null;
+    this.showInstructorDropdown = false;
   }
 }

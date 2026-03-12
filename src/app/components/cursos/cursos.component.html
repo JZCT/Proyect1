@@ -9,104 +9,150 @@
     </button>
   </div>
 
-  <div *ngIf="showForm && isAdmin" class="form-section">
-    <h3>{{ editingId ? 'Editar curso' : 'Nuevo curso' }}</h3>
-
-    <form class="form" (ngSubmit)="editingId ? updateCurso() : addCurso()">
-      <div class="form-group">
-        <label for="nombre">Nombre del curso</label>
-        <input
-          type="text"
-          id="nombre"
-          name="nombre"
-          required
-          [ngModel]="editingId ? editingCurso.nombre : newCurso.nombre"
-          (ngModelChange)="editingId ? (editingCurso.nombre = $event) : (newCurso.nombre = $event)"
-        />
+  <div *ngIf="showForm && isAdmin" class="modal-overlay" (click)="resetForm()">
+    <div class="modal-content form-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3>{{ editingId ? 'Editar curso' : 'Nuevo curso' }}</h3>
+          <p class="modal-subtitle">Usa el selector desplegable para asignar instructores antes de guardar.</p>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" (click)="resetForm()">Cerrar</button>
       </div>
 
-      <div class="form-group">
-        <label for="descripcion">Descripcion</label>
-        <textarea
-          id="descripcion"
-          name="descripcion"
-          rows="4"
-          required
-          [ngModel]="editingId ? editingCurso.descripcion : newCurso.descripcion"
-          (ngModelChange)="editingId ? (editingCurso.descripcion = $event) : (newCurso.descripcion = $event)"
-        ></textarea>
-      </div>
+      <form class="form" (ngSubmit)="editingId ? updateCurso() : addCurso()">
+        <div class="form-group">
+          <label for="nombre">Nombre del curso</label>
+          <input
+            type="text"
+            id="nombre"
+            name="nombre"
+            required
+            [ngModel]="editingId ? editingCurso.nombre : newCurso.nombre"
+            (ngModelChange)="editingId ? (editingCurso.nombre = $event) : (newCurso.nombre = $event)"
+          />
+        </div>
 
-      <div class="form-group">
-        <label for="company_tag">Etiqueta empresa</label>
-        <select
-          id="company_tag"
-          name="company_tag"
-          required
-          [ngModel]="editingId ? editingCurso.companyTag : newCurso.companyTag"
-          (ngModelChange)="editingId ? (editingCurso.companyTag = $event) : (newCurso.companyTag = $event)"
-        >
-          <option value="">Selecciona etiqueta de empresa</option>
-          <option *ngFor="let tag of getCompanyTagOptions(editingId ? editingCurso.companyTag : newCurso.companyTag)" [value]="tag">
-            {{ tag }}
-          </option>
-        </select>
-        <p class="field-help">Estas opciones salen de los usuarios tipo empresa.</p>
-      </div>
+        <div class="form-group">
+          <label for="descripcion">Descripcion</label>
+          <textarea
+            id="descripcion"
+            name="descripcion"
+            rows="4"
+            required
+            [ngModel]="editingId ? editingCurso.descripcion : newCurso.descripcion"
+            (ngModelChange)="editingId ? (editingCurso.descripcion = $event) : (newCurso.descripcion = $event)"
+          ></textarea>
+        </div>
 
-      <div class="form-group">
-        <label for="Fecha_inicio">Fecha de inicio</label>
-        <input
-          type="date"
-          id="Fecha_inicio"
-          name="Fecha_inicio"
-          required
-          [ngModel]="editingId ? formatDate(editingCurso.Fecha_inicio) : formatDate(newCurso.Fecha_inicio)"
-          (ngModelChange)="editingId ? (editingCurso.Fecha_inicio = $event) : (newCurso.Fecha_inicio = $event)"
-        />
-      </div>
+        <div class="form-group">
+          <label for="company_tag">Etiqueta empresa</label>
+          <select
+            id="company_tag"
+            name="company_tag"
+            required
+            [ngModel]="editingId ? editingCurso.companyTag : newCurso.companyTag"
+            (ngModelChange)="editingId ? (editingCurso.companyTag = $event) : (newCurso.companyTag = $event)"
+          >
+            <option value="">Selecciona etiqueta de empresa</option>
+            <option *ngFor="let tag of getCompanyTagOptions(editingId ? editingCurso.companyTag : newCurso.companyTag)" [value]="tag">
+              {{ tag }}
+            </option>
+          </select>
+          <p class="field-help">Estas opciones salen de los usuarios tipo empresa.</p>
+        </div>
 
-      <div class="form-group">
-        <label for="fecha_fin">Fecha de fin</label>
-        <input
-          type="date"
-          id="fecha_fin"
-          name="fecha_fin"
-          required
-          [ngModel]="editingId ? formatDate(editingCurso.Fecha_fin) : formatDate(newCurso.Fecha_fin)"
-          (ngModelChange)="editingId ? (editingCurso.Fecha_fin = $event) : (newCurso.Fecha_fin = $event)"
-        />
-      </div>
+        <div class="form-group">
+          <label for="Fecha_inicio">Fecha de inicio</label>
+          <input
+            type="date"
+            id="Fecha_inicio"
+            name="Fecha_inicio"
+            required
+            [ngModel]="editingId ? formatDate(editingCurso.Fecha_inicio) : formatDate(newCurso.Fecha_inicio)"
+            (ngModelChange)="editingId ? (editingCurso.Fecha_inicio = $event) : (newCurso.Fecha_inicio = $event)"
+          />
+        </div>
 
-      <div class="form-group">
-        <label for="nom_representante">Representante</label>
-        <input
-          type="text"
-          id="nom_representante"
-          name="nom_representante"
-          required
-          [ngModel]="editingId ? editingCurso.nom_representante : newCurso.nom_representante"
-          (ngModelChange)="editingId ? (editingCurso.nom_representante = $event) : (newCurso.nom_representante = $event)"
-        />
-      </div>
+        <div class="form-group">
+          <label for="fecha_fin">Fecha de fin</label>
+          <input
+            type="date"
+            id="fecha_fin"
+            name="fecha_fin"
+            required
+            [ngModel]="editingId ? formatDate(editingCurso.Fecha_fin) : formatDate(newCurso.Fecha_fin)"
+            (ngModelChange)="editingId ? (editingCurso.Fecha_fin = $event) : (newCurso.Fecha_fin = $event)"
+          />
+        </div>
 
-      <div class="form-group">
-        <label for="num_representante">Telefono representante</label>
-        <input
-          type="text"
-          id="num_representante"
-          name="num_representante"
-          required
-          [ngModel]="editingId ? editingCurso.num_represnetantes : newCurso.num_represnetantes"
-          (ngModelChange)="editingId ? (editingCurso.num_represnetantes = $event) : (newCurso.num_represnetantes = $event)"
-        />
-      </div>
+        <div class="form-group">
+          <label for="nom_representante">Representante</label>
+          <input
+            type="text"
+            id="nom_representante"
+            name="nom_representante"
+            required
+            [ngModel]="editingId ? editingCurso.nom_representante : newCurso.nom_representante"
+            (ngModelChange)="editingId ? (editingCurso.nom_representante = $event) : (newCurso.nom_representante = $event)"
+          />
+        </div>
 
-      <div class="form-actions">
-        <button type="submit" class="btn btn-success">{{ editingId ? 'Actualizar' : 'Guardar' }}</button>
-        <button type="button" class="btn btn-secondary" (click)="resetForm()">Cancelar</button>
-      </div>
-    </form>
+        <div class="form-group">
+          <label for="num_representante">Telefono representante</label>
+          <input
+            type="text"
+            id="num_representante"
+            name="num_representante"
+            required
+            [ngModel]="editingId ? editingCurso.num_represnetantes : newCurso.num_represnetantes"
+            (ngModelChange)="editingId ? (editingCurso.num_represnetantes = $event) : (newCurso.num_represnetantes = $event)"
+          />
+        </div>
+
+        <div class="form-group form-group-full">
+          <label>Instructores asignados</label>
+          <button
+            type="button"
+            class="select-trigger"
+            (click)="toggleInstructorDropdown($event)"
+            [attr.aria-expanded]="showInstructorDropdown"
+          >
+            {{ getCurrentInstructors().length > 0 ? getCurrentInstructors().length + ' instructores seleccionados' : 'Seleccionar instructores' }}
+          </button>
+
+          <div class="select-menu" *ngIf="showInstructorDropdown" (click)="$event.stopPropagation()">
+            <label class="select-option" *ngFor="let instructor of getAvailableInstructores()">
+              <input
+                type="checkbox"
+                [checked]="isInstructorSelected(instructor.id)"
+                (change)="toggleInstructorSelection(instructor.id)"
+              />
+              <span>{{ instructor.nombre }}</span>
+            </label>
+          </div>
+
+          <div class="selected-chips" *ngIf="getCurrentInstructors().length > 0; else noSelectedInstructors">
+            <button
+              type="button"
+              class="chip"
+              *ngFor="let instructorId of getCurrentInstructors()"
+              (click)="removeInstructorSelection(instructorId)"
+            >
+              {{ getInstructorName(instructorId) }} ×
+            </button>
+          </div>
+
+          <ng-template #noSelectedInstructors>
+            <p class="field-help">Selecciona minimo 3 instructores para el curso.</p>
+          </ng-template>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-success">{{ editingId ? 'Actualizar' : 'Guardar' }}</button>
+          <button type="button" class="btn btn-secondary" (click)="resetForm()">Cancelar</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <div class="table-section">
@@ -174,11 +220,12 @@
             <th>Nombre</th>
             <th>Descripcion</th>
             <th>Empresa</th>
+            <th>Instructores</th>
             <th>Inicio</th>
             <th>Fin</th>
             <th>Representante</th>
             <th>Telefono</th>
-            <th *ngIf="isAdmin">Acciones</th>
+            <th>Acciones</th>
           </tr>
         </thead>
 
@@ -187,17 +234,87 @@
             <td>{{ curso.nombre }}</td>
             <td>{{ curso.descripcion }}</td>
             <td>{{ curso.companyTag || '-' }}</td>
+            <td>
+              <div class="instructor-cell">
+                <span class="instructor-count">{{ curso.instructorIds?.length || 0 }}</span>
+                <small>{{ getInstructorSummary(curso.instructorIds) }}</small>
+              </div>
+            </td>
             <td>{{ curso.Fecha_inicio | date }}</td>
             <td>{{ curso.Fecha_fin | date }}</td>
             <td>{{ curso.nom_representante }}</td>
             <td>{{ curso.num_represnetantes }}</td>
-            <td class="actions" *ngIf="isAdmin">
-              <button class="btn btn-sm btn-info" (click)="startEdit(curso)">Editar</button>
-              <button class="btn btn-sm btn-danger" (click)="deleteCurso(curso.idcurso)">Eliminar</button>
+            <td class="actions">
+              <div class="action-menu-wrapper">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  (click)="toggleActionMenu(curso.idcurso, $event)"
+                  [attr.aria-expanded]="activeActionMenuId === curso.idcurso"
+                >
+                  Acciones
+                </button>
+
+                <div class="action-menu" *ngIf="activeActionMenuId === curso.idcurso" (click)="$event.stopPropagation()">
+                  <button type="button" (click)="openCursoDetail(curso)">Ver detalles</button>
+                  <button type="button" *ngIf="isAdmin" (click)="startEdit(curso)">Editar</button>
+                  <button type="button" class="action-danger" *ngIf="isAdmin" (click)="deleteCurso(curso.idcurso)">Eliminar</button>
+                </div>
+              </div>
             </td>
           </tr>
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <div *ngIf="selectedCourseDetail" class="modal-overlay" (click)="closeCursoDetail()">
+    <div class="modal-content details-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3>{{ selectedCourseDetail.nombre }}</h3>
+          <p class="modal-subtitle">Resumen del curso y responsables asignados.</p>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" (click)="closeCursoDetail()">Cerrar</button>
+      </div>
+
+      <div class="detail-grid">
+        <section class="detail-card">
+          <h4>Descripcion</h4>
+          <p>{{ selectedCourseDetail.descripcion || 'Sin descripcion' }}</p>
+        </section>
+
+        <section class="detail-card">
+          <h4>Empresa</h4>
+          <p>{{ selectedCourseDetail.companyTag || '-' }}</p>
+        </section>
+
+        <section class="detail-card">
+          <h4>Fechas</h4>
+          <p>Inicio: {{ selectedCourseDetail.Fecha_inicio | date }}</p>
+          <p>Fin: {{ selectedCourseDetail.Fecha_fin | date }}</p>
+        </section>
+
+        <section class="detail-card">
+          <h4>Representante</h4>
+          <p>{{ selectedCourseDetail.nom_representante || '-' }}</p>
+          <p>{{ selectedCourseDetail.num_represnetantes || '-' }}</p>
+        </section>
+
+        <section class="detail-card detail-card-full">
+          <h4>Instructores asignados</h4>
+
+          <div class="selected-chips" *ngIf="selectedCourseDetail.instructorIds?.length; else noDetailInstructors">
+            <span class="chip chip-static" *ngFor="let instructorId of selectedCourseDetail.instructorIds">
+              {{ getInstructorName(instructorId) }}
+            </span>
+          </div>
+
+          <ng-template #noDetailInstructors>
+            <p class="empty-state">Sin instructores asignados.</p>
+          </ng-template>
+        </section>
+      </div>
     </div>
   </div>
 </div>
