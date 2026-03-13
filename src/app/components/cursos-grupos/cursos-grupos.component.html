@@ -19,8 +19,11 @@
           <small *ngIf="user.role !== 'company'">Selecciona un curso para cargar su grupo de personas.</small>
         </div>
 
-        <div *ngIf="showCursoForm && user.role === 'admin'" class="form-section">
-          <h4>{{ editingCursoId ? 'Editar curso' : 'Nuevo curso' }}</h4>
+        <ng-template #cursoFormContent>
+          <div class="form-header">
+            <h4>{{ editingCursoId ? 'Editar curso' : 'Nuevo curso' }}</h4>
+            <button *ngIf="editingCursoId" type="button" class="btn btn-secondary btn-sm" (click)="resetCursoForm()">Cerrar</button>
+          </div>
 
           <form (ngSubmit)="editingCursoId ? updateCurso() : addCurso()" class="form">
             <div class="form-group">
@@ -97,14 +100,14 @@
             <div class="form-group">
               <label>Telefono representante</label>
               <input
-                type="text"
+                type="tel"
                 name="curso_num_representantes"
                 required
                 maxlength="10"
                 pattern="[0-9]*"
                 inputmode="numeric"
                 [ngModel]="editingCursoId ? editingCurso.num_represnetantes : newCurso.num_represnetantes"
-                (ngModelChange)="editingCursoId ? (editingCurso.num_represnetantes = $event) : (newCurso.num_represnetantes = $event)"
+                (ngModelChange)="updateCurrentRepresentativePhone($event)"
               />
             </div>
 
@@ -113,6 +116,16 @@
               <button type="button" class="btn btn-secondary" (click)="resetCursoForm()">Cancelar</button>
             </div>
           </form>
+        </ng-template>
+
+        <div *ngIf="showCursoForm && user.role === 'admin' && !editingCursoId" class="form-section">
+          <ng-container *ngTemplateOutlet="cursoFormContent"></ng-container>
+        </div>
+
+        <div *ngIf="showCursoForm && user.role === 'admin' && editingCursoId" class="modal-overlay" (click)="resetCursoForm()">
+          <div class="modal-content" (click)="$event.stopPropagation()">
+            <ng-container *ngTemplateOutlet="cursoFormContent"></ng-container>
+          </div>
         </div>
 
         <div class="cursos-list">
@@ -376,10 +389,9 @@
                 <label>
                   Practica
                   <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
+                    type="text"
+                    inputmode="decimal"
+                    maxlength="5"
                     [ngModel]="persona.clfPractica"
                     (ngModelChange)="onCalificacionChange(persona, 'clfPractica', $event)"
                     [name]="'practica_' + persona.id"
@@ -388,10 +400,9 @@
                 <label>
                   Teorica
                   <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
+                    type="text"
+                    inputmode="decimal"
+                    maxlength="5"
                     [ngModel]="persona.clfTeorica"
                     (ngModelChange)="onCalificacionChange(persona, 'clfTeorica', $event)"
                     [name]="'teorica_' + persona.id"

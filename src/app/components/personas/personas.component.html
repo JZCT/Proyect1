@@ -116,9 +116,14 @@
     </div>
   </div>
 
-  <div *ngIf="showForm" class="form-section">
-    <h3>{{ editingId ? 'Editar persona' : 'Nueva persona' }}</h3>
-    <p class="hint-chip">Dato obligatorio: CURP valida de 18 caracteres.</p>
+  <ng-template #personaFormContent>
+    <div class="form-header">
+      <div>
+        <h3>{{ editingId ? 'Editar persona' : 'Nueva persona' }}</h3>
+        <p class="hint-chip">Dato obligatorio: CURP valida de 18 caracteres.</p>
+      </div>
+      <button *ngIf="editingId" type="button" class="btn btn-secondary btn-sm" (click)="resetForm()">Cerrar</button>
+    </div>
 
     <div class="photo-preview-wrapper">
       <div class="photo-box">
@@ -138,10 +143,19 @@
     <div class="camera-box" *ngIf="cameraActive">
       <video #cameraVideo autoplay playsinline muted></video>
       <canvas #cameraCanvas class="camera-canvas"></canvas>
+      <div class="camera-overlay">
+        <button
+          type="button"
+          class="camera-shutter"
+          (click)="capturarFoto()"
+          aria-label="Capturar foto"
+        >
+          <span class="camera-shutter-inner" aria-hidden="true"></span>
+        </button>
+      </div>
     </div>
 
     <div class="camera-actions" *ngIf="cameraActive">
-      <button type="button" class="btn btn-primary btn-sm" (click)="capturarFoto()">Capturar foto</button>
       <button type="button" class="btn btn-secondary btn-sm" (click)="detenerCamara()">Cerrar camara</button>
     </div>
 
@@ -173,7 +187,15 @@
 
         <div class="form-group">
           <label>Telefono</label>
-          <input type="tel" [ngModel]="editingId ? editingPersona.telefono : newPersona.telefono" (ngModelChange)="editingId ? editingPersona.telefono = $event : newPersona.telefono = $event" name="telefono" />
+          <input
+            type="tel"
+            inputmode="numeric"
+            maxlength="10"
+            pattern="[0-9]*"
+            [ngModel]="editingId ? editingPersona.telefono : newPersona.telefono"
+            (ngModelChange)="updateCurrentTelefono($event)"
+            name="telefono"
+          />
         </div>
 
         <div class="form-group">
@@ -189,12 +211,11 @@
         <div class="form-group">
           <label>Calf. practica (0-100)</label>
           <input
-            type="number"
-            min="0"
-            max="100"
-            step="0.1"
+            type="text"
+            inputmode="decimal"
+            maxlength="5"
             [ngModel]="editingId ? editingPersona.clfPractica : newPersona.clfPractica"
-            (ngModelChange)="editingId ? editingPersona.clfPractica = $event : newPersona.clfPractica = $event"
+            (ngModelChange)="updateCurrentScore('clfPractica', $event)"
             name="clf_practica"
           />
         </div>
@@ -202,12 +223,11 @@
         <div class="form-group">
           <label>Calf. teorica (0-100)</label>
           <input
-            type="number"
-            min="0"
-            max="100"
-            step="0.1"
+            type="text"
+            inputmode="decimal"
+            maxlength="5"
             [ngModel]="editingId ? editingPersona.clfTeorica : newPersona.clfTeorica"
-            (ngModelChange)="editingId ? editingPersona.clfTeorica = $event : newPersona.clfTeorica = $event"
+            (ngModelChange)="updateCurrentScore('clfTeorica', $event)"
             name="clf_teorica"
           />
         </div>
@@ -258,6 +278,16 @@
         <button type="button" class="btn btn-secondary" (click)="resetForm()">Cancelar</button>
       </div>
     </form>
+  </ng-template>
+
+  <div *ngIf="showForm && !editingId" class="form-section">
+    <ng-container *ngTemplateOutlet="personaFormContent"></ng-container>
+  </div>
+
+  <div *ngIf="showForm && editingId" class="modal-overlay" (click)="resetForm()">
+    <div class="modal-content form-modal" (click)="$event.stopPropagation()">
+      <ng-container *ngTemplateOutlet="personaFormContent"></ng-container>
+    </div>
   </div>
 
   <div *ngIf="showFilePreview" class="modal-overlay" (click)="closeArchivoPreview()">
@@ -388,7 +418,7 @@
             </td>
             <td>
               <div class="actions">
-                <button class="btn btn-info btn-sm" (click)="startEdit(persona)" *ngIf="isAdmin">Editar</button>
+                <button class="btn btn-info btn-sm" (click)="startEdit(persona)" *ngIf="canEditPersonas">Editar</button>
                 <button class="btn btn-danger btn-sm" (click)="deletePersona(persona.id)" *ngIf="isAdmin">Eliminar</button>
               </div>
             </td>

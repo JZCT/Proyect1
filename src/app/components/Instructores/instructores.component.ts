@@ -7,6 +7,7 @@ import { AuthService } from '../../services/auth.service';
 import { Instructor } from '../../models/instructor.model';
 import { Curso } from '../../models/curso.model';
 import { resolveAppAssetUrl } from '../../utils/asset-url.util';
+import { sanitizePhoneInput } from '../../utils/input-sanitizers.util';
 
 @Component({
   selector: 'app-instructor',
@@ -37,6 +38,10 @@ export class InstructorComponent implements OnInit, OnDestroy {
   @ViewChild('photoInput') photoInput?: ElementRef<HTMLInputElement>;
   @ViewChild('cameraVideo') cameraVideo?: ElementRef<HTMLVideoElement>;
   @ViewChild('cameraCanvas') cameraCanvas?: ElementRef<HTMLCanvasElement>;
+
+  updateInstructorTelefono(value: unknown): void {
+    this.nuevoInstructor.telefono = sanitizePhoneInput(value);
+  }
 
   nuevoInstructor: Instructor = {
     nombre: '',
@@ -96,14 +101,19 @@ export class InstructorComponent implements OnInit, OnDestroy {
     }
 
     try {
+      const instructorPayload: Instructor = {
+        ...this.nuevoInstructor,
+        telefono: sanitizePhoneInput(this.nuevoInstructor.telefono)
+      };
+
       if (this.editIndex !== null) {
         const instructor = this.instructores[this.editIndex];
         if (instructor.id) {
-          await this.instructorService.updateInstructor(instructor.id, this.nuevoInstructor);
+          await this.instructorService.updateInstructor(instructor.id, instructorPayload);
           alert('Instructor actualizado');
         }
       } else {
-        await this.instructorService.addInstructor(this.nuevoInstructor);
+        await this.instructorService.addInstructor(instructorPayload);
         alert('Instructor agregado');
       }
       this.cancelar();
@@ -123,7 +133,10 @@ export class InstructorComponent implements OnInit, OnDestroy {
     if (index < 0) return;
 
     this.editIndex = index;
-    this.nuevoInstructor = { ...this.instructores[index] };
+    this.nuevoInstructor = {
+      ...this.instructores[index],
+      telefono: sanitizePhoneInput(this.instructores[index].telefono)
+    };
   }
 
   async eliminarInstructor(instructor: Instructor) {

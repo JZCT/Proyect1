@@ -9,6 +9,7 @@ import { NotificationService } from '../../services/notification.service';
 import { Curso } from '../../models/curso.model';
 import { Instructor } from '../../models/instructor.model';
 import { User } from '../../models/user.model';
+import { sanitizePhoneInput } from '../../utils/input-sanitizers.util';
 
 @Component({
   selector: 'app-cursos',
@@ -36,6 +37,17 @@ export class CursosComponent implements OnInit {
   sortBy: 'nombre' | 'empresa' | 'inicio' | 'fin' = 'nombre';
   sortDirection: 'asc' | 'desc' = 'asc';
   exportingReport = false;
+
+  updateCurrentRepresentativePhone(value: unknown): void {
+    const telefono = sanitizePhoneInput(value);
+
+    if (this.editingId) {
+      this.editingCurso.num_represnetantes = telefono;
+      return;
+    }
+
+    this.newCurso.num_represnetantes = telefono;
+  }
 
   newCurso: Partial<Curso> = {
     nombre: '',
@@ -200,6 +212,7 @@ export class CursosComponent implements OnInit {
     try {
       const cursoToAdd: Curso = {
         ...(this.newCurso as Curso),
+        num_represnetantes: sanitizePhoneInput(this.newCurso.num_represnetantes),
         companyTag: this.normalizeCompanyTag(this.newCurso.companyTag),
         instructorIds: this.selectedInstructors
       };
@@ -218,7 +231,10 @@ export class CursosComponent implements OnInit {
     this.closeFloatingMenus();
     this.selectedCourseDetail = null;
     this.editingId = curso.idcurso || null;
-    this.editingCurso = { ...curso };
+    this.editingCurso = {
+      ...curso,
+      num_represnetantes: sanitizePhoneInput(curso.num_represnetantes)
+    };
     this.editingInstructors = [...(curso.instructorIds || [])];
     this.showInstructorDropdown = false;
     this.showForm = true;
@@ -240,6 +256,7 @@ export class CursosComponent implements OnInit {
     try {
       const cursoToUpdate: Partial<Curso> = {
         ...this.editingCurso,
+        num_represnetantes: sanitizePhoneInput(this.editingCurso.num_represnetantes),
         companyTag: this.normalizeCompanyTag(this.editingCurso.companyTag),
         instructorIds: this.editingInstructors
       };

@@ -26,6 +26,10 @@
   --shadow-md: 0 12px 24px rgba(15, 23, 42, 0.08);
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body.cecapta-standalone {
   margin: 0;
   min-height: 100vh;
@@ -47,6 +51,13 @@ app-root {
   background: linear-gradient(180deg, var(--brand-4) 0%, var(--bg) 48%, #f6fbff 100%);
   color: var(--text);
   line-height: 1.35;
+}
+
+app-root button,
+app-root input,
+app-root select,
+app-root textarea {
+  font: inherit;
 }
 
 body.cecapta-standalone app-root {
@@ -134,6 +145,7 @@ app-root .table-scroll {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
@@ -159,4 +171,33 @@ app-root video,
 app-root canvas,
 app-root iframe {
   max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  app-root .page-title {
+    font-size: 19px;
+  }
+
+  app-root .page-subtitle {
+    font-size: 12px;
+  }
+
+  app-root .hint-chip {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+    white-space: normal;
+  }
+
+  app-root .table-scroll {
+    border-radius: 10px;
+  }
+
+  app-root .table-scroll .table {
+    min-width: 760px;
+  }
+
+  app-root .table-scroll .table.table-compact {
+    min-width: 560px;
+  }
 }

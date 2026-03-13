@@ -8,6 +8,7 @@
     "build": "ng build",
     "build:wordpress": "ng build --configuration production --base-href ./",
     "build:wordpress:embed": "npm run build:wordpress && node scripts/generate-wordpress-embed.cjs",
+    "build:wordpress:plugin": "npm run build:wordpress && node scripts/generate-wordpress-plugin.cjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "bootstrap:admin": "node scripts/firebase-admin-tools.cjs bootstrap-admin",

@@ -15,6 +15,7 @@ import { Instructor } from '../../models/instructor.model';
 import { Persona } from '../../models/persona.model';
 import { User } from '../../models/user.model';
 import { resolveAppAssetUrl } from '../../utils/asset-url.util';
+import { sanitizePhoneInput, sanitizeScoreInput } from '../../utils/input-sanitizers.util';
 
 @Component({
   selector: 'app-cursos-grupos',
@@ -92,6 +93,17 @@ export class CursosGruposComponent implements OnInit {
     private notificationService: NotificationService
   ) {
     this.currentUser$ = this.authService.currentUserData$;
+  }
+
+  updateCurrentRepresentativePhone(value: unknown): void {
+    const telefono = sanitizePhoneInput(value);
+
+    if (this.editingCursoId) {
+      this.editingCurso.num_represnetantes = telefono;
+      return;
+    }
+
+    this.newCurso.num_represnetantes = telefono;
   }
 
   ngOnInit(): void {
@@ -269,6 +281,7 @@ export class CursosGruposComponent implements OnInit {
       try {
         await this.cursoService.addCurso({
           ...(this.newCurso as Curso),
+          num_represnetantes: sanitizePhoneInput(this.newCurso.num_represnetantes),
           companyTag: this.normalizeCompanyTag(this.newCurso.companyTag),
           personasIds: []
         });
@@ -287,7 +300,10 @@ export class CursosGruposComponent implements OnInit {
     if (!this.canManageCurso()) return;
 
     this.editingCursoId = curso.idcurso || null;
-    this.editingCurso = { ...curso };
+    this.editingCurso = {
+      ...curso,
+      num_represnetantes: sanitizePhoneInput(curso.num_represnetantes)
+    };
     this.showCursoForm = true;
   }
 
@@ -303,6 +319,7 @@ export class CursosGruposComponent implements OnInit {
       try {
         await this.cursoService.updateCurso(this.editingCursoId, {
           ...this.editingCurso,
+          num_represnetantes: sanitizePhoneInput(this.editingCurso.num_represnetantes),
           companyTag: this.normalizeCompanyTag(this.editingCurso.companyTag)
         } as Curso);
         this.resetCursoForm();
@@ -509,10 +526,7 @@ export class CursosGruposComponent implements OnInit {
   }
 
   private getValidScore(value: unknown): number | null {
-    if (value === null || value === undefined || value === '') return null;
-    const numericValue = Number(value);
-    if (Number.isNaN(numericValue)) return null;
-    return Math.max(0, Math.min(100, numericValue));
+    return sanitizeScoreInput(value);
   }
 
   private applyCursoFilter() {

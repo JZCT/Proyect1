@@ -55,6 +55,13 @@
   color: var(--text);
 }
 
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
 .panel-header small {
   color: var(--muted);
   font-size: 12px;
@@ -113,6 +120,9 @@ select:focus {
   padding: 8px 10px;
   font-size: 13px;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
 
@@ -343,9 +353,110 @@ select:focus {
   text-align: center;
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.modal-content {
+  width: min(720px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
+  padding: 14px;
+}
+
 @media (max-width: 900px) {
   .content-wrapper {
     grid-template-columns: 1fr;
   }
+
+  .form-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
+@media (max-width: 680px) {
+  .container-fluid {
+    gap: 12px;
+  }
+
+  .header,
+  .cursos-panel,
+  .grupos-panel,
+  .form-section,
+  .instructores-section,
+  .modal-content {
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .panel-header,
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .report-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .report-actions .btn,
+  .form-actions .btn,
+  .curso-actions .btn,
+  .grupo-actions .btn {
+    flex: 1 1 0;
+    width: 100%;
+  }
+
+  .resultado-filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .resultado-filters .btn {
+    width: 100%;
+  }
+
+  .calificaciones-resumen,
+  .assign-progress {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .curso-item,
+  .grupo-item {
+    padding: 12px;
+  }
+
+  .curso-info,
+  .grupo-info {
+    flex-basis: 100%;
+  }
+
+  .curso-actions,
+  .grupo-actions {
+    width: 100%;
+  }
+
+  .calificacion-editor {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .resultado-filters {
+    grid-template-columns: 1fr;
+  }
+}

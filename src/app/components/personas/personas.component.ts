@@ -10,6 +10,7 @@ import { NotificationService } from '../../services/notification.service';
 import { Persona } from '../../models/persona.model';
 import { User } from '../../models/user.model';
 import { resolveAppAssetUrl } from '../../utils/asset-url.util';
+import { sanitizePhoneInput, sanitizeScoreInput } from '../../utils/input-sanitizers.util';
 
 type PersonaArchivo = NonNullable<Persona['archivos']>[number];
 type FilePreviewType = 'image' | 'pdf' | 'text' | 'unsupported';
@@ -104,6 +105,32 @@ export class PersonasComponent implements OnInit, OnDestroy {
     private sanitizer: DomSanitizer
   ) {}
 
+  get canEditPersonas(): boolean {
+    return this.isAdmin || this.currentUser?.role === 'instructor';
+  }
+
+  updateCurrentTelefono(value: unknown): void {
+    const telefono = sanitizePhoneInput(value);
+
+    if (this.editingId) {
+      this.editingPersona.telefono = telefono;
+      return;
+    }
+
+    this.newPersona.telefono = telefono;
+  }
+
+  updateCurrentScore(field: 'clfPractica' | 'clfTeorica', value: unknown): void {
+    const score = this.normalizeScoreForStorage(value);
+
+    if (this.editingId) {
+      this.editingPersona[field] = score;
+      return;
+    }
+
+    this.newPersona[field] = score;
+  }
+
   ngOnInit(): void {
     this.checkAdminStatus();
     this.loadCurrentUser();
@@ -190,7 +217,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   triggerCamera() {
-    if (!this.isAdmin) {
+    if (!this.canEditPersonas) {
       this.showMessage('No tienes permisos para realizar esta acción');
       return;
     }
@@ -198,7 +225,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   seleccionarArchivoFoto() {
-    if (!this.isAdmin) return;
+    if (!this.canEditPersonas) return;
 
     this.showPhotoOptions = false;
     this.detenerCamara();
@@ -206,14 +233,14 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   tomarFotoDesdeMenu() {
-    if (!this.isAdmin) return;
+    if (!this.canEditPersonas) return;
 
     this.showPhotoOptions = false;
     this.iniciarCamara();
   }
 
   onPhotoSelected(event: Event) {
-    if (!this.isAdmin) return;
+    if (!this.canEditPersonas) return;
 
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -244,7 +271,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   async iniciarCamara() {
-    if (!this.isAdmin) return;
+    if (!this.canEditPersonas) return;
 
     if (!this.isCameraSupported()) {
       this.showMessage('Tu navegador no soporta la camara');
@@ -277,7 +304,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   capturarFoto() {
-    if (!this.isAdmin) return;
+    if (!this.canEditPersonas) return;
     if (!this.cameraVideo || !this.cameraCanvas) return;
 
     const video = this.cameraVideo.nativeElement;
@@ -323,7 +350,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   onFilesSelected(event: Event) {
-    if (!this.isAdmin) return;
+    if (!this.canEditPersonas) return;
 
     const input = event.target as HTMLInputElement;
     const files = input.files;
@@ -388,18 +415,19 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   startEdit(persona: Persona) {
-    if (!this.isAdmin) return;
+    if (!this.canEditPersonas) return;
 
     this.editingId = persona.id || null;
     this.editingPersona = {
       ...persona,
-      curp: this.normalizeCurp(persona.curp)
+      curp: this.normalizeCurp(persona.curp),
+      telefono: sanitizePhoneInput(persona.telefono)
     };
     this.showForm = true;
   }
 
   async updatePersona() {
-    if (!this.isAdmin || !this.editingId) return;
+    if (!this.canEditPersonas || !this.editingId) return;
 
     const editCurp = this.normalizeCurp(this.editingPersona.curp);
     if (!editCurp) {
@@ -661,6 +689,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
     return {
       ...persona,
       curp: this.normalizeCurp(persona.curp),
+      telefono: sanitizePhoneInput(persona.telefono),
       clfPractica: this.normalizeScoreForStorage(persona.clfPractica),
       clfTeorica: this.normalizeScoreForStorage(persona.clfTeorica)
     };
@@ -672,10 +701,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   private getValidScore(value: unknown): number | null {
-    if (value === null || value === undefined || value === '') return null;
-    const numericValue = Number(value);
-    if (Number.isNaN(numericValue)) return null;
-    return Math.max(0, Math.min(100, numericValue));
+    return sanitizeScoreInput(value);
   }
 
   private revokeObjectUrls(archivos: PersonaArchivo[] | undefined): void {

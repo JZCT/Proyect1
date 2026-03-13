@@ -100,12 +100,15 @@
         <div class="form-group">
           <label for="num_representante">Telefono representante</label>
           <input
-            type="text"
+            type="tel"
             id="num_representante"
             name="num_representante"
             required
+            inputmode="numeric"
+            maxlength="10"
+            pattern="[0-9]*"
             [ngModel]="editingId ? editingCurso.num_represnetantes : newCurso.num_represnetantes"
-            (ngModelChange)="editingId ? (editingCurso.num_represnetantes = $event) : (newCurso.num_represnetantes = $event)"
+            (ngModelChange)="updateCurrentRepresentativePhone($event)"
           />
         </div>
 

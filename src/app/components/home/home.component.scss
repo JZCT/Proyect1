@@ -62,3 +62,29 @@
   border-radius: 999px;
   padding: 4px 10px;
 }
+
+@media (max-width: 640px) {
+  .home-page {
+    gap: 12px;
+  }
+
+  .welcome-card,
+  .modules {
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  .modules-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .module-card {
+    padding: 14px;
+  }
+
+  .module-card a {
+    width: 100%;
+    justify-content: center;
+    padding: 8px 12px;
+  }
+}

@@ -1,12 +1,24 @@
 <div class="contenedor">
-  <div class="formulario">
-    <div class="page-title-group">
-      <h2 class="page-title">{{ editIndex !== null ? 'Editar Instructor' : 'Nuevo Instructor' }}</h2>
-      <p class="page-subtitle">Captura datos basicos y asigna cursos desde la misma vista.</p>
+  <ng-template #instructorFormContent>
+    <div class="form-header">
+      <div class="page-title-group">
+        <h2 class="page-title">{{ editIndex !== null ? 'Editar Instructor' : 'Nuevo Instructor' }}</h2>
+        <p class="page-subtitle">Captura datos basicos y asigna cursos desde la misma vista.</p>
+      </div>
+      <button *ngIf="editIndex !== null" type="button" class="cancelar btn-close" (click)="cancelar()">Cerrar</button>
     </div>
 
     <input type="text" placeholder="Nombre" [(ngModel)]="nuevoInstructor.nombre">
-    <input type="text" placeholder="Telefono" [(ngModel)]="nuevoInstructor.telefono">
+    <input
+      type="tel"
+      placeholder="Telefono"
+      inputmode="numeric"
+      maxlength="10"
+      pattern="[0-9]*"
+      [ngModel]="nuevoInstructor.telefono"
+      (ngModelChange)="updateInstructorTelefono($event)"
+      name="instructor_telefono"
+    >
 
     <div class="foto-wrapper">
       <img class="preview" [src]="nuevoInstructor.foto || defaultImg" (error)="onImgError($event)">
@@ -23,10 +35,19 @@
     <div class="camera-box" *ngIf="cameraActive">
       <video #cameraVideo autoplay playsinline muted></video>
       <canvas #cameraCanvas class="camera-canvas"></canvas>
+      <div class="camera-overlay">
+        <button
+          type="button"
+          class="camera-shutter"
+          (click)="capturarFoto()"
+          aria-label="Capturar foto"
+        >
+          <span class="camera-shutter-inner" aria-hidden="true"></span>
+        </button>
+      </div>
     </div>
 
     <div class="camera-actions" *ngIf="cameraActive">
-      <button type="button" class="btn-capture" (click)="capturarFoto()">Capturar foto</button>
       <button type="button" class="btn-stop" (click)="detenerCamara()">Cerrar camara</button>
     </div>
 
@@ -34,6 +55,10 @@
       <button (click)="guardarInstructor()" class="guardar">Guardar</button>
       <button (click)="cancelar()" class="cancelar">Cancelar</button>
     </div>
+  </ng-template>
+
+  <div class="formulario" *ngIf="editIndex === null">
+    <ng-container *ngTemplateOutlet="instructorFormContent"></ng-container>
   </div>
 
   <div class="panel-derecho">
@@ -107,6 +132,12 @@
           <button (click)="eliminarInstructor(instructor)">Eliminar</button>
         </div>
       </article>
+    </div>
+  </div>
+
+  <div *ngIf="editIndex !== null" class="modal-overlay" (click)="cancelar()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <ng-container *ngTemplateOutlet="instructorFormContent"></ng-container>
     </div>
   </div>
 </div>

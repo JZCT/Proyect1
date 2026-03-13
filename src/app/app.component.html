@@ -1,29 +1,47 @@
 <div class="layout">
   <header class="app-header" *ngIf="!isLoginPage && !isEmbedMode">
     <div class="app-header__inner">
-      <div class="brand">
-        <h1>{{ title }}</h1>
-        <p>Operacion diaria simple para cursos, personas e instructores</p>
+      <div class="app-header__top">
+        <div class="brand">
+          <h1>{{ title }}</h1>
+          <p>Operacion diaria simple para cursos, personas e instructores</p>
+        </div>
+
+        <button
+          type="button"
+          class="nav-toggle"
+          [attr.aria-expanded]="mobileNavOpen"
+          aria-controls="primary-navigation"
+          aria-label="Abrir menu de navegacion"
+          (click)="toggleMobileNav()"
+        >
+          {{ mobileNavOpen ? 'Cerrar menu' : 'Menu' }}
+        </button>
       </div>
 
-      <nav *ngIf="currentUser$ | async as user; else guestLinks" class="app-nav">
-        <a *ngIf="user.role !== 'instructor'" routerLink="/home" routerLinkActive="active">Home</a>
-        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Cursos y Personas</a>
-        <a *ngIf="user.role !== 'instructor'" routerLink="/cursos" routerLinkActive="active">Cursos</a>
-        <a *ngIf="user.role === 'admin' || user.role === 'instructor'" routerLink="/personas" routerLinkActive="active">Personas</a>
-        <a *ngIf="user.role === 'admin'" routerLink="/instructores" routerLinkActive="active">Instructores</a>
-        <a *ngIf="user.role === 'admin'" routerLink="/usuario" routerLinkActive="active">Usuarios</a>
+      <nav
+        *ngIf="currentUser$ | async as user; else guestLinks"
+        id="primary-navigation"
+        class="app-nav"
+        [class.is-open]="mobileNavOpen"
+      >
+        <a *ngIf="user.role !== 'instructor'" routerLink="/home" routerLinkActive="active" (click)="closeMobileNav()">Home</a>
+        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeMobileNav()">Cursos y Personas</a>
+        <a *ngIf="user.role !== 'instructor'" routerLink="/cursos" routerLinkActive="active" (click)="closeMobileNav()">Cursos</a>
+        <a *ngIf="user.role === 'admin' || user.role === 'instructor'" routerLink="/personas" routerLinkActive="active" (click)="closeMobileNav()">Personas</a>
+        <a *ngIf="user.role === 'admin'" routerLink="/instructores" routerLinkActive="active" (click)="closeMobileNav()">Instructores</a>
+        <a *ngIf="user.role === 'admin'" routerLink="/usuario" routerLinkActive="active" (click)="closeMobileNav()">Usuarios</a>
 
         <div class="user-block">
           <span>{{ user.nombre || user.email }}</span>
           <small class="role-badge">{{ user.role || 'user' }}</small>
-          <button class="btn-logout" (click)="logout()">Salir</button>
+          <button type="button" class="btn-logout" (click)="logout()">Salir</button>
         </div>
       </nav>
 
       <ng-template #guestLinks>
-        <nav class="app-nav">
-          <a routerLink="/login" class="active">Login</a>
+        <nav id="primary-navigation" class="app-nav" [class.is-open]="mobileNavOpen">
+          <a routerLink="/login" class="active" (click)="closeMobileNav()">Login</a>
         </nav>
       </ng-template>
     </div>

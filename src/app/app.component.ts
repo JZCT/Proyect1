@@ -17,6 +17,7 @@ import './utils/asset-url.util';
 export class AppComponent {
   title = 'CecaptaINS - Sistema de Gestion';
   currentUser$ = this.authService.currentUserData$;
+  mobileNavOpen = false;
   @HostBinding('class.login-page') isLoginPage: boolean = false;
   @HostBinding('class.embed-mode') isEmbedMode: boolean = false;
 
@@ -35,6 +36,7 @@ export class AppComponent {
       .pipe(filter(event => event instanceof NavigationEnd))
       .subscribe((event) => {
         this.updateRouteState((event as NavigationEnd).urlAfterRedirects);
+        this.closeMobileNav();
       });
   }
 
@@ -48,6 +50,14 @@ export class AppComponent {
       console.error('Error al cerrar sesion:', error);
       this.notificationService.error('No se pudo cerrar sesion. Intenta de nuevo.');
     }
+  }
+
+  toggleMobileNav() {
+    this.mobileNavOpen = !this.mobileNavOpen;
+  }
+
+  closeMobileNav() {
+    this.mobileNavOpen = false;
   }
 
   private updateRouteState(url: string) {

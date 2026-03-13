@@ -80,6 +80,18 @@ Recomendacion:
 - usa `cecapta-shortcode.php` si quieres integracion mas estable en WordPress
 - usa `cecapta-page-snippet.html` si prefieres pegarlo en un bloque HTML manual
 
+Si prefieres instalarla como plugin ZIP dentro de WordPress:
+
+```bash
+npm run build:wordpress:plugin
+```
+
+Ese comando crea:
+- `dist/cecaptains/wordpress/cecapta-embed/`
+- `dist/cecaptains/wordpress/cecapta-embed.zip`
+
+Luego sube `cecapta-embed.zip` desde `Plugins > Anadir nuevo > Subir plugin` y usa el shortcode `[cecapta_app]`.
+
 ## Testing
 
 Ejecutar pruebas unitarias:

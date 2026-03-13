@@ -38,6 +38,13 @@
   flex-wrap: wrap;
 }
 
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
 .table-tools {
   margin-top: 8px;
   display: flex;
@@ -180,15 +187,62 @@ select:focus {
   border-radius: 12px;
   overflow: hidden;
   background: var(--primary-strong);
+  position: relative;
 }
 
 .camera-box video {
   width: 100%;
   display: block;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
 }
 
 .camera-canvas {
   display: none;
+}
+
+.camera-overlay {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 18px 16px;
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.4), transparent 68%);
+  pointer-events: none;
+}
+
+.camera-shutter {
+  width: 68px;
+  height: 68px;
+  border-radius: 999px;
+  border: 4px solid rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.22);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.28);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.camera-shutter:hover {
+  transform: scale(1.03);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.camera-shutter:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 3px;
+}
+
+.camera-shutter-inner {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .camera-actions {
@@ -197,6 +251,18 @@ select:focus {
   justify-content: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .camera-shutter {
+    width: 62px;
+    height: 62px;
+  }
+
+  .camera-shutter-inner {
+    width: 44px;
+    height: 44px;
+  }
 }
 
 .file-input {
@@ -402,6 +468,10 @@ select:focus {
   padding: 14px;
 }
 
+.form-modal {
+  width: min(980px, 100%);
+}
+
 .file-preview-modal {
   width: min(900px, 100%);
 }
@@ -542,6 +612,10 @@ select:focus {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
+  }
+
+  .form-header {
+    flex-direction: column;
   }
 
   .table {
