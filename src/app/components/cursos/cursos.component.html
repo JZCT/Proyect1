@@ -258,7 +258,13 @@
                   Acciones
                 </button>
 
-                <div class="action-menu" *ngIf="activeActionMenuId === curso.idcurso" (click)="$event.stopPropagation()">
+                <div
+                  class="action-menu"
+                  *ngIf="activeActionMenuId === curso.idcurso"
+                  [style.top.px]="actionMenuPosition.top"
+                  [style.left.px]="actionMenuPosition.left"
+                  (click)="$event.stopPropagation()"
+                >
                   <button type="button" (click)="openCursoDetail(curso)">Ver detalles</button>
                   <button type="button" *ngIf="isAdmin" (click)="startEdit(curso)">Editar</button>
                   <button type="button" class="action-danger" *ngIf="isAdmin" (click)="deleteCurso(curso.idcurso)">Eliminar</button>

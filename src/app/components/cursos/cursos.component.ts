@@ -27,6 +27,7 @@ export class CursosComponent implements OnInit {
   showInstructorDropdown = false;
   editingId: string | null = null;
   activeActionMenuId: string | null = null;
+  actionMenuPosition = { top: 0, left: 0 };
   selectedCourseDetail: Curso | null = null;
   isAdmin = false;
   currentUser: User | null = null;
@@ -112,6 +113,16 @@ export class CursosComponent implements OnInit {
     if (this.showForm) {
       this.resetForm();
     }
+  }
+
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    this.closeFloatingMenus();
+  }
+
+  @HostListener('window:scroll')
+  onWindowScroll(): void {
+    this.closeFloatingMenus();
   }
 
   private checkAdminStatus() {
@@ -319,7 +330,18 @@ export class CursosComponent implements OnInit {
     if (!cursoId) return;
 
     this.showInstructorDropdown = false;
-    this.activeActionMenuId = this.activeActionMenuId === cursoId ? null : cursoId;
+
+    if (this.activeActionMenuId === cursoId) {
+      this.activeActionMenuId = null;
+      return;
+    }
+
+    const trigger = event.currentTarget as HTMLElement | null;
+    if (trigger) {
+      this.actionMenuPosition = this.getActionMenuPosition(trigger.getBoundingClientRect());
+    }
+
+    this.activeActionMenuId = cursoId;
   }
 
   openCursoDetail(curso: Curso, event?: MouseEvent) {
@@ -590,6 +612,23 @@ export class CursosComponent implements OnInit {
     const date = new Date(value as string | Date);
     const time = date.getTime();
     return Number.isNaN(time) ? 0 : time;
+  }
+
+  private getActionMenuPosition(rect: DOMRect): { top: number; left: number } {
+    const menuWidth = 180;
+    const actionCount = this.isAdmin ? 3 : 1;
+    const menuHeight = actionCount * 42 + 12;
+    const viewportPadding = 8;
+    const preferredTop = rect.bottom + 6;
+    const top = preferredTop + menuHeight > window.innerHeight - viewportPadding
+      ? Math.max(viewportPadding, rect.top - menuHeight - 6)
+      : preferredTop;
+    const left = Math.min(
+      Math.max(viewportPadding, rect.right - menuWidth),
+      window.innerWidth - menuWidth - viewportPadding
+    );
+
+    return { top, left };
   }
 
   private closeFloatingMenus() {
