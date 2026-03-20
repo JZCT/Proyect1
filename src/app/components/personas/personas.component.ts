@@ -10,9 +10,12 @@ import { NotificationService } from '../../services/notification.service';
 import { Persona } from '../../models/persona.model';
 import { User } from '../../models/user.model';
 import { resolveAppAssetUrl } from '../../utils/asset-url.util';
+import { normalizeDateInput } from '../../utils/date.util';
 import { sanitizePhoneInput, sanitizeScoreInput } from '../../utils/input-sanitizers.util';
 
-type PersonaArchivo = NonNullable<Persona['archivos']>[number];
+type PersonaArchivo = NonNullable<Persona['archivos']>[number] & {
+  file?: File;
+};
 type FilePreviewType = 'image' | 'pdf' | 'text' | 'unsupported';
 
 @Component({
@@ -36,6 +39,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
   showForm = false;
   editingId: string | null = null;
   loadingFile = false;
+  savingPersona = false;
   cameraActive = false;
   showPhotoOptions = false;
   isAdmin = false;
@@ -46,11 +50,14 @@ export class PersonasComponent implements OnInit, OnDestroy {
   sortDirection: 'asc' | 'desc' = 'asc';
   selectedPersonaIds = new Set<string>();
   deletingSelected = false;
+  deletingPersonaId: string | null = null;
   showFilePreview = false;
   previewFile: PersonaArchivo | null = null;
   previewType: FilePreviewType = 'unsupported';
   previewText = '';
   previewResourceUrl: SafeResourceUrl | null = null;
+  previewOpenUrl: string | null = null;
+  previewError = '';
 
   // Propiedades para carga masiva
   showBulkImport = false;
@@ -82,6 +89,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
     email: '',
     telefono: '',
     empresa: '',
+    companyTag: '',
     lugar: '',
     clfPractica: undefined,
     clfTeorica: undefined,
@@ -95,6 +103,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
     email: '',
     telefono: '',
     empresa: '',
+    companyTag: '',
     lugar: '',
     clfPractica: undefined,
     clfTeorica: undefined,
@@ -180,7 +189,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
       const companyTag = this.normalizeCompanyTag(this.currentUser.companyTag || '');
       this.personas = companyTag
         ? this.allPersonas.filter((persona) =>
-          this.normalizeCompanyTag(persona.empresa || '') === companyTag
+          this.normalizeCompanyTag(persona.companyTag || persona.empresa || '') === companyTag
         )
         : [];
 
@@ -245,30 +254,32 @@ export class PersonasComponent implements OnInit, OnDestroy {
     this.iniciarCamara();
   }
 
-  onPhotoSelected(event: Event) {
+  async onPhotoSelected(event: Event) {
     if (!this.canEditPersonas) return;
 
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (file) {
       this.loadingFile = true;
-      
-      // Convertir a base64 para almacenar (en producción usarías Firebase Storage)
-      const reader = new FileReader();
-      reader.onload = (loadEvent: ProgressEvent<FileReader>) => {
-        const base64 = loadEvent.target?.result as string;
-        
+      try {
+        const dataUrl = await this.readFileAsDataUrl(file);
+
         if (this.editingId) {
-          this.editingPersona.foto = base64;
+          this.editingPersona.foto = dataUrl;
         } else {
-          this.newPersona.foto = base64;
+          this.newPersona.foto = dataUrl;
         }
 
         this.showPhotoOptions = false;
         this.detenerCamara();
+      } catch (error) {
+        console.error('Error leyendo la foto:', error);
+        this.showMessage('No se pudo leer la foto seleccionada');
+      } finally {
         this.loadingFile = false;
-      };
-      reader.readAsDataURL(file);
+        input.value = '';
+      }
+      return;
     }
   }
 
@@ -355,7 +366,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
     this.cameraActive = false;
   }
 
-  onFilesSelected(event: Event) {
+  async onFilesSelected(event: Event) {
     if (!this.canEditPersonas) return;
 
     const input = event.target as HTMLInputElement;
@@ -364,34 +375,39 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
     this.loadingFile = true;
 
-    const archivos = Array.from(files).map((file) => ({
-      nombre: file.name,
-      url: URL.createObjectURL(file),
-      tipo: file.type
-    }));
+    try {
+      const archivos = await Promise.all(Array.from(files).map(async (file) => ({
+        nombre: file.name,
+        url: await this.readFileAsDataUrl(file),
+        tipo: file.type || this.getFileTypeFromName(file.name),
+        size: file.size,
+        uploadedAt: new Date()
+      })));
 
-    if (this.editingId) {
-      this.editingPersona.archivos = [
-        ...(this.editingPersona.archivos || []),
+      const target = this.editingId ? this.editingPersona : this.newPersona;
+      target.archivos = [
+        ...(target.archivos || []),
         ...archivos
       ];
-    } else {
-      this.newPersona.archivos = [
-        ...(this.newPersona.archivos || []),
-        ...archivos
-      ];
+
+      input.value = '';
+    } catch (error) {
+      console.error('Error leyendo archivos:', error);
+      this.showMessage('No se pudieron leer uno o mas archivos');
+    } finally {
+      this.loadingFile = false;
+      input.value = '';
     }
-
-    input.value = '';
-    this.loadingFile = false;
   }
 
   getFotoUrl(foto: string | undefined): string {
-    return foto || resolveAppAssetUrl('assets/default-avatar.png');
+    const normalized = this.normalizeTextField(foto);
+    return this.isSafeImageUrl(normalized) ? normalized : resolveAppAssetUrl('assets/default-avatar.png');
   }
 
   async addPersona() {
     if (!this.canEditPersonas) return;
+    if (this.savingPersona) return;
 
     if (!this.newPersona.nombre || !this.newPersona.email) {
       this.showMessage('Nombre y email son requeridos');
@@ -410,6 +426,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
     }
 
     try {
+      this.savingPersona = true;
       const personaToSave = this.preparePersonaForSave(this.newPersona);
       await this.personaService.addPersona(personaToSave as Persona);
       this.resetForm();
@@ -417,6 +434,8 @@ export class PersonasComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('Error agregando persona:', error);
       this.showMessage(this.getPersonaSaveErrorMessage(error, 'agregar'));
+    } finally {
+      this.savingPersona = false;
     }
   }
 
@@ -426,6 +445,8 @@ export class PersonasComponent implements OnInit, OnDestroy {
     this.editingId = persona.id || null;
     this.editingPersona = {
       ...persona,
+      foto: persona.foto || '',
+      archivos: (persona.archivos || []).map((archivo) => ({ ...archivo })),
       curp: this.normalizeCurp(persona.curp),
       telefono: sanitizePhoneInput(persona.telefono)
     };
@@ -434,6 +455,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
   async updatePersona() {
     if (!this.canEditPersonas || !this.editingId) return;
+    if (this.savingPersona) return;
 
     const editCurp = this.normalizeCurp(this.editingPersona.curp);
     if (!editCurp) {
@@ -447,6 +469,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
     }
 
     try {
+      this.savingPersona = true;
       const personaToUpdate = this.preparePersonaForSave(this.editingPersona);
       await this.personaService.updatePersona(
         this.editingId,
@@ -456,6 +479,8 @@ export class PersonasComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('Error actualizando persona:', error);
       this.showMessage(this.getPersonaSaveErrorMessage(error, 'actualizar'));
+    } finally {
+      this.savingPersona = false;
     }
   }
 
@@ -464,11 +489,19 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
     if (confirm('¿Estás seguro de eliminar esta persona?')) {
       try {
+        this.deletingPersonaId = id;
         await this.personaService.deletePersona(id);
         this.selectedPersonaIds.delete(id);
+        this.allPersonas = this.allPersonas.filter((persona) => persona.id !== id);
+        this.applyPersonaVisibility();
+        if (this.editingId === id) {
+          this.resetForm();
+        }
       } catch (error) {
         console.error('Error eliminando persona:', error);
         this.showMessage('Error al eliminar persona');
+      } finally {
+        this.deletingPersonaId = null;
       }
     }
   }
@@ -539,6 +572,8 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
     try {
       await this.personaService.deletePersonas(idsToDelete);
+      this.allPersonas = this.allPersonas.filter((persona) => !idsToDelete.includes(persona.id || ''));
+      this.applyPersonaVisibility();
       this.clearSelection();
       this.showMessage(`Se eliminaron ${idsToDelete.length} personas`);
     } catch (error) {
@@ -553,6 +588,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
     this.showPhotoOptions = false;
     this.detenerCamara();
     this.closeArchivoPreview();
+    this.savingPersona = false;
     this.revokeObjectUrls(this.newPersona.archivos as PersonaArchivo[] | undefined);
     this.revokeObjectUrls(this.editingPersona.archivos as PersonaArchivo[] | undefined);
 
@@ -562,6 +598,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
       email: '',
       telefono: '',
       empresa: '',
+      companyTag: '',
       lugar: '',
       clfPractica: undefined,
       clfTeorica: undefined,
@@ -575,6 +612,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
       email: '',
       telefono: '',
       empresa: '',
+      companyTag: '',
       lugar: '',
       clfPractica: undefined,
       clfTeorica: undefined,
@@ -590,8 +628,38 @@ export class PersonasComponent implements OnInit, OnDestroy {
     return (this.editingId ? this.editingPersona.archivos : this.newPersona.archivos) || [];
   }
 
-  isImageFile(tipo: string | undefined): boolean {
-    return !!tipo?.startsWith('image/');
+  isImageFile(file: PersonaArchivo): boolean {
+    const previewType = this.getPreviewType(file);
+    return previewType === 'image' && this.canRenderLocalOrRemotePreview(file, previewType);
+  }
+
+  canPreviewArchivo(file: PersonaArchivo): boolean {
+    const previewType = this.getPreviewType(file);
+    return this.isSafeAttachmentUrl(file.url || '', previewType);
+  }
+
+  getArchivoPreviewTooltip(file: PersonaArchivo): string {
+    if (!this.canPreviewArchivo(file)) {
+      return this.getArchivoPreviewError(file);
+    }
+
+    const previewType = this.getPreviewType(file);
+    if (previewType === 'unsupported') {
+      return 'Abrir archivo';
+    }
+
+    if (previewType === 'text' && !this.canLoadTextPreview(file.url || '')) {
+      return 'Abrir archivo';
+    }
+
+    return 'Ver archivo';
+  }
+
+  getArchivoActionLabel(file: PersonaArchivo): string {
+    const previewType = this.getPreviewType(file);
+    if (previewType === 'unsupported') return 'Abrir';
+    if (previewType === 'text' && !this.canLoadTextPreview(file.url || '')) return 'Abrir';
+    return 'Ver';
   }
 
   openArchivo(file: PersonaArchivo): void {
@@ -601,16 +669,42 @@ export class PersonasComponent implements OnInit, OnDestroy {
     this.previewType = this.getPreviewType(file);
     this.previewText = '';
     this.previewResourceUrl = null;
+    this.previewOpenUrl = null;
+    this.previewError = '';
 
-    if (this.previewType === 'pdf') {
+    const previewType = this.getPreviewType(file);
+    const safeAttachment = this.isSafeAttachmentUrl(file.url || '', previewType);
+    this.previewOpenUrl = safeAttachment ? file.url : null;
+
+    if (!safeAttachment) {
+      this.previewType = 'unsupported';
+      this.previewError = this.getArchivoPreviewError(file);
+      this.showFilePreview = true;
+      return;
+    }
+
+    if (previewType === 'pdf') {
       this.previewResourceUrl = this.sanitizer.bypassSecurityTrustResourceUrl(file.url);
     }
 
-    if (this.previewType === 'text') {
+    if (previewType === 'text') {
+      if (!this.canLoadTextPreview(file.url || '')) {
+        this.previewType = 'unsupported';
+        this.previewError = 'La vista previa de texto no esta disponible para este archivo. Usa Abrir.';
+        this.showFilePreview = true;
+        return;
+      }
+
       this.loadTextPreview(file);
     }
 
+    this.previewType = previewType;
     this.showFilePreview = true;
+  }
+
+  onPreviewImageError(): void {
+    this.previewType = 'unsupported';
+    this.previewError = 'No se pudo cargar la imagen de este archivo.';
   }
 
   closeArchivoPreview(): void {
@@ -619,13 +713,20 @@ export class PersonasComponent implements OnInit, OnDestroy {
     this.previewType = 'unsupported';
     this.previewText = '';
     this.previewResourceUrl = null;
+    this.previewOpenUrl = null;
+    this.previewError = '';
   }
 
   private getPreviewType(file: PersonaArchivo): FilePreviewType {
     const tipo = (file.tipo || '').toLowerCase();
     const nombre = (file.nombre || '').toLowerCase();
 
-    if (tipo.startsWith('image/')) return 'image';
+    if (tipo.startsWith('image/')) {
+      if (tipo === 'image/svg+xml' || nombre.endsWith('.svg')) {
+        return 'unsupported';
+      }
+      return 'image';
+    }
     if (tipo.includes('pdf') || nombre.endsWith('.pdf')) return 'pdf';
 
     const isTextFile =
@@ -642,8 +743,14 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
   private async loadTextPreview(file: PersonaArchivo): Promise<void> {
     try {
+      if (!this.canLoadTextPreview(file.url || '')) {
+        this.previewText = 'La vista previa de texto no esta disponible para este archivo. Usa Abrir.';
+        return;
+      }
+
       const response = await fetch(file.url);
       this.previewText = await response.text();
+      return;
     } catch (error) {
       console.error('Error cargando vista previa de texto:', error);
       this.previewText = 'No se pudo mostrar la vista previa de este archivo.';
@@ -698,15 +805,22 @@ export class PersonasComponent implements OnInit, OnDestroy {
       email: this.normalizeTextField(persona.email),
       telefono: sanitizePhoneInput(persona.telefono),
       empresa: this.normalizeOptionalTextField(persona.empresa),
+      companyTag: this.normalizeCompanyTag(
+        this.normalizeOptionalTextField(persona.companyTag) || this.normalizeOptionalTextField(persona.empresa) || ''
+      ),
       lugar: this.normalizeOptionalTextField(persona.lugar),
       clfPractica: this.normalizeScoreForStorage(persona.clfPractica),
       clfTeorica: this.normalizeScoreForStorage(persona.clfTeorica),
-      foto: this.normalizeOptionalTextField(persona.foto),
-      archivos: (persona.archivos || []).map((archivo) => ({
-        nombre: this.normalizeTextField(archivo.nombre),
-        url: this.normalizeTextField(archivo.url),
-        tipo: this.normalizeOptionalTextField(archivo.tipo) || 'application/octet-stream'
-      }))
+      foto: this.normalizeAttachmentUrl(persona.foto),
+      archivos: (persona.archivos || [])
+        .map((archivo) => ({
+          nombre: this.normalizeTextField(archivo.nombre),
+          url: this.normalizeAttachmentUrl(archivo.url),
+          tipo: this.normalizeOptionalTextField(archivo.tipo) || 'application/octet-stream',
+          uploadedAt: normalizeDateInput(archivo.uploadedAt),
+          size: this.normalizeNumberField(archivo.size)
+        }))
+        .filter((archivo) => !!archivo.nombre && !!archivo.url)
     };
   }
 
@@ -714,9 +828,238 @@ export class PersonasComponent implements OnInit, OnDestroy {
     return String(value ?? '').trim();
   }
 
+  private canLoadTextPreview(url: string): boolean {
+    const normalizedUrl = this.normalizeTextField(url);
+    if (!normalizedUrl) return false;
+
+    const protocol = this.getUrlProtocol(normalizedUrl);
+    if (protocol === 'data:') {
+      return true;
+    }
+
+    if (protocol === 'http:' || protocol === 'https:') {
+      try {
+        return new URL(normalizedUrl, window.location.origin).origin === window.location.origin;
+      } catch {
+        return false;
+      }
+    }
+
+    return false;
+  }
+
+  private isSafeImageUrl(url: string): boolean {
+    const normalizedUrl = this.normalizeTextField(url);
+    if (!normalizedUrl) return false;
+
+    const protocol = this.getUrlProtocol(normalizedUrl);
+    if (protocol === 'javascript:' || protocol === 'file:' || protocol === 'vbscript:' || protocol === 'blob:') {
+      return false;
+    }
+
+    if (protocol === 'data:') {
+      return this.isAllowedDataUrlForPreview(normalizedUrl, 'image');
+    }
+
+    return protocol === 'http:' || protocol === 'https:';
+  }
+
+  private async readFileAsDataUrl(file: File): Promise<string> {
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === 'string') {
+          resolve(result);
+          return;
+        }
+
+        reject(new Error('No se pudo leer el archivo'));
+      };
+
+      reader.onerror = () => {
+        reject(reader.error || new Error('No se pudo leer el archivo'));
+      };
+
+      reader.readAsDataURL(file as File);
+    });
+  }
+
+  private isRenderablePreview(file: PersonaArchivo): boolean {
+    const url = this.normalizeTextField(file.url);
+    if (!url) return false;
+    const previewType = this.getPreviewType(file);
+    if (previewType === 'unsupported') return false;
+    return this.isRenderablePreviewUrl(url, previewType);
+  }
+
+  private isRenderablePreviewUrl(url: string, previewType: FilePreviewType): boolean {
+    if (!this.isSafeAttachmentUrl(url, previewType)) {
+      return false;
+    }
+
+    if (previewType === 'unsupported') {
+      return false;
+    }
+
+    if (previewType === 'image') {
+      return this.isAllowedDataUrlForPreview(url, 'image') || this.isTrustedHttpPreviewUrl(url);
+    }
+
+    if (previewType === 'pdf') {
+      return this.isAllowedDataUrlForPreview(url, 'pdf') || this.isTrustedHttpPreviewUrl(url);
+    }
+
+    if (previewType === 'text') {
+      return this.isAllowedDataUrlForPreview(url, 'text') || this.isTrustedHttpPreviewUrl(url);
+    }
+
+    return false;
+  }
+
+  private canRenderLocalOrRemotePreview(file: PersonaArchivo, previewType: FilePreviewType): boolean {
+    return this.isSafeAttachmentUrl(file.url || '', previewType);
+  }
+
+  private getUrlProtocol(url: string): string {
+    const normalized = this.normalizeTextField(url);
+    if (!normalized) return '';
+
+    try {
+      return new URL(normalized, window.location.origin).protocol.toLowerCase();
+    } catch {
+      return '';
+    }
+  }
+
+  private isTrustedHttpPreviewUrl(url: string): boolean {
+    const normalized = this.normalizeTextField(url);
+    if (!normalized) return false;
+
+    try {
+      const parsed = new URL(normalized, window.location.origin);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  private getDataUrlMime(url: string): string {
+    const normalized = this.normalizeTextField(url);
+    if (!normalized.toLowerCase().startsWith('data:')) {
+      return '';
+    }
+
+    const commaIndex = normalized.indexOf(',');
+    const header = commaIndex >= 0 ? normalized.slice(5, commaIndex) : normalized.slice(5);
+    const mime = header.split(';')[0].trim().toLowerCase();
+    return mime;
+  }
+
+  private isAllowedDataUrlForPreview(url: string, previewType: FilePreviewType): boolean {
+    const mime = this.getDataUrlMime(url);
+    if (!mime) return false;
+
+    if (previewType === 'image') {
+      return mime.startsWith('image/') && mime !== 'image/svg+xml';
+    }
+
+    if (previewType === 'pdf') {
+      return mime === 'application/pdf';
+    }
+
+    if (previewType === 'text') {
+      return (
+        mime.startsWith('text/') ||
+        mime === 'application/json' ||
+        mime === 'application/xml' ||
+        mime === 'application/octet-stream'
+      );
+    }
+
+    return false;
+  }
+
+  private isAllowedDataUrlForAttachment(url: string): boolean {
+    const mime = this.getDataUrlMime(url);
+    if (!mime) return false;
+
+    if (mime === 'image/svg+xml' || mime === 'text/html' || mime === 'application/javascript') {
+      return false;
+    }
+
+    return true;
+  }
+
+  private getArchivoPreviewError(file: PersonaArchivo): string {
+    const protocol = this.getUrlProtocol(file.url || '');
+    const previewType = this.getPreviewType(file);
+
+    if (protocol === 'blob:') {
+      return 'Este archivo se guardo con una URL temporal y ya no se puede previsualizar. Vuelve a cargarlo.';
+    }
+
+    if (protocol === 'javascript:' || protocol === 'file:' || protocol === 'vbscript:') {
+      return 'La URL de este archivo no es segura y fue bloqueada.';
+    }
+
+    if ((protocol === 'http:' || protocol === 'https:') && !this.isTrustedHttpPreviewUrl(file.url || '')) {
+      return 'La URL de este archivo apunta a otro origen y fue bloqueada.';
+    }
+
+    if (!previewType || previewType === 'unsupported') {
+      return 'No hay vista previa integrada para este tipo de archivo. Usa Abrir para verlo.';
+    }
+
+    if (!this.isRenderablePreviewUrl(file.url || '', previewType)) {
+      return 'El contenido de este archivo no coincide con una vista previa segura.';
+    }
+
+    return 'No se pudo abrir este archivo.';
+  }
+
   private normalizeOptionalTextField(value: unknown): string | undefined {
     const normalized = this.normalizeTextField(value);
     return normalized || undefined;
+  }
+
+  private normalizeAttachmentUrl(value: unknown): string {
+    const normalized = this.normalizeTextField(value);
+    if (!normalized) return '';
+
+    const protocol = this.getUrlProtocol(normalized);
+    if (protocol === 'javascript:' || protocol === 'file:' || protocol === 'vbscript:' || protocol === 'blob:') {
+      return '';
+    }
+
+    return normalized;
+  }
+
+  private isSafeAttachmentUrl(url: string, previewType?: FilePreviewType): boolean {
+    const normalizedUrl = this.normalizeTextField(url);
+    if (!normalizedUrl) return false;
+
+    const protocol = this.getUrlProtocol(normalizedUrl);
+    if (!protocol) return false;
+
+    if (protocol === 'javascript:' || protocol === 'file:' || protocol === 'vbscript:' || protocol === 'blob:') {
+      return false;
+    }
+
+    if (protocol === 'http:' || protocol === 'https:') {
+      return this.isTrustedHttpPreviewUrl(normalizedUrl);
+    }
+
+    if (protocol === 'data:') {
+      if (previewType === 'image' || previewType === 'pdf' || previewType === 'text') {
+        return this.isAllowedDataUrlForPreview(normalizedUrl, previewType);
+      }
+
+      return this.isAllowedDataUrlForAttachment(normalizedUrl);
+    }
+
+    return false;
   }
 
   private getPersonaSaveErrorMessage(error: unknown, action: 'agregar' | 'actualizar'): string {
@@ -727,6 +1070,15 @@ export class PersonasComponent implements OnInit, OnDestroy {
   private normalizeScoreForStorage(value: unknown): number | undefined {
     const score = this.getValidScore(value);
     return score === null ? undefined : score;
+  }
+
+  private normalizeNumberField(value: unknown): number | undefined {
+    if (value === null || value === undefined || value === '') {
+      return undefined;
+    }
+
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : undefined;
   }
 
   private getValidScore(value: unknown): number | null {
@@ -741,6 +1093,23 @@ export class PersonasComponent implements OnInit, OnDestroy {
         URL.revokeObjectURL(archivo.url);
       }
     }
+  }
+
+  private getFileTypeFromName(fileName: string): string {
+    const name = fileName.toLowerCase();
+
+    if (name.endsWith('.pdf')) return 'application/pdf';
+    if (name.endsWith('.txt')) return 'text/plain';
+    if (name.endsWith('.csv')) return 'text/csv';
+    if (name.endsWith('.json')) return 'application/json';
+    if (name.endsWith('.xml')) return 'application/xml';
+    if (name.endsWith('.md')) return 'text/markdown';
+    if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
+    if (name.endsWith('.png')) return 'image/png';
+    if (name.endsWith('.gif')) return 'image/gif';
+    if (name.endsWith('.webp')) return 'image/webp';
+
+    return 'application/octet-stream';
   }
 
   // ==================== CARGA MASIVA ====================
@@ -936,7 +1305,11 @@ export class PersonasComponent implements OnInit, OnDestroy {
     try {
       const filter = this.buildReportFilter();
       const reportData = this.reportService.generateReportData(this.personas, filter);
-      await this.reportService.exportToPDF(reportData);
+      await this.reportService.exportToPDF(reportData, {
+        onClose: () => {
+          this.showReports = false;
+        }
+      });
     } catch (error: any) {
       console.error('Error exportando PDF:', error);
       this.showMessage('Error al exportar reporte');
@@ -971,6 +1344,18 @@ export class PersonasComponent implements OnInit, OnDestroy {
     return this.filteredPersonas
       .map(persona => persona.id)
       .filter((id): id is string => !!id);
+  }
+
+  trackByPersonaId(index: number, persona: Persona): string {
+    return persona.id || persona.curp || persona.email || persona.nombre || `${index}`;
+  }
+
+  trackByArchivo(index: number, archivo: PersonaArchivo): string {
+    return `${archivo.nombre || 'archivo'}|${archivo.url || ''}|${archivo.tipo || ''}|${index}`;
+  }
+
+  trackByBulkPersona(index: number, persona: Persona): string {
+    return persona.id || persona.curp || persona.email || persona.nombre || `${index}`;
   }
 
   private syncSelectionWithCurrentData(): void {

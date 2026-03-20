@@ -1,0 +1,67 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isBootstrapAdminUid() {
+      return signedIn() && request.auth.uid in [
+        '9Joz8XEbqiSk2AzSWDzvikfQfEk1'
+      ];
+    }
+
+    function userDocExists() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function currentUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isBootstrapAdminUid() || (userDocExists() && currentUser().role == 'admin');
+    }
+
+    function isInstructor() {
+      return userDocExists() && currentUser().role == 'instructor';
+    }
+
+    function isCompany() {
+      return userDocExists() && currentUser().role == 'company';
+    }
+
+    function currentCompanyTag() {
+      return userDocExists() ? currentUser().companyTag : '';
+    }
+
+    function companyMatches(resourceTag) {
+      return isCompany() && resourceTag == currentCompanyTag();
+    }
+
+    match /users/{userId} {
+      allow read: if isAdmin() || (signedIn() && (userId == request.auth.uid || resource.data.uid == request.auth.uid));
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /usuarios/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /cursos/{docId} {
+      allow read: if isAdmin() || isInstructor() || companyMatches(resource.data.companyTag);
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /instructores/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /personas/{docId} {
+      allow read: if isAdmin() || isInstructor() || companyMatches(resource.data.companyTag);
+      allow create, update: if isAdmin() || isInstructor();
+      allow delete: if isAdmin();
+    }
+  }
+}

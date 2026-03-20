@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { InstructorService } from '../../services/instructor.service';
+import { NotificationService } from '../../services/notification.service';
 import { User } from '../../models/user.model';
 import { Instructor } from '../../models/instructor.model';
 
@@ -23,6 +24,7 @@ export class UsersComponent implements OnInit {
   editingCompanyTagUserId: string | null = null;
   editingCompanyTagValue: string = '';
   savingCompanyTagUserId: string | null = null;
+  deletingUserId: string | null = null;
 
   newUser: Partial<User> = {
     nombre: '',
@@ -42,7 +44,8 @@ export class UsersComponent implements OnInit {
 
   constructor(
     private authService: AuthService,
-    private instructorService: InstructorService
+    private instructorService: InstructorService,
+    private notificationService: NotificationService
   ) {}
 
   ngOnInit(): void {
@@ -56,7 +59,6 @@ export class UsersComponent implements OnInit {
     this.authService.isAdmin().subscribe({
       next: (adminStatus) => {
         this.isAdmin = adminStatus;
-        console.log('¿Es admin?', adminStatus);
       },
       error: (error) => {
         console.error('Error verificando admin:', error);
@@ -70,7 +72,6 @@ export class UsersComponent implements OnInit {
       if (firebaseUser) {
         const userData = await this.authService.getUserData(firebaseUser.uid);
         this.currentUser = userData;
-        console.log('Usuario actual:', this.currentUser);
       }
     });
   }
@@ -101,40 +102,40 @@ export class UsersComponent implements OnInit {
   async addUser() {
     // Validaciones
     if (!this.newUser.nombre || !this.newUser.nombre.trim()) {
-      alert('Por favor ingresa el nombre completo');
+      this.notificationService.warning('Por favor ingresa el nombre completo');
       return;
     }
 
     if (!this.newUser.email || !this.newUser.email.trim()) {
-      alert('Por favor ingresa un email válido');
+      this.notificationService.warning('Por favor ingresa un email valido');
       return;
     }
 
     if (!this.newUser.password || this.newUser.password.length < 6) {
-      alert('La contraseña debe tener al menos 6 caracteres');
+      this.notificationService.warning('La contrasena debe tener al menos 6 caracteres');
       return;
     }
 
     if (!this.newUser.role || !this.newUser.role.trim()) {
-      alert('Por favor selecciona un rol');
+      this.notificationService.warning('Por favor selecciona un rol');
       return;
     }
 
     if (this.newUser.role === 'instructor' && !this.newUser.instructorId) {
-      alert('Selecciona el perfil de instructor para este usuario');
+      this.notificationService.warning('Selecciona el perfil de instructor para este usuario');
       return;
     }
 
     // Validar que el rol sea uno de los permitidos
     const rolesValidos = ['admin', 'instructor', 'company'];
     if (!rolesValidos.includes(this.newUser.role)) {
-      alert('Rol inválido seleccionado');
+      this.notificationService.warning('Rol invalido seleccionado');
       return;
     }
 
     // Solo admin puede crear otros usuarios
     if (!this.isAdmin) {
-      alert('Solo los administradores pueden crear usuarios');
+      this.notificationService.warning('Solo los administradores pueden crear usuarios');
       return;
     }
 
@@ -155,11 +156,11 @@ export class UsersComponent implements OnInit {
       }
 
       await this.authService.addUser(this.newUser as User);
-      alert('✅ Usuario agregado exitosamente');
+      this.notificationService.success('Usuario agregado exitosamente');
       this.resetForm();
     } catch (error: any) {
       console.error('Error al agregar usuario:', error);
-      alert('❌ Error al agregar usuario: ' + (error.message || 'Error desconocido'));
+      this.notificationService.error('Error al agregar usuario: ' + (error.message || 'Error desconocido'));
     } finally {
       this.loading = false;
     }
@@ -170,7 +171,7 @@ export class UsersComponent implements OnInit {
 
     // Solo admin puede eliminar usuarios
     if (!this.isAdmin) {
-      alert('Solo los administradores pueden eliminar usuarios');
+      this.notificationService.warning('Solo los administradores pueden eliminar usuarios');
       return;
     }
 
@@ -178,12 +179,15 @@ export class UsersComponent implements OnInit {
     if (confirm(`¿Estás seguro de eliminar a ${usuario?.nombre}?`)) {
       try {
         this.loading = true;
+        this.deletingUserId = id;
         await this.authService.deleteUser(id);
-        alert('✅ Usuario eliminado exitosamente');
+        this.users = this.users.filter((user) => user.id !== id);
+        this.notificationService.success('Usuario eliminado exitosamente');
       } catch (error: any) {
         console.error('Error al eliminar usuario:', error);
-        alert('❌ Error al eliminar usuario: ' + (error.message || 'Error desconocido'));
+        this.notificationService.error('Error al eliminar usuario: ' + (error.message || 'Error desconocido'));
       } finally {
+        this.deletingUserId = null;
         this.loading = false;
       }
     }
@@ -217,11 +221,11 @@ export class UsersComponent implements OnInit {
         role: user.role,
         companyTag: this.editingCompanyTagValue
       });
-      alert('Etiqueta de empresa actualizada correctamente');
+      this.notificationService.success('Etiqueta de empresa actualizada correctamente');
       this.cancelCompanyTagEdit();
     } catch (error: any) {
       console.error('Error actualizando etiqueta de empresa:', error);
-      alert('Error al actualizar la etiqueta: ' + (error.message || 'Error desconocido'));
+      this.notificationService.error('Error al actualizar la etiqueta: ' + (error.message || 'Error desconocido'));
     } finally {
       this.savingCompanyTagUserId = null;
     }
@@ -291,6 +295,14 @@ export class UsersComponent implements OnInit {
 
       return target.includes(term);
     });
+  }
+
+  trackByUserId(index: number, user: User): string {
+    return user.id || user.email || user.nombre || `${index}`;
+  }
+
+  trackByInstructorId(index: number, instructor: Instructor): string {
+    return instructor.id || instructor.nombre || `${index}`;
   }
 
   private normalizeSearch(value?: string): string {

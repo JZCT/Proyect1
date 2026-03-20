@@ -87,6 +87,7 @@ select:focus {
 .users-list {
   display: grid;
   gap: 10px;
+  min-height: 0;
 }
 
 .user-item {
@@ -147,6 +148,18 @@ select:focus {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.user-actions .btn {
+  min-width: 112px;
+}
+
+.user-actions .btn-danger {
+  box-shadow: 0 8px 18px rgba(220, 38, 38, 0.14);
+}
+
+.user-actions .btn-secondary {
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
 }
 
 .role {

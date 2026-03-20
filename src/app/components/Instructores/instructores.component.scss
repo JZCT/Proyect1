@@ -131,6 +131,13 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.foto-trigger:hover {
+  transform: translateY(-1px);
+  filter: saturate(1.02);
 }
 
 .photo-options {
@@ -155,8 +162,16 @@
   border-radius: 8px;
   padding: 7px 8px;
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
   text-align: left;
+  min-height: 32px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.photo-options button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgba(0, 131, 251, 0.08);
 }
 
 .photo-options button:disabled {
@@ -167,7 +182,92 @@
 .photo-actions,
 .acciones-form {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.acciones-form .btn {
+  width: 100%;
+}
+
+.cursos-editor {
+  border-top: 1px solid var(--surface-elevated);
+  padding-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.cursos-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cursos-editor-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.cursos-editor-search input {
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 9px;
+  min-width: 0;
+}
+
+.cursos-editor-list {
+  display: grid;
+  gap: 6px;
+  max-height: 240px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.curso-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  cursor: pointer;
+}
+
+.curso-toggle input {
+  margin-top: 2px;
+}
+
+.curso-toggle span {
+  display: grid;
+  gap: 2px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.curso-toggle small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.selected-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.chip:hover {
+  opacity: 0.92;
 }
 
 .btn-camera,
@@ -176,17 +276,37 @@
 .guardar,
 .cancelar,
 .btn-assign,
-.acciones button {
+.btn-close {
   border: 1px solid var(--border-strong);
-  border-radius: 9px;
+  border-radius: 10px;
+  padding: 8px 10px;
+  min-height: 38px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.btn-camera,
+.btn-capture,
+.btn-stop {
   background: var(--surface-soft);
   color: var(--text);
-  padding: 8px 10px;
-  cursor: pointer;
 }
 
 .btn-close {
   align-self: flex-start;
+  background: var(--surface-elevated);
+  border-color: var(--border);
+  color: var(--text-soft);
 }
 
 .guardar,
@@ -196,11 +316,61 @@
   color: var(--surface);
 }
 
-.cancelar,
-.acciones button:last-child {
-  background: #fee2e2;
-  border-color: #fecaca;
-  color: #991b1b;
+.cancelar {
+  background: var(--surface-elevated);
+  border-color: var(--border);
+  color: var(--text-soft);
+}
+
+.acciones {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.acciones .btn {
+  width: 100%;
+  min-height: 38px;
+  font-weight: 700;
+}
+
+.acciones .btn-danger {
+  box-shadow: 0 8px 18px rgba(220, 38, 38, 0.14);
+}
+
+.acciones .btn-info {
+  box-shadow: 0 8px 18px rgba(0, 131, 251, 0.14);
+}
+
+.btn-camera:hover:not(:disabled),
+.btn-capture:hover:not(:disabled),
+.btn-stop:hover:not(:disabled),
+.guardar:hover:not(:disabled),
+.cancelar:hover:not(:disabled),
+.btn-assign:hover:not(:disabled),
+.btn-close:hover:not(:disabled),
+.acciones .btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn-camera:active:not(:disabled),
+.btn-capture:active:not(:disabled),
+.btn-stop:active:not(:disabled),
+.guardar:active:not(:disabled),
+.cancelar:active:not(:disabled),
+.btn-assign:active:not(:disabled),
+.btn-close:active:not(:disabled),
+.acciones .btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+@media (max-width: 640px) {
+  .photo-actions,
+  .acciones-form {
+    grid-template-columns: 1fr;
+  }
 }
 
 .camera-box {
@@ -292,6 +462,7 @@
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 10px;
   min-width: 0;
+  min-height: 0;
 }
 
 .empty-grid {

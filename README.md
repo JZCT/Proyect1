@@ -121,6 +121,15 @@ Notas:
 - Los JSON de cuentas de servicio quedaron ignorados en `.gitignore`.
 - Este flujo copia Firestore; la migracion completa de Authentication con passwords requiere un paso aparte.
 
+## Adjuntos En Firestore
+
+Los archivos de personas se guardan como `data:` dentro del mismo documento de Firestore.
+
+Notas:
+- No dependes de un bucket externo para subir o reabrir archivos.
+- La app valida el tamano del documento antes de guardar para no pasar el limite de Firestore.
+- Si necesitas archivos muy grandes, conviene reducir su peso antes de adjuntarlos.
+
 ## Herramientas Utilizadas
 
 - **Angular 17** - Framework principal

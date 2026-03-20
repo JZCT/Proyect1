@@ -59,6 +59,8 @@ export class CursosGruposComponent implements OnInit {
   resultadoFilter: 'all' | 'apto' | 'noApto' | 'sinEvaluar' = 'all';
   savingCalificaciones: Record<string, boolean> = {};
   exportingCursoReport = false;
+  savingCurso = false;
+  deletingCursoId: string | null = null;
 
   showCursoForm = false;
 
@@ -249,6 +251,22 @@ export class CursosGruposComponent implements OnInit {
     );
   }
 
+  trackByCursoId(index: number, curso: Curso): string {
+    return curso.idcurso || curso.nombre || `${index}`;
+  }
+
+  trackByPersonaId(index: number, persona: Persona): string {
+    return persona.id || persona.curp || persona.email || persona.nombre || `${index}`;
+  }
+
+  trackByInstructorId(index: number, instructor: Instructor): string {
+    return instructor.id || instructor.nombre || `${index}`;
+  }
+
+  trackByString(index: number, value: string): string {
+    return value || `${index}`;
+  }
+
   onInstructorImgError(event: Event) {
     const img = event.target as HTMLImageElement;
     img.onerror = null;
@@ -267,6 +285,7 @@ export class CursosGruposComponent implements OnInit {
 
   async addCurso() {
     if (!this.canManageCurso()) return;
+    if (this.savingCurso) return;
 
     if (
       this.newCurso.nombre &&
@@ -279,6 +298,7 @@ export class CursosGruposComponent implements OnInit {
       this.newCurso.companyTag.trim()
     ) {
       try {
+        this.savingCurso = true;
         await this.cursoService.addCurso({
           ...(this.newCurso as Curso),
           num_represnetantes: sanitizePhoneInput(this.newCurso.num_represnetantes),
@@ -290,6 +310,8 @@ export class CursosGruposComponent implements OnInit {
       } catch (error) {
         console.error('Error agregando curso:', error);
         this.notificationService.error('Error al agregar curso');
+      } finally {
+        this.savingCurso = false;
       }
     } else {
       this.notificationService.warning('Completa todos los campos, incluyendo etiqueta de empresa');
@@ -309,6 +331,7 @@ export class CursosGruposComponent implements OnInit {
 
   async updateCurso() {
     if (!this.canManageCurso()) return;
+    if (this.savingCurso) return;
 
     if (this.editingCursoId) {
       if (!this.editingCurso.companyTag || !this.editingCurso.companyTag.trim()) {
@@ -317,6 +340,7 @@ export class CursosGruposComponent implements OnInit {
       }
 
       try {
+        this.savingCurso = true;
         await this.cursoService.updateCurso(this.editingCursoId, {
           ...this.editingCurso,
           num_represnetantes: sanitizePhoneInput(this.editingCurso.num_represnetantes),
@@ -327,23 +351,31 @@ export class CursosGruposComponent implements OnInit {
       } catch (error) {
         console.error('Error actualizando curso:', error);
         this.notificationService.error('Error al actualizar curso');
+      } finally {
+        this.savingCurso = false;
       }
     }
   }
 
   async deleteCurso(id: string | undefined) {
     if (!this.canManageCurso()) return;
+    if (!id || this.deletingCursoId === id) return;
 
     if (id && confirm('Estas seguro de eliminar este curso?')) {
       try {
+        this.deletingCursoId = id;
         await this.cursoService.deleteCurso(id);
         this.selectedCurso = null;
         this.personasEnCurso = [];
         this.instructoresEnCurso = [];
+        this.allCursos = this.allCursos.filter((curso) => curso.idcurso !== id);
+        this.applyCursoFilter();
         this.notificationService.success('Curso eliminado exitosamente');
       } catch (error) {
         console.error('Error eliminando curso:', error);
         this.notificationService.error('Error al eliminar curso');
+      } finally {
+        this.deletingCursoId = null;
       }
     }
   }
@@ -371,6 +403,7 @@ export class CursosGruposComponent implements OnInit {
 
     this.editingCursoId = null;
     this.showCursoForm = false;
+    this.savingCurso = false;
   }
 
   async addPersonaToCurso(personaId: string | null) {

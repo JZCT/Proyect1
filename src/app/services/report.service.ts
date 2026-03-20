@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Persona } from '../models/persona.model';
 import { Curso } from '../models/curso.model';
 import { APP_LOGO_URL } from '../utils/branding.util';
+import { coerceDate } from '../utils/date.util';
 
 export interface ReportFilter {
   empresa?: string;
@@ -105,7 +106,7 @@ export class ReportService {
       persona.curp || '',
       persona.email || '',
       persona.telefono || '',
-      persona.empresa || '',
+      this.formatCompanyTag(persona.empresa),
       persona.lugar || 'N/A',
       this.formatCalificacion(persona.clfPractica),
       this.formatCalificacion(persona.clfTeorica),
@@ -142,14 +143,14 @@ export class ReportService {
         CURP: persona.curp || '',
         Email: persona.email,
         Telefono: persona.telefono,
-        Empresa: persona.empresa,
+        Empresa: this.formatCompanyTag(persona.empresa),
         Ubicacion: persona.lugar || '-',
         'Calif Practica': this.formatCalificacion(persona.clfPractica),
         'Calif Teorica': this.formatCalificacion(persona.clfTeorica),
         'Calif Final': this.formatCalificacion(this.getCalificacionFinal(persona)),
         Resultado: this.getResultadoTexto(persona),
         'Cursos Asignados': persona.cursoIds?.length || 0,
-        'Fecha Creacion': persona.createdAt ? new Date(persona.createdAt).toLocaleDateString() : '-'
+        'Fecha Creacion': this.formatDate(persona.createdAt)
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(data);
@@ -190,7 +191,7 @@ export class ReportService {
     }
   }
 
-  async exportToPDF(reportData: ReportData): Promise<void> {
+  async exportToPDF(reportData: ReportData, options?: { onClose?: () => void }): Promise<void> {
     try {
       const html = this.generateHTMLReport(reportData);
       const blob = new Blob([html], { type: 'text/html' });
@@ -202,6 +203,20 @@ export class ReportService {
         throw new Error('No se pudo abrir la ventana del reporte');
       }
 
+      let closeHandled = false;
+      const handleClose = () => {
+        if (closeHandled) return;
+        closeHandled = true;
+        window.clearInterval(closeMonitor);
+        options?.onClose?.();
+      };
+      const closeMonitor = window.setInterval(() => {
+        if (reportWindow.closed) {
+          handleClose();
+        }
+      }, 500);
+
+      reportWindow.addEventListener('beforeunload', handleClose, { once: true });
       reportWindow.onload = () => {
         reportWindow.print();
         window.URL.revokeObjectURL(url);
@@ -224,9 +239,9 @@ export class ReportService {
       const data = cursos.map((curso) => ({
         Nombre: curso.nombre || '',
         Descripcion: curso.descripcion || '',
-        'Etiqueta Empresa': curso.companyTag || '',
-        Inicio: curso.Fecha_inicio ? new Date(curso.Fecha_inicio).toLocaleDateString() : '-',
-        Fin: curso.Fecha_fin ? new Date(curso.Fecha_fin).toLocaleDateString() : '-',
+        'Etiqueta Empresa': this.formatCompanyTag(curso.companyTag),
+        Inicio: this.formatDate(curso.Fecha_inicio),
+        Fin: this.formatDate(curso.Fecha_fin),
         Representante: curso.nom_representante || '',
         'Telefono Representante': curso.num_represnetantes || '',
         Instructores: curso.instructorIds?.length || 0
@@ -257,7 +272,7 @@ export class ReportService {
 
   async exportCursosToPDF(
     cursos: Curso[],
-    options?: { title?: string; companyTag?: string }
+    options?: { title?: string; companyTag?: string; onClose?: () => void }
   ): Promise<void> {
     try {
       const generatedAt = new Date();
@@ -269,9 +284,9 @@ export class ReportService {
         <tr>
           <td>${this.escapeHtml(curso.nombre || '')}</td>
           <td>${this.escapeHtml(curso.descripcion || '')}</td>
-          <td>${this.escapeHtml(curso.companyTag || '-')}</td>
-          <td>${curso.Fecha_inicio ? this.escapeHtml(new Date(curso.Fecha_inicio).toLocaleDateString()) : '-'}</td>
-          <td>${curso.Fecha_fin ? this.escapeHtml(new Date(curso.Fecha_fin).toLocaleDateString()) : '-'}</td>
+          <td>${this.escapeHtml(this.formatCompanyTag(curso.companyTag) || '-')}</td>
+          <td>${this.escapeHtml(this.formatDate(curso.Fecha_inicio))}</td>
+          <td>${this.escapeHtml(this.formatDate(curso.Fecha_fin))}</td>
           <td>${this.escapeHtml(curso.nom_representante || '-')}</td>
           <td>${this.escapeHtml(curso.num_represnetantes || '-')}</td>
         </tr>
@@ -286,7 +301,7 @@ export class ReportService {
         generatedAt,
         metadata: [
           { label: 'Fecha de emision', value: generatedAt.toLocaleString() },
-          { label: 'Empresa', value: options?.companyTag || 'Todas las empresas' },
+          { label: 'Empresa', value: this.formatCompanyTag(options?.companyTag) || 'Todas las empresas' },
           { label: 'Total de registros', value: String(cursos.length) }
         ],
         summary: [
@@ -314,6 +329,20 @@ export class ReportService {
         throw new Error('No se pudo abrir la ventana del reporte');
       }
 
+      let closeHandled = false;
+      const handleClose = () => {
+        if (closeHandled) return;
+        closeHandled = true;
+        window.clearInterval(closeMonitor);
+        options?.onClose?.();
+      };
+      const closeMonitor = window.setInterval(() => {
+        if (reportWindow.closed) {
+          handleClose();
+        }
+      }, 500);
+
+      reportWindow.addEventListener('beforeunload', handleClose, { once: true });
       reportWindow.onload = () => {
         reportWindow.print();
         window.URL.revokeObjectURL(url);
@@ -325,7 +354,7 @@ export class ReportService {
   }
 
   private getReportTitle(filter: ReportFilter): string {
-    if (filter.empresa) return `Reporte de Personas - Empresa: ${filter.empresa}`;
+    if (filter.empresa) return `Reporte de Personas - Empresa: ${this.formatCompanyTag(filter.empresa)}`;
     if (filter.lugar) return `Reporte de Personas - Ubicacion: ${filter.lugar}`;
     if (filter.instructorId) return 'Reporte de Personas por Instructor';
     return 'Reporte General de Personas';
@@ -340,7 +369,7 @@ export class ReportService {
           <td>${this.escapeHtml(persona.curp || '')}</td>
           <td>${this.escapeHtml(persona.email || '')}</td>
           <td>${this.escapeHtml(persona.telefono || '')}</td>
-          <td>${this.escapeHtml(persona.empresa || '')}</td>
+          <td>${this.escapeHtml(this.formatCompanyTag(persona.empresa))}</td>
           <td>${this.escapeHtml(persona.lugar || '-')}</td>
           <td>${this.formatCalificacion(persona.clfPractica)}</td>
           <td>${this.formatCalificacion(persona.clfTeorica)}</td>
@@ -358,7 +387,7 @@ export class ReportService {
       generatedAt: reportData.generatedAt,
       metadata: [
         { label: 'Fecha de emision', value: reportData.generatedAt.toLocaleString() },
-        { label: 'Empresa', value: reportData.empresa || 'Todas las empresas' },
+        { label: 'Empresa', value: this.formatCompanyTag(reportData.empresa) || 'Todas las empresas' },
         { label: 'Ubicacion', value: reportData.lugar || 'Todas las ubicaciones' },
         { label: 'Instructor', value: reportData.instructorName || 'No especificado' }
       ],
@@ -935,6 +964,15 @@ export class ReportService {
 
   private sanitizeFilename(filename: string): string {
     return filename.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  }
+
+  private formatCompanyTag(tag?: string | null): string {
+    return (tag || '').trim().toUpperCase();
+  }
+
+  private formatDate(value: unknown): string {
+    const date = coerceDate(value);
+    return date ? date.toLocaleDateString() : '-';
   }
 
   private getCalificacionFinal(persona: Partial<Persona>): number | null {

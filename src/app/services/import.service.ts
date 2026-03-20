@@ -62,6 +62,7 @@ export class ImportService {
           email,
           telefono: normalizedRow['telefono'] || normalizedRow['celular'] || importOptions.defaultTelefono || '',
           empresa: normalizedRow['empresa'] || importOptions.defaultEmpresa || '',
+          companyTag: this.normalizeCompanyTag(normalizedRow['empresa'] || importOptions.defaultEmpresa || ''),
           lugar: normalizedRow['lugar'] || normalizedRow['ubicacion'] || normalizedRow['ciudad'] || importOptions.defaultLugar || '',
           archivos: [],
           cursoIds: []
@@ -216,6 +217,16 @@ export class ImportService {
       .trim()
       .replace(/^@+/, '')
       .replace(/[^a-z0-9.-]/g, '');
+  }
+
+  private normalizeCompanyTag(value: string): string {
+    return (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .trim();
   }
 
   private normalizeImportOptions(options: BulkImportOptions): Required<BulkImportOptions> {

@@ -19,6 +19,9 @@ import { sanitizePhoneInput } from '../../utils/input-sanitizers.util';
   styleUrl: './cursos.component.scss'
 })
 export class CursosComponent implements OnInit {
+  private readonly MIN_INSTRUCTORES = 1;
+  private readonly MAX_INSTRUCTORES = 3;
+
   cursos: Curso[] = [];
   allCursos: Curso[] = [];
   instructores: Instructor[] = [];
@@ -33,8 +36,11 @@ export class CursosComponent implements OnInit {
   currentUser: User | null = null;
   selectedInstructors: string[] = [];
   editingInstructors: string[] = [];
+  savingCurso = false;
+  deletingCursoId: string | null = null;
   searchTerm: string = '';
   tagSearchTerm: string = '';
+  instructorSearchTerm: string = '';
   sortBy: 'nombre' | 'empresa' | 'inicio' | 'fin' = 'nombre';
   sortDirection: 'asc' | 'desc' = 'asc';
   exportingReport = false;
@@ -204,6 +210,7 @@ export class CursosComponent implements OnInit {
 
   async addCurso() {
     if (!this.isAdmin) return;
+    if (this.savingCurso) return;
 
     if (!this.newCurso.nombre || !this.newCurso.descripcion) {
       this.notificationService.warning('Nombre y descripcion son requeridos');
@@ -215,17 +222,21 @@ export class CursosComponent implements OnInit {
       return;
     }
 
-    if (!this.selectedInstructors || this.selectedInstructors.length < 3) {
-      this.notificationService.warning('Debes seleccionar minimo 3 instructores para el curso');
+    const instructorIds = this.normalizeInstructorIds(this.selectedInstructors);
+    if (instructorIds.length < this.MIN_INSTRUCTORES || instructorIds.length > this.MAX_INSTRUCTORES) {
+      this.notificationService.warning(
+        `Debes seleccionar entre ${this.MIN_INSTRUCTORES} y ${this.MAX_INSTRUCTORES} instructores para el curso`
+      );
       return;
     }
 
     try {
+      this.savingCurso = true;
       const cursoToAdd: Curso = {
         ...(this.newCurso as Curso),
         num_represnetantes: sanitizePhoneInput(this.newCurso.num_represnetantes),
         companyTag: this.normalizeCompanyTag(this.newCurso.companyTag),
-        instructorIds: this.selectedInstructors
+        instructorIds
       };
       await this.cursoService.addCurso(cursoToAdd);
       this.resetForm();
@@ -233,6 +244,8 @@ export class CursosComponent implements OnInit {
     } catch (error) {
       console.error('Error agregando curso:', error);
       this.notificationService.error('Error al agregar curso');
+    } finally {
+      this.savingCurso = false;
     }
   }
 
@@ -246,30 +259,35 @@ export class CursosComponent implements OnInit {
       ...curso,
       num_represnetantes: sanitizePhoneInput(curso.num_represnetantes)
     };
-    this.editingInstructors = [...(curso.instructorIds || [])];
+    this.editingInstructors = this.normalizeInstructorIds(curso.instructorIds || []);
     this.showInstructorDropdown = false;
     this.showForm = true;
   }
 
   async updateCurso() {
     if (!this.isAdmin || !this.editingId) return;
+    if (this.savingCurso) return;
 
     if (!this.editingCurso.companyTag || !this.editingCurso.companyTag.trim()) {
       this.notificationService.warning('La etiqueta de empresa es requerida');
       return;
     }
 
-    if (!this.editingInstructors || this.editingInstructors.length < 3) {
-      this.notificationService.warning('Debes seleccionar minimo 3 instructores para el curso');
+    const instructorIds = this.normalizeInstructorIds(this.editingInstructors);
+    if (instructorIds.length < this.MIN_INSTRUCTORES || instructorIds.length > this.MAX_INSTRUCTORES) {
+      this.notificationService.warning(
+        `Debes seleccionar entre ${this.MIN_INSTRUCTORES} y ${this.MAX_INSTRUCTORES} instructores para el curso`
+      );
       return;
     }
 
     try {
+      this.savingCurso = true;
       const cursoToUpdate: Partial<Curso> = {
         ...this.editingCurso,
         num_represnetantes: sanitizePhoneInput(this.editingCurso.num_represnetantes),
         companyTag: this.normalizeCompanyTag(this.editingCurso.companyTag),
-        instructorIds: this.editingInstructors
+        instructorIds
       };
       await this.cursoService.updateCurso(this.editingId, cursoToUpdate);
       this.resetForm();
@@ -277,20 +295,34 @@ export class CursosComponent implements OnInit {
     } catch (error) {
       console.error('Error actualizando curso:', error);
       this.notificationService.error('Error al actualizar curso');
+    } finally {
+      this.savingCurso = false;
     }
   }
 
   async deleteCurso(id: string | undefined) {
     if (!this.isAdmin || !id) return;
+    if (this.deletingCursoId === id) return;
 
     this.closeFloatingMenus();
     if (confirm('Estas seguro de eliminar este curso?')) {
       try {
+        this.deletingCursoId = id;
         await this.cursoService.deleteCurso(id);
+        this.allCursos = this.allCursos.filter((curso) => curso.idcurso !== id);
+        this.applyCursoFilter();
         this.notificationService.success('Curso eliminado exitosamente');
+        if (this.selectedCourseDetail?.idcurso === id) {
+          this.closeCursoDetail();
+        }
+        if (this.editingId === id) {
+          this.resetForm();
+        }
       } catch (error) {
         console.error('Error eliminando curso:', error);
         this.notificationService.error('Error al eliminar curso');
+      } finally {
+        this.deletingCursoId = null;
       }
     }
   }
@@ -321,8 +353,10 @@ export class CursosComponent implements OnInit {
     this.selectedInstructors = [];
     this.editingInstructors = [];
     this.editingId = null;
+    this.instructorSearchTerm = '';
     this.showInstructorDropdown = false;
     this.showForm = false;
+    this.savingCurso = false;
   }
 
   toggleActionMenu(cursoId: string | undefined, event: MouseEvent) {
@@ -358,6 +392,9 @@ export class CursosComponent implements OnInit {
     event.stopPropagation();
     this.activeActionMenuId = null;
     this.showInstructorDropdown = !this.showInstructorDropdown;
+    if (this.showInstructorDropdown) {
+      this.instructorSearchTerm = '';
+    }
   }
 
   toggleInstructorSelection(instructorId: string | undefined) {
@@ -367,16 +404,38 @@ export class CursosComponent implements OnInit {
     const index = selections.indexOf(instructorId);
 
     if (index >= 0) {
+      if (selections.length <= this.MIN_INSTRUCTORES) {
+        this.notificationService.warning(
+          `El curso debe conservar al menos ${this.MIN_INSTRUCTORES} instructor`
+        );
+        return;
+      }
+
       selections.splice(index, 1);
-    } else {
-      selections.push(instructorId);
+      return;
     }
+
+    if (selections.length >= this.MAX_INSTRUCTORES) {
+      this.notificationService.warning(
+        `El curso solo puede tener hasta ${this.MAX_INSTRUCTORES} instructores`
+      );
+      return;
+    }
+
+    selections.push(instructorId);
   }
 
   removeInstructorSelection(instructorId: string) {
     const selections = this.editingId ? this.editingInstructors : this.selectedInstructors;
     const index = selections.indexOf(instructorId);
     if (index >= 0) {
+      if (selections.length <= this.MIN_INSTRUCTORES) {
+        this.notificationService.warning(
+          `El curso debe conservar al menos ${this.MIN_INSTRUCTORES} instructor`
+        );
+        return;
+      }
+
       selections.splice(index, 1);
     }
   }
@@ -384,6 +443,20 @@ export class CursosComponent implements OnInit {
   isInstructorSelected(instructorId: string | undefined): boolean {
     if (!instructorId) return false;
     return this.getCurrentInstructors().includes(instructorId);
+  }
+
+  canToggleInstructorSelection(instructorId: string | undefined): boolean {
+    if (!instructorId) return false;
+
+    const selections = this.getCurrentInstructors();
+    const isSelected = selections.includes(instructorId);
+    return isSelected
+      ? selections.length > this.MIN_INSTRUCTORES
+      : selections.length < this.MAX_INSTRUCTORES;
+  }
+
+  canRemoveInstructorSelection(instructorId: string): boolean {
+    return this.canToggleInstructorSelection(instructorId);
   }
 
   getInstructorSummary(instructorIds?: string[]): string {
@@ -396,7 +469,32 @@ export class CursosComponent implements OnInit {
   }
 
   getAvailableInstructores(): Instructor[] {
-    return this.instructores.filter((instructor) => !!instructor.id);
+    return this.instructores
+      .filter((instructor) => !!instructor.id)
+      .sort((a, b) => this.normalizeSearch(a.nombre || '').localeCompare(this.normalizeSearch(b.nombre || '')));
+  }
+
+  filteredAvailableInstructores(): Instructor[] {
+    const term = this.normalizeSearch(this.instructorSearchTerm);
+    const available = this.getAvailableInstructores();
+
+    if (!term) return available;
+
+    return available.filter((instructor) =>
+      this.normalizeText([instructor.nombre, instructor.telefono || ''].join(' ')).includes(term)
+    );
+  }
+
+  trackByCursoId(index: number, curso: Curso): string {
+    return curso.idcurso || curso.nombre || `${index}`;
+  }
+
+  trackByInstructorId(index: number, instructor: Instructor): string {
+    return instructor.id || instructor.nombre || `${index}`;
+  }
+
+  trackByString(index: number, value: string): string {
+    return value || `${index}`;
   }
 
   getInstructorName(instructorId: string): string {
@@ -455,6 +553,12 @@ export class CursosComponent implements OnInit {
 
   private normalizeCompanyTag(tag?: string): string {
     return (tag || '').trim().toLowerCase();
+  }
+
+  private normalizeInstructorIds(instructorIds?: string[]): string[] {
+    return Array.from(
+      new Set((instructorIds || []).map((id) => (id || '').trim()).filter(Boolean))
+    );
   }
 
   private getInstructorIdsForCurrentUser(): Set<string> {
@@ -541,7 +645,7 @@ export class CursosComponent implements OnInit {
 
   private getCursosReportTitle(): string {
     if (this.currentUser?.role === 'company' && this.currentUser.companyTag) {
-      return `Reporte de Cursos - Empresa: ${this.currentUser.companyTag}`;
+      return `Reporte de Cursos - Empresa: ${this.currentUser.companyTag.toUpperCase()}`;
     }
     return 'Reporte General de Cursos';
   }

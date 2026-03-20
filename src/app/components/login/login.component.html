@@ -41,7 +41,11 @@
       Olvide mi contrasena
     </button>
 
-    <button type="submit" class="btn-submit" [disabled]="loginForm.invalid || loading">
+    <p class="login-hint login-hint--warning" *ngIf="loginLockMessage">
+      {{ loginLockMessage }}
+    </p>
+
+    <button type="submit" class="btn-submit" [disabled]="!canSubmitLogin">
       {{ loading ? 'Cargando...' : 'Entrar' }}
     </button>
   </form>

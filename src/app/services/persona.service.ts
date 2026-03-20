@@ -1,11 +1,12 @@
 import { Injectable } from '@angular/core';
-import { 
-  Firestore, 
-  collection, 
-  addDoc, 
-  collectionData, 
-  doc, 
-  deleteDoc, 
+import {
+  Firestore,
+  collection,
+  collectionData,
+  doc,
+  deleteDoc,
+  getDoc,
+  setDoc,
   updateDoc,
   writeBatch,
   query,
@@ -13,63 +14,74 @@ import {
   getDocs
 } from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
-import { Persona } from '../models/persona.model';
+import { Persona, PersonaArchivo } from '../models/persona.model';
+import { normalizeDateInput } from '../utils/date.util';
 
 @Injectable({
   providedIn: 'root'
 })
 export class PersonaService {
+  private readonly MAX_DOCUMENT_SIZE_BYTES = 900_000;
   private personasCollection;
 
   constructor(private firestore: Firestore) {
     this.personasCollection = collection(this.firestore, 'personas');
   }
 
-  // Obtener todas las personas
   getPersonas(): Observable<Persona[]> {
     return collectionData(this.personasCollection, { idField: 'id' }) as Observable<Persona[]>;
   }
 
-  // Agregar persona
   async addPersona(persona: Persona): Promise<void> {
+    const personaDoc = doc(this.personasCollection);
+
     try {
-      const newPersona = this.sanitizeForFirestore({
+      const preparedPersona = this.preparePersonaForFirestore({
         ...persona,
         createdAt: new Date(),
         cursoIds: persona.cursoIds || []
-      }) as Record<string, unknown>;
-      await addDoc(this.personasCollection, newPersona as any);
+      });
+
+      const payload = this.sanitizeForFirestore(preparedPersona) as Record<string, unknown>;
+      this.ensureDocumentSize(payload, 'agregar');
+
+      await setDoc(personaDoc, payload as any);
     } catch (error) {
       console.error('Error agregando persona:', error);
       throw error;
     }
   }
 
-  // Actualizar persona
   async updatePersona(id: string, persona: Partial<Persona>): Promise<void> {
+    const personaDoc = doc(this.firestore, `personas/${id}`);
+
     try {
-      const personaDoc = doc(this.firestore, `personas/${id}`);
-      const payload = this.sanitizeForFirestore({ ...persona }) as Record<string, unknown>;
+      const existingPersona = await this.getPersonaById(id);
+      const preparedPersona = this.preparePersonaForFirestore({
+        ...(existingPersona || {}),
+        ...persona
+      });
+
+      const payload = this.sanitizeForFirestore(preparedPersona) as Record<string, unknown>;
       if (Object.keys(payload).length === 0) return;
-      await updateDoc(personaDoc, payload as any);
+
+      this.ensureDocumentSize(payload, 'actualizar');
+      await setDoc(personaDoc, payload as any, { merge: true });
     } catch (error) {
       console.error('Error actualizando persona:', error);
       throw error;
     }
   }
 
-  // Eliminar persona
   async deletePersona(id: string): Promise<void> {
     try {
-      const personaDoc = doc(this.firestore, `personas/${id}`);
-      await deleteDoc(personaDoc);
+      await deleteDoc(doc(this.firestore, `personas/${id}`));
     } catch (error) {
       console.error('Error eliminando persona:', error);
       throw error;
     }
   }
 
-  // Eliminar personas en lote (operacion rapida para seleccion multiple)
   async deletePersonas(ids: string[]): Promise<void> {
     const uniqueIds = [...new Set(ids.filter(Boolean))];
     if (uniqueIds.length === 0) {
@@ -77,10 +89,10 @@ export class PersonaService {
     }
 
     try {
-      const chunkSize = 450; // Firestore permite hasta 500 operaciones por batch
+      const chunkSize = 450;
 
-      for (let i = 0; i < uniqueIds.length; i += chunkSize) {
-        const chunk = uniqueIds.slice(i, i + chunkSize);
+      for (let index = 0; index < uniqueIds.length; index += chunkSize) {
+        const chunk = uniqueIds.slice(index, index + chunkSize);
         const batch = writeBatch(this.firestore);
 
         for (const id of chunk) {
@@ -95,12 +107,11 @@ export class PersonaService {
     }
   }
 
-  // Obtener persona por email
   async getPersonaByEmail(email: string): Promise<Persona | null> {
     try {
       const q = query(this.personasCollection, where('email', '==', email));
       const querySnapshot = await getDocs(q);
-      
+
       if (!querySnapshot.empty) {
         const personaData = querySnapshot.docs[0].data() as Persona;
         return {
@@ -108,6 +119,7 @@ export class PersonaService {
           id: querySnapshot.docs[0].id
         };
       }
+
       return null;
     } catch (error) {
       console.error('Error obteniendo persona:', error);
@@ -115,52 +127,160 @@ export class PersonaService {
     }
   }
 
-  // Asignar persona a curso
   async assignToCurso(personaId: string, cursoId: string): Promise<void> {
     try {
       const personaDoc = doc(this.firestore, `personas/${personaId}`);
       const persona = await this.getPersonaById(personaId);
-      
-      if (persona) {
-        const cursoIds = [...(persona.cursoIds || []), cursoId];
-        await updateDoc(personaDoc, { cursoIds });
-      }
+
+      if (!persona) return;
+
+      const cursoIds = [...new Set([...(persona.cursoIds || []), cursoId].map((item) => this.normalizeTextValue(item)).filter(Boolean))];
+      await updateDoc(personaDoc, { cursoIds });
     } catch (error) {
       console.error('Error asignando persona a curso:', error);
       throw error;
     }
   }
 
-  // Remover persona de curso
   async removeFromCurso(personaId: string, cursoId: string): Promise<void> {
     try {
       const personaDoc = doc(this.firestore, `personas/${personaId}`);
       const persona = await this.getPersonaById(personaId);
-      
-      if (persona && persona.cursoIds) {
-        const cursoIds = persona.cursoIds.filter(id => id !== cursoId);
-        await updateDoc(personaDoc, { cursoIds });
-      }
+
+      if (!persona) return;
+
+      const cursoIds = (persona.cursoIds || []).filter((id) => id !== cursoId);
+      await updateDoc(personaDoc, { cursoIds });
     } catch (error) {
       console.error('Error removiendo persona de curso:', error);
       throw error;
     }
   }
 
-  // Obtener persona por ID
   private async getPersonaById(id: string): Promise<Persona | null> {
     try {
       const personaDoc = doc(this.firestore, `personas/${id}`);
-      const querySnapshot = await getDocs(query(this.personasCollection, where('__name__', '==', id)));
-      
-      if (!querySnapshot.empty) {
-        return querySnapshot.docs[0].data() as Persona;
+      const snapshot = await getDoc(personaDoc);
+
+      if (!snapshot.exists()) {
+        return null;
       }
-      return null;
+
+      return {
+        id: snapshot.id,
+        ...(snapshot.data() as Persona)
+      };
     } catch (error) {
       console.error('Error obteniendo persona:', error);
       return null;
     }
+  }
+
+  private preparePersonaForFirestore(persona: Partial<Persona>): Persona {
+    const normalizedArchivos = this.normalizeArchivos(persona.archivos);
+    const normalizedCursoIds = Array.from(
+      new Set((persona.cursoIds || []).map((id) => this.normalizeTextValue(id)).filter(Boolean))
+    );
+
+    return {
+      nombre: this.normalizeTextValue(persona.nombre),
+      curp: this.normalizeTextValue(persona.curp),
+      email: this.normalizeTextValue(persona.email),
+      telefono: this.normalizeTextValue(persona.telefono),
+      empresa: this.normalizeTextValue(persona.empresa),
+      companyTag: this.normalizeCompanyTag(persona.companyTag || persona.empresa || ''),
+      lugar: this.normalizeTextValue(persona.lugar),
+      foto: this.normalizeAttachmentUrl(persona.foto),
+      clfPractica: this.normalizeNumberValue(persona.clfPractica),
+      clfTeorica: this.normalizeNumberValue(persona.clfTeorica),
+      archivos: normalizedArchivos,
+      cursoIds: normalizedCursoIds,
+      createdAt: normalizeDateInput(persona.createdAt, new Date()) ?? new Date()
+    };
+  }
+
+  private normalizeArchivos(archivos: PersonaArchivo[] | undefined): PersonaArchivo[] {
+    return (archivos || [])
+      .map((archivo) => {
+        const nombre = this.normalizeTextValue(archivo.nombre);
+        const url = this.normalizeAttachmentUrl(archivo.url);
+
+        if (!nombre || !url) {
+          return null;
+        }
+
+        return {
+          nombre,
+          url,
+          tipo: this.normalizeTextValue(archivo.tipo) || 'application/octet-stream',
+          uploadedAt: normalizeDateInput(archivo.uploadedAt),
+          size: this.normalizeNumberValue(archivo.size)
+        } as PersonaArchivo;
+      })
+      .filter((archivo): archivo is PersonaArchivo => archivo !== null);
+  }
+
+  private ensureDocumentSize(payload: Record<string, unknown>, action: 'agregar' | 'actualizar'): void {
+    const bytes = new TextEncoder().encode(JSON.stringify(payload)).length;
+
+    if (bytes > this.MAX_DOCUMENT_SIZE_BYTES) {
+      const sizeKb = Math.ceil(bytes / 1024);
+      throw new Error(
+        `No se puede ${action} la persona porque el documento es demasiado grande (${sizeKb} KB). Firestore permite un maximo de 1 MB por documento. ` +
+        'Reduce el tamano de la foto o de los archivos y vuelve a intentar.'
+      );
+    }
+  }
+
+  private normalizeTextValue(value: unknown): string {
+    return String(value ?? '').trim();
+  }
+
+  private normalizeOptionalTextField(value: unknown): string | undefined {
+    const normalized = this.normalizeTextValue(value);
+    return normalized || undefined;
+  }
+
+  private normalizeNumberValue(value: unknown): number | undefined {
+    if (value === null || value === undefined || value === '') {
+      return undefined;
+    }
+
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : undefined;
+  }
+
+  private normalizeAttachmentUrl(value: unknown): string {
+    const normalized = this.normalizeTextValue(value);
+    if (!normalized) return '';
+
+    const protocol = this.getUrlProtocol(normalized);
+    if (protocol === 'javascript:' || protocol === 'file:' || protocol === 'vbscript:' || protocol === 'blob:') {
+      return '';
+    }
+
+    return normalized;
+  }
+
+  private getUrlProtocol(url: string): string {
+    const normalized = this.normalizeTextValue(url);
+    if (!normalized) return '';
+
+    try {
+      return new URL(normalized, window.location.origin).protocol.toLowerCase();
+    } catch {
+      return '';
+    }
+  }
+
+  private normalizeCompanyTag(value: string): string {
+    return (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .trim();
   }
 
   private sanitizeForFirestore(value: unknown): unknown {

@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { InstructorService } from '../../services/instructor.service';
 import { CursoService } from '../../services/curso.service';
 import { AuthService } from '../../services/auth.service';
+import { NotificationService } from '../../services/notification.service';
 import { Instructor } from '../../models/instructor.model';
 import { Curso } from '../../models/curso.model';
 import { resolveAppAssetUrl } from '../../utils/asset-url.util';
@@ -26,10 +27,16 @@ export class InstructorComponent implements OnInit, OnDestroy {
   isAdmin = false;
   loadingAssignment = false;
   searchTerm = '';
+  courseSearchTerm = '';
   sortBy: 'nombre' | 'cursos' = 'nombre';
   sortDirection: 'asc' | 'desc' = 'asc';
+  savingInstructor = false;
+  deletingInstructorId: string | null = null;
 
   selectedCursoByInstructor: Record<string, string> = {};
+  private cursosById: Record<string, Curso> = {};
+  visibleInstructores: Instructor[] = [];
+  visibleCursosForEdit: Curso[] = [];
 
   cameraActive = false;
   showPhotoOptions = false;
@@ -53,7 +60,8 @@ export class InstructorComponent implements OnInit, OnDestroy {
   constructor(
     private instructorService: InstructorService,
     private cursoService: CursoService,
-    private authService: AuthService
+    private authService: AuthService,
+    private notificationService: NotificationService
   ) {}
 
   ngOnInit(): void {
@@ -76,6 +84,7 @@ export class InstructorComponent implements OnInit, OnDestroy {
     this.instructorService.getInstructores().subscribe({
       next: (instructores) => {
         this.instructores = instructores;
+        this.refreshVisibleInstructores();
       },
       error: (error) => {
         console.error('Error cargando instructores:', error);
@@ -87,6 +96,14 @@ export class InstructorComponent implements OnInit, OnDestroy {
     this.cursoService.getCursos().subscribe({
       next: (cursos) => {
         this.cursos = cursos;
+        this.cursosById = cursos.reduce<Record<string, Curso>>((acc, curso) => {
+          if (curso.idcurso) {
+            acc[curso.idcurso] = curso;
+          }
+          return acc;
+        }, {});
+        this.refreshVisibleCursosForEdit();
+        this.refreshVisibleInstructores();
       },
       error: (error) => {
         console.error('Error cargando cursos:', error);
@@ -96,36 +113,46 @@ export class InstructorComponent implements OnInit, OnDestroy {
 
   async guardarInstructor() {
     if (!this.nuevoInstructor.nombre || !this.nuevoInstructor.telefono) {
-      alert('Completa los campos requeridos');
+      this.notificationService.warning('Completa los campos requeridos');
+      return;
+    }
+
+    if (this.savingInstructor) {
       return;
     }
 
     try {
+      this.savingInstructor = true;
       const instructorPayload: Instructor = {
         ...this.nuevoInstructor,
-        telefono: sanitizePhoneInput(this.nuevoInstructor.telefono)
+        telefono: sanitizePhoneInput(this.nuevoInstructor.telefono),
+        cursosIds: this.normalizeCursoIds(this.nuevoInstructor.cursosIds)
       };
 
       if (this.editIndex !== null) {
         const instructor = this.instructores[this.editIndex];
         if (instructor.id) {
           await this.instructorService.updateInstructor(instructor.id, instructorPayload);
-          alert('Instructor actualizado');
+          this.notificationService.success('Instructor actualizado');
         }
       } else {
         await this.instructorService.addInstructor(instructorPayload);
-        alert('Instructor agregado');
+        this.notificationService.success('Instructor agregado');
       }
       this.cancelar();
     } catch (error) {
       console.error('Error guardando instructor:', error);
-      alert(`Error al guardar instructor: ${error}`);
+      this.notificationService.error(
+        `Error al guardar instructor: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      );
+    } finally {
+      this.savingInstructor = false;
     }
   }
 
   editarInstructor(instructor: Instructor) {
     if (!this.isAdmin) {
-      alert('No tienes permisos para editar instructores');
+      this.notificationService.warning('No tienes permisos para editar instructores');
       return;
     }
 
@@ -135,26 +162,39 @@ export class InstructorComponent implements OnInit, OnDestroy {
     this.editIndex = index;
     this.nuevoInstructor = {
       ...this.instructores[index],
-      telefono: sanitizePhoneInput(this.instructores[index].telefono)
+      telefono: sanitizePhoneInput(this.instructores[index].telefono),
+      cursosIds: [...(this.instructores[index].cursosIds || [])]
     };
+    this.courseSearchTerm = '';
+    this.refreshVisibleCursosForEdit();
   }
 
   async eliminarInstructor(instructor: Instructor) {
     if (!this.isAdmin) {
-      alert('No tienes permisos para eliminar instructores');
+      this.notificationService.warning('No tienes permisos para eliminar instructores');
       return;
     }
 
     if (!confirm(`Eliminar a ${instructor.nombre}?`)) return;
 
     try {
+      this.deletingInstructorId = instructor.id || null;
       if (instructor.id) {
         await this.instructorService.deleteInstructor(instructor.id);
-        alert('Instructor eliminado');
+        this.instructores = this.instructores.filter((item) => item.id !== instructor.id);
+        this.refreshVisibleInstructores();
+        if (this.editIndex !== null && this.nuevoInstructor.id === instructor.id) {
+          this.cancelar();
+        }
+        this.notificationService.success('Instructor eliminado');
       }
     } catch (error) {
       console.error('Error eliminando instructor:', error);
-      alert(`Error al eliminar instructor: ${error}`);
+      this.notificationService.error(
+        `Error al eliminar instructor: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      );
+    } finally {
+      this.deletingInstructorId = null;
     }
   }
 
@@ -166,6 +206,8 @@ export class InstructorComponent implements OnInit, OnDestroy {
       foto: '',
       cursosIds: []
     };
+    this.courseSearchTerm = '';
+    this.refreshVisibleCursosForEdit();
     this.showPhotoOptions = false;
     this.detenerCamara();
   }
@@ -207,7 +249,7 @@ export class InstructorComponent implements OnInit, OnDestroy {
 
   async iniciarCamara() {
     if (!this.isCameraSupported()) {
-      alert('Tu navegador no soporta la camara');
+      this.notificationService.warning('Tu navegador no soporta la camara');
       return;
     }
 
@@ -223,7 +265,7 @@ export class InstructorComponent implements OnInit, OnDestroy {
       requestAnimationFrame(() => this.attachCameraStream());
     } catch (error) {
       console.error('Error iniciando camara:', error);
-      alert('No se pudo abrir la camara. Revisa permisos del navegador.');
+      this.notificationService.error('No se pudo abrir la camara. Revisa permisos del navegador.');
     }
   }
 
@@ -244,7 +286,7 @@ export class InstructorComponent implements OnInit, OnDestroy {
     const canvas = this.cameraCanvas.nativeElement;
 
     if (!video.videoWidth || !video.videoHeight) {
-      alert('La camara aun no esta lista. Intenta de nuevo.');
+      this.notificationService.warning('La camara aun no esta lista. Intenta de nuevo.');
       return;
     }
 
@@ -253,7 +295,7 @@ export class InstructorComponent implements OnInit, OnDestroy {
 
     const context = canvas.getContext('2d');
     if (!context) {
-      alert('No se pudo capturar la imagen');
+      this.notificationService.error('No se pudo capturar la imagen');
       return;
     }
 
@@ -275,24 +317,72 @@ export class InstructorComponent implements OnInit, OnDestroy {
     this.cameraActive = false;
   }
 
+  toggleCursoSelection(cursoId: string | undefined) {
+    if (!cursoId) return;
+
+    const current = [...(this.nuevoInstructor.cursosIds || [])];
+    const index = current.indexOf(cursoId);
+
+    if (index >= 0) {
+      current.splice(index, 1);
+    } else {
+      current.push(cursoId);
+    }
+
+    this.nuevoInstructor.cursosIds = this.normalizeCursoIds(current);
+  }
+
+  removeCursoSelection(cursoId: string) {
+    const current = (this.nuevoInstructor.cursosIds || []).filter((id) => id !== cursoId);
+    this.nuevoInstructor.cursosIds = this.normalizeCursoIds(current);
+  }
+
+  isCursoSelected(cursoId: string | undefined): boolean {
+    if (!cursoId) return false;
+    return (this.nuevoInstructor.cursosIds || []).includes(cursoId);
+  }
+
+  onSearchTermChange(value: string): void {
+    this.searchTerm = value;
+    this.refreshVisibleInstructores();
+  }
+
+  onCourseSearchTermChange(value: string): void {
+    this.courseSearchTerm = value;
+    this.refreshVisibleCursosForEdit();
+  }
+
+  onSortByChange(value: 'nombre' | 'cursos'): void {
+    this.sortBy = value;
+    this.refreshVisibleInstructores();
+  }
+
+  onSortDirectionChange(value: 'asc' | 'desc'): void {
+    this.sortDirection = value;
+    this.refreshVisibleInstructores();
+  }
+
+  private refreshVisibleCursosForEdit(): void {
+    const term = this.normalizeSearch(this.courseSearchTerm);
+    const filtered = term
+      ? this.cursos.filter((curso) => this.getCursoSearchText(curso).includes(term))
+      : [...this.cursos];
+
+    this.visibleCursosForEdit = filtered.sort((a, b) => {
+      const nombreA = this.normalizeSearch(a.nombre || '');
+      const nombreB = this.normalizeSearch(b.nombre || '');
+      return nombreA.localeCompare(nombreB);
+    });
+  }
+
   onImgError(event: Event) {
     const img = event.target as HTMLImageElement;
     img.onerror = null;
     img.src = this.defaultImg;
   }
 
-  getCursoNames(cursoIds?: string[]): string {
-    if (!cursoIds || cursoIds.length === 0) {
-      return 'Sin cursos asignados';
-    }
-
-    return cursoIds
-      .map(id => this.getCursoNombre(id))
-      .join(', ');
-  }
-
   getCursoNombre(cursoId: string): string {
-    const curso = this.cursos.find(c => c.idcurso === cursoId);
+    const curso = this.cursosById[cursoId];
     return curso ? curso.nombre : 'Curso desconocido';
   }
 
@@ -316,13 +406,13 @@ export class InstructorComponent implements OnInit, OnDestroy {
 
   async toggleAsignacionCurso(instructor: Instructor) {
     if (!this.isAdmin || !instructor.id) {
-      alert('No tienes permisos para asignar cursos');
+      this.notificationService.warning('No tienes permisos para asignar cursos');
       return;
     }
 
     const cursoId = this.getSelectedCursoId(instructor);
     if (!cursoId) {
-      alert('Selecciona un curso');
+      this.notificationService.warning('Selecciona un curso');
       return;
     }
 
@@ -330,17 +420,37 @@ export class InstructorComponent implements OnInit, OnDestroy {
 
     try {
       if (this.isCursoAsignado(instructor, cursoId)) {
-        await this.instructorService.unassignInstructorFromCurso(instructor.id, cursoId);
         await this.cursoService.removeInstructorFromCurso(cursoId, instructor.id);
+        try {
+          await this.instructorService.unassignInstructorFromCurso(instructor.id, cursoId);
+        } catch (error) {
+          try {
+            await this.cursoService.addInstructorToCurso(cursoId, instructor.id);
+          } catch (rollbackError) {
+            console.error('Error revirtiendo desasignacion del curso:', rollbackError);
+          }
+          throw error;
+        }
         this.updateLocalAsignacion(instructor, cursoId, false);
       } else {
-        await this.instructorService.assignInstructorToCurso(instructor.id, cursoId);
         await this.cursoService.addInstructorToCurso(cursoId, instructor.id);
+        try {
+          await this.instructorService.assignInstructorToCurso(instructor.id, cursoId);
+        } catch (error) {
+          try {
+            await this.cursoService.removeInstructorFromCurso(cursoId, instructor.id);
+          } catch (rollbackError) {
+            console.error('Error revirtiendo asignacion del curso:', rollbackError);
+          }
+          throw error;
+        }
         this.updateLocalAsignacion(instructor, cursoId, true);
       }
     } catch (error) {
       console.error('Error actualizando asignacion:', error);
-      alert('No se pudo actualizar la asignacion del curso');
+      this.notificationService.error(
+        error instanceof Error ? error.message : 'No se pudo actualizar la asignacion del curso'
+      );
     } finally {
       this.loadingAssignment = false;
     }
@@ -351,34 +461,62 @@ export class InstructorComponent implements OnInit, OnDestroy {
 
     if (assign) {
       instructor.cursosIds = Array.from(new Set([...current, cursoId]));
+      this.refreshVisibleInstructores();
       return;
     }
 
     instructor.cursosIds = current.filter(id => id !== cursoId);
+    this.refreshVisibleInstructores();
   }
 
-  get filteredInstructores(): Instructor[] {
+  private normalizeCursoIds(cursoIds?: string[]): string[] {
+    return Array.from(new Set((cursoIds || []).map((id) => (id || '').trim()).filter(Boolean)));
+  }
+
+  trackByInstructorId(_: number, instructor: Instructor): string {
+    return instructor.id || instructor.nombre;
+  }
+
+  trackByCursoId(_: number, curso: Curso): string {
+    return curso.idcurso || curso.nombre;
+  }
+
+  trackByString(_: number, value: string): string {
+    return value;
+  }
+
+  private refreshVisibleInstructores(): void {
     const term = this.normalizeSearch(this.searchTerm);
-    const filtered = this.instructores.filter((instructor) => {
-      const cursos = (instructor.cursosIds || [])
-        .map((id) => this.getCursoNombre(id))
-        .join(' ');
+    const filtered = term
+      ? this.instructores.filter((instructor) => this.getInstructorSearchText(instructor).includes(term))
+      : [...this.instructores];
 
-      const target = this.normalizeText([
-        instructor.nombre,
-        instructor.telefono || '',
-        cursos
-      ]
-        .join(' '));
-
-      return target.includes(term);
-    });
-
-    return [...filtered].sort((a, b) => this.compareInstructores(a, b));
+    this.visibleInstructores = filtered.sort((a, b) => this.compareInstructores(a, b));
   }
 
   private normalizeSearch(value?: string): string {
     return this.normalizeText(value || '').trim();
+  }
+
+  private getCursoSearchText(curso: Curso): string {
+    return this.normalizeText([
+      curso.nombre,
+      curso.companyTag || '',
+      curso.descripcion || '',
+      curso.nom_representante || ''
+    ].join(' '));
+  }
+
+  private getInstructorSearchText(instructor: Instructor): string {
+    const cursos = (instructor.cursosIds || [])
+      .map((id) => this.getCursoNombre(id))
+      .join(' ');
+
+    return this.normalizeText([
+      instructor.nombre,
+      instructor.telefono || '',
+      cursos
+    ].join(' '));
   }
 
   private normalizeText(value: string): string {

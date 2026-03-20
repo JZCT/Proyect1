@@ -40,7 +40,7 @@
           [disabled]="loading"
         />
         <p class="field-help">
-          Si la dejas vacia, se genera automaticamente: <strong>{{ autoCompanyTagPreview }}</strong>
+          Si la dejas vacia, se genera automaticamente: <strong>{{ autoCompanyTagPreview | uppercase }}</strong>
         </p>
       </div>
 
@@ -48,7 +48,7 @@
         <label>Perfil de instructor</label>
         <select [(ngModel)]="newUser.instructorId" [disabled]="loading">
           <option value="">Selecciona un instructor</option>
-          <option *ngFor="let instructor of instructores" [value]="instructor.id">
+          <option *ngFor="let instructor of instructores; trackBy: trackByInstructorId" [value]="instructor.id">
             {{ instructor.nombre }}{{ instructor.telefono ? ' - ' + instructor.telefono : '' }}
           </option>
         </select>
@@ -60,7 +60,7 @@
 
     <p class="panel-note">Empresa usa etiqueta; instructor debe vincularse a un perfil de instructor.</p>
 
-    <button (click)="addUser()" [disabled]="loading" class="btn btn-primary">
+    <button type="button" (click)="addUser()" [disabled]="loading" class="btn btn-primary">
       {{ loading ? 'Creando...' : 'Agregar usuario' }}
     </button>
   </section>
@@ -80,13 +80,13 @@
 
     <div *ngIf="filteredUsers.length === 0" class="empty-state">No hay usuarios para la busqueda actual.</div>
 
-    <div *ngIf="filteredUsers.length > 0" class="users-list">
-      <div *ngFor="let user of filteredUsers" class="user-item">
+    <div *ngIf="filteredUsers.length > 0" class="scrollable-results users-list">
+      <div *ngFor="let user of filteredUsers; trackBy: trackByUserId" class="user-item">
         <div class="user-main">
           <strong>{{ user.nombre }}</strong>
           <span>{{ user.email }}</span>
           <span class="role" [ngClass]="'role-' + user.role">{{ getRoleLabel(user.role) }}</span>
-          <span *ngIf="user.role === 'company' && user.companyTag && editingCompanyTagUserId !== user.id">Etiqueta: {{ user.companyTag }}</span>
+          <span *ngIf="user.role === 'company' && user.companyTag && editingCompanyTagUserId !== user.id">Etiqueta: {{ user.companyTag | uppercase }}</span>
           <span *ngIf="user.role === 'instructor'">Instructor: {{ getInstructorNameById(user.instructorId) }}</span>
 
           <div class="company-tag-edit" *ngIf="user.role === 'company' && editingCompanyTagUserId === user.id">
@@ -98,7 +98,7 @@
               [disabled]="loading || savingCompanyTagUserId === user.id"
             />
             <small class="field-help">
-              Si queda vacia, se regenera automaticamente: <strong>{{ getAutoCompanyTagPreviewForUser(user) }}</strong>
+              Si queda vacia, se regenera automaticamente: <strong>{{ getAutoCompanyTagPreviewForUser(user) | uppercase }}</strong>
             </small>
           </div>
         </div>
@@ -134,7 +134,14 @@
             </button>
           </ng-container>
 
-          <button (click)="deleteUser(user.id)" [disabled]="loading" class="btn btn-danger">Eliminar</button>
+          <button
+            type="button"
+            (click)="deleteUser(user.id)"
+            [disabled]="loading || deletingUserId === user.id"
+            class="btn btn-danger"
+          >
+            {{ deletingUserId === user.id ? 'Eliminando...' : 'Eliminar' }}
+          </button>
         </div>
       </div>
     </div>

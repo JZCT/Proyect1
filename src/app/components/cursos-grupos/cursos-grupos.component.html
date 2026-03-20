@@ -11,7 +11,7 @@
       <div class="cursos-panel">
         <div class="panel-header">
           <h3>Cursos</h3>
-          <button *ngIf="user.role === 'admin'" class="btn btn-sm btn-primary" (click)="toggleCursoForm()">
+          <button type="button" *ngIf="user.role === 'admin'" class="btn btn-sm btn-primary" (click)="toggleCursoForm()">
             {{ showCursoForm ? 'Cerrar formulario' : 'Nuevo curso' }}
           </button>
           <small *ngIf="user.role === 'company'">Ves solo los cursos asignados a tu empresa.</small>
@@ -58,7 +58,7 @@
               >
                 <option value="">Selecciona etiqueta de empresa</option>
                 <option *ngFor="let tag of getCompanyTagOptions(editingCursoId ? editingCurso.companyTag : newCurso.companyTag)" [value]="tag">
-                  {{ tag }}
+                  {{ tag | uppercase }}
                 </option>
               </select>
               <p class="field-help">Se toman del catalogo de usuarios empresa.</p>
@@ -112,8 +112,10 @@
             </div>
 
             <div class="form-actions">
-              <button type="submit" class="btn btn-success">{{ editingCursoId ? 'Actualizar' : 'Guardar' }}</button>
-              <button type="button" class="btn btn-secondary" (click)="resetCursoForm()">Cancelar</button>
+              <button type="submit" class="btn btn-success" [disabled]="savingCurso">
+                {{ savingCurso ? (editingCursoId ? 'Actualizando...' : 'Guardando...') : (editingCursoId ? 'Actualizar' : 'Guardar') }}
+              </button>
+              <button type="button" class="btn btn-secondary" (click)="resetCursoForm()" [disabled]="savingCurso">Cancelar</button>
             </div>
           </form>
         </ng-template>
@@ -169,36 +171,52 @@
 
           <div *ngIf="filteredCursosList.length === 0" class="empty-state">No hay cursos para la busqueda actual.</div>
 
-          <div
-            *ngFor="let curso of filteredCursosList"
-            class="curso-item"
-            [class.selected]="selectedCurso?.idcurso === curso.idcurso"
-            (click)="selectCurso(curso)"
-          >
-            <div class="curso-info">
-              <h5>{{ curso.nombre }}</h5>
-              <p>{{ curso.descripcion }}</p>
-              <p>Empresa: {{ curso.companyTag || '-' }}</p>
-              <p>Inicio: {{ curso.Fecha_inicio | date }} | Fin: {{ curso.Fecha_fin | date }}</p>
-              <p>Representante: {{ curso.nom_representante }} | Telefono: {{ curso.num_represnetantes }}</p>
+          <div *ngIf="filteredCursosList.length > 0" class="scrollable-results">
+            <div
+              *ngFor="let curso of filteredCursosList; trackBy: trackByCursoId"
+              class="curso-item"
+              [class.selected]="selectedCurso?.idcurso === curso.idcurso"
+              (click)="selectCurso(curso)"
+            >
+              <div class="curso-info">
+                <h5>{{ curso.nombre }}</h5>
+                <p>{{ curso.descripcion }}</p>
+                <p>Empresa: {{ (curso.companyTag || '-') | uppercase }}</p>
+                <p>Inicio: {{ curso.Fecha_inicio | date }} | Fin: {{ curso.Fecha_fin | date }}</p>
+                <p>Representante: {{ curso.nom_representante }} | Telefono: {{ curso.num_represnetantes }}</p>
 
-              <ng-container *ngIf="getInstructoresByCurso(curso) as cursoInstructores">
-                <div class="curso-instructores-avatars" *ngIf="cursoInstructores.length > 0">
-                  <img
-                    *ngFor="let instructor of cursoInstructores"
-                    class="curso-instructor-avatar"
-                    [src]="instructor.foto || defaultInstructorImg"
-                    [alt]="instructor.nombre"
-                    [title]="instructor.nombre"
-                    (error)="onInstructorImgError($event)"
-                  />
-                </div>
-              </ng-container>
-            </div>
+                <ng-container *ngIf="getInstructoresByCurso(curso) as cursoInstructores">
+                  <div class="curso-instructores-avatars" *ngIf="cursoInstructores.length > 0">
+                    <img
+                      *ngFor="let instructor of cursoInstructores; trackBy: trackByInstructorId"
+                      class="curso-instructor-avatar"
+                      [src]="instructor.foto || defaultInstructorImg"
+                      [alt]="instructor.nombre"
+                      [title]="instructor.nombre"
+                      (error)="onInstructorImgError($event)"
+                    />
+                  </div>
+                </ng-container>
+              </div>
 
-            <div class="curso-actions" *ngIf="user.role === 'admin'">
-              <button class="btn btn-sm btn-info" (click)="startEditCurso(curso); $event.stopPropagation()">Editar</button>
-              <button class="btn btn-sm btn-danger" (click)="deleteCurso(curso.idcurso); $event.stopPropagation()">Eliminar</button>
+              <div class="curso-actions" *ngIf="user.role === 'admin'">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-info"
+                  (click)="startEditCurso(curso); $event.stopPropagation()"
+                  [disabled]="deletingCursoId === curso.idcurso"
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-danger"
+                  (click)="deleteCurso(curso.idcurso); $event.stopPropagation()"
+                  [disabled]="deletingCursoId === curso.idcurso"
+                >
+                  {{ deletingCursoId === curso.idcurso ? 'Eliminando...' : 'Eliminar' }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -243,7 +261,7 @@
           </div>
 
           <div *ngIf="instructoresEnCurso.length > 0" class="instructores-grid">
-            <div *ngFor="let instructor of instructoresEnCurso" class="instructor-card">
+            <div *ngFor="let instructor of instructoresEnCurso; trackBy: trackByInstructorId" class="instructor-card">
               <img
                 class="instructor-avatar"
                 [src]="instructor.foto || defaultInstructorImg"
@@ -282,7 +300,7 @@
             <select [(ngModel)]="selectedPersonaToAdd" name="persona_select">
               <option [ngValue]="null">Seleccionar</option>
               <option
-                *ngFor="let p of filteredPersonasAsignacion"
+                *ngFor="let p of filteredPersonasAsignacion; trackBy: trackByPersonaId"
                 [ngValue]="p.id"
                 [disabled]="isPersonaAsignada(p.id)"
               >
@@ -290,6 +308,7 @@
               </option>
             </select>
             <button
+              type="button"
               class="btn btn-sm btn-primary"
               (click)="addPersonaToCurso(selectedPersonaToAdd)"
               [disabled]="!selectedPersonaToAdd || isPersonaAsignada(selectedPersonaToAdd)"
@@ -370,57 +389,59 @@
 
           <div *ngIf="filteredPersonasEnCurso.length === 0" class="empty-state">No hay personas para la busqueda actual.</div>
 
-          <div *ngFor="let persona of filteredPersonasEnCurso" class="grupo-item">
-            <div class="grupo-info">
-              <h5>{{ persona.nombre }}</h5>
-              <p>{{ persona.email }} | {{ persona.telefono }} | CURP: {{ persona.curp || '-' }}</p>
-              <p>
-                Practica: {{ formatCalificacion(persona.clfPractica) }} |
-                Teorica: {{ formatCalificacion(persona.clfTeorica) }} |
-                Final: {{ formatCalificacion(getCalificacionFinal(persona)) }}
-              </p>
-              <p>
-                <span class="status-badge" [ngClass]="getResultadoClase(persona)">
-                  {{ getResultadoTexto(persona) }}
-                </span>
-              </p>
+          <div *ngIf="filteredPersonasEnCurso.length > 0" class="scrollable-results">
+            <div *ngFor="let persona of filteredPersonasEnCurso; trackBy: trackByPersonaId" class="grupo-item">
+              <div class="grupo-info">
+                <h5>{{ persona.nombre }}</h5>
+                <p>{{ persona.email }} | {{ persona.telefono }} | CURP: {{ persona.curp || '-' }}</p>
+                <p>
+                  Practica: {{ formatCalificacion(persona.clfPractica) }} |
+                  Teorica: {{ formatCalificacion(persona.clfTeorica) }} |
+                  Final: {{ formatCalificacion(getCalificacionFinal(persona)) }}
+                </p>
+                <p>
+                  <span class="status-badge" [ngClass]="getResultadoClase(persona)">
+                    {{ getResultadoTexto(persona) }}
+                  </span>
+                </p>
 
-              <div *ngIf="canManagePersonas()" class="calificacion-editor">
-                <label>
-                  Practica
-                  <input
-                    type="text"
-                    inputmode="decimal"
-                    maxlength="5"
-                    [ngModel]="persona.clfPractica"
-                    (ngModelChange)="onCalificacionChange(persona, 'clfPractica', $event)"
-                    [name]="'practica_' + persona.id"
-                  />
-                </label>
-                <label>
-                  Teorica
-                  <input
-                    type="text"
-                    inputmode="decimal"
-                    maxlength="5"
-                    [ngModel]="persona.clfTeorica"
-                    (ngModelChange)="onCalificacionChange(persona, 'clfTeorica', $event)"
-                    [name]="'teorica_' + persona.id"
-                  />
-                </label>
-                <button
-                  type="button"
-                  class="btn btn-sm btn-success"
-                  (click)="saveCalificaciones(persona)"
-                  [disabled]="!persona.id || savingCalificaciones[persona.id]"
-                >
-                  {{ persona.id && savingCalificaciones[persona.id] ? 'Guardando...' : 'Guardar calificacion' }}
-                </button>
+                <div *ngIf="canManagePersonas()" class="calificacion-editor">
+                  <label>
+                    Practica
+                    <input
+                      type="text"
+                      inputmode="decimal"
+                      maxlength="5"
+                      [ngModel]="persona.clfPractica"
+                      (ngModelChange)="onCalificacionChange(persona, 'clfPractica', $event)"
+                      [name]="'practica_' + persona.id"
+                    />
+                  </label>
+                  <label>
+                    Teorica
+                    <input
+                      type="text"
+                      inputmode="decimal"
+                      maxlength="5"
+                      [ngModel]="persona.clfTeorica"
+                      (ngModelChange)="onCalificacionChange(persona, 'clfTeorica', $event)"
+                      [name]="'teorica_' + persona.id"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-success"
+                    (click)="saveCalificaciones(persona)"
+                    [disabled]="!persona.id || savingCalificaciones[persona.id]"
+                  >
+                    {{ persona.id && savingCalificaciones[persona.id] ? 'Guardando...' : 'Guardar calificacion' }}
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div class="grupo-actions" *ngIf="canManagePersonas()">
-              <button class="btn btn-sm btn-danger" (click)="removePersonaFromCurso(persona.id)">Remover</button>
+              <div class="grupo-actions" *ngIf="canManagePersonas()">
+                <button type="button" class="btn btn-sm btn-danger" (click)="removePersonaFromCurso(persona.id)">Remover</button>
+              </div>
             </div>
           </div>
         </div>

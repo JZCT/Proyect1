@@ -4,7 +4,7 @@
       <h2 class="page-title">Gestion de Cursos</h2>
       <p class="page-subtitle">Registra datos del curso y usa etiqueta de empresa para segmentar vistas.</p>
     </div>
-    <button *ngIf="isAdmin" class="btn btn-primary" (click)="toggleForm()">
+    <button type="button" *ngIf="isAdmin" class="btn btn-primary" (click)="toggleForm()">
       {{ showForm ? 'Cerrar' : 'Agregar curso' }}
     </button>
   </div>
@@ -55,7 +55,7 @@
           >
             <option value="">Selecciona etiqueta de empresa</option>
             <option *ngFor="let tag of getCompanyTagOptions(editingId ? editingCurso.companyTag : newCurso.companyTag)" [value]="tag">
-              {{ tag }}
+              {{ tag | uppercase }}
             </option>
           </select>
           <p class="field-help">Estas opciones salen de los usuarios tipo empresa.</p>
@@ -112,47 +112,78 @@
           />
         </div>
 
-        <div class="form-group form-group-full">
+        <div class="form-group form-group-full instructor-picker">
           <label>Instructores asignados</label>
+          <div class="instructor-picker-header">
+            <span class="picker-count">{{ getCurrentInstructors().length }}/3 seleccionados</span>
+            <span class="field-help">Busca por nombre o telefono y selecciona hasta 3.</span>
+          </div>
+          <div class="selected-chips" *ngIf="getCurrentInstructors().length > 0; else noSelectedInstructors">
+            <button
+              type="button"
+              class="chip"
+              *ngFor="let instructorId of getCurrentInstructors(); trackBy: trackByString"
+              (click)="removeInstructorSelection(instructorId)"
+              [disabled]="!canRemoveInstructorSelection(instructorId)"
+            >
+              {{ getInstructorName(instructorId) }} x
+            </button>
+          </div>
+          <ng-template #noSelectedInstructors>
+            <p class="field-help">Aun no hay instructores seleccionados.</p>
+          </ng-template>
+
           <button
             type="button"
             class="select-trigger"
             (click)="toggleInstructorDropdown($event)"
             [attr.aria-expanded]="showInstructorDropdown"
           >
-            {{ getCurrentInstructors().length > 0 ? getCurrentInstructors().length + ' instructores seleccionados' : 'Seleccionar instructores' }}
+            {{ showInstructorDropdown ? 'Ocultar selector' : 'Abrir selector' }}
           </button>
 
           <div class="select-menu" *ngIf="showInstructorDropdown" (click)="$event.stopPropagation()">
-            <label class="select-option" *ngFor="let instructor of getAvailableInstructores()">
+            <div class="select-menu-search">
               <input
-                type="checkbox"
-                [checked]="isInstructorSelected(instructor.id)"
-                (change)="toggleInstructorSelection(instructor.id)"
+                type="text"
+                placeholder="Buscar instructor..."
+                [ngModel]="instructorSearchTerm"
+                (ngModelChange)="instructorSearchTerm = $event"
+                name="instructor_search"
+                autocomplete="off"
               />
-              <span>{{ instructor.nombre }}</span>
-            </label>
-          </div>
+              <span class="field-help">
+                {{ filteredAvailableInstructores().length }}/{{ getAvailableInstructores().length }}
+              </span>
+            </div>
 
-          <div class="selected-chips" *ngIf="getCurrentInstructors().length > 0; else noSelectedInstructors">
-            <button
-              type="button"
-              class="chip"
-              *ngFor="let instructorId of getCurrentInstructors()"
-              (click)="removeInstructorSelection(instructorId)"
-            >
-              {{ getInstructorName(instructorId) }} ×
-            </button>
-          </div>
+            <div class="select-options" *ngIf="filteredAvailableInstructores().length > 0; else noInstructorMatches">
+              <label class="select-option" *ngFor="let instructor of filteredAvailableInstructores(); trackBy: trackByInstructorId" [class.selected]="isInstructorSelected(instructor.id)">
+                <input
+                  type="checkbox"
+                  [checked]="isInstructorSelected(instructor.id)"
+                  (change)="toggleInstructorSelection(instructor.id)"
+                  [disabled]="!canToggleInstructorSelection(instructor.id)"
+                />
+                <span>
+                  {{ instructor.nombre }}
+                  <small>{{ instructor.telefono || 'Sin telefono' }}</small>
+                </span>
+                <span class="option-state">{{ isInstructorSelected(instructor.id) ? 'Seleccionado' : 'Disponible' }}</span>
+              </label>
+            </div>
 
-          <ng-template #noSelectedInstructors>
-            <p class="field-help">Selecciona minimo 3 instructores para el curso.</p>
-          </ng-template>
+            <ng-template #noInstructorMatches>
+              <p class="empty-state select-empty">No hay instructores que coincidan.</p>
+            </ng-template>
+          </div>
         </div>
 
         <div class="form-actions">
-          <button type="submit" class="btn btn-success">{{ editingId ? 'Actualizar' : 'Guardar' }}</button>
-          <button type="button" class="btn btn-secondary" (click)="resetForm()">Cancelar</button>
+          <button type="submit" class="btn btn-success" [disabled]="savingCurso">
+            {{ savingCurso ? (editingId ? 'Actualizando...' : 'Guardando...') : (editingId ? 'Actualizar' : 'Guardar') }}
+          </button>
+          <button type="button" class="btn btn-secondary" (click)="resetForm()" [disabled]="savingCurso">Cancelar</button>
         </div>
       </form>
     </div>
@@ -162,10 +193,10 @@
     <h3>Lista de cursos ({{ filteredCursos.length }})</h3>
 
     <div class="report-actions" *ngIf="canExportReports">
-      <button class="btn btn-secondary btn-sm" (click)="exportCursosExcel()" [disabled]="exportingReport || filteredCursos.length === 0">
+      <button type="button" class="btn btn-secondary btn-sm" (click)="exportCursosExcel()" [disabled]="exportingReport || filteredCursos.length === 0">
         {{ exportingReport ? 'Generando...' : 'Exportar Excel' }}
       </button>
-      <button class="btn btn-secondary btn-sm" (click)="exportCursosPDF()" [disabled]="exportingReport || filteredCursos.length === 0">
+      <button type="button" class="btn btn-secondary btn-sm" (click)="exportCursosPDF()" [disabled]="exportingReport || filteredCursos.length === 0">
         {{ exportingReport ? 'Generando...' : 'Exportar PDF' }}
       </button>
     </div>
@@ -233,10 +264,10 @@
         </thead>
 
         <tbody>
-          <tr *ngFor="let curso of filteredCursos">
+          <tr *ngFor="let curso of filteredCursos; trackBy: trackByCursoId">
             <td>{{ curso.nombre }}</td>
             <td>{{ curso.descripcion }}</td>
-            <td>{{ curso.companyTag || '-' }}</td>
+            <td>{{ (curso.companyTag || '-') | uppercase }}</td>
             <td>
               <div class="instructor-cell">
                 <span class="instructor-count">{{ curso.instructorIds?.length || 0 }}</span>
@@ -266,8 +297,23 @@
                   (click)="$event.stopPropagation()"
                 >
                   <button type="button" (click)="openCursoDetail(curso)">Ver detalles</button>
-                  <button type="button" *ngIf="isAdmin" (click)="startEdit(curso)">Editar</button>
-                  <button type="button" class="action-danger" *ngIf="isAdmin" (click)="deleteCurso(curso.idcurso)">Eliminar</button>
+                  <button
+                    type="button"
+                    *ngIf="isAdmin"
+                    (click)="startEdit(curso)"
+                    [disabled]="deletingCursoId === curso.idcurso"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    class="action-danger"
+                    *ngIf="isAdmin"
+                    (click)="deleteCurso(curso.idcurso)"
+                    [disabled]="deletingCursoId === curso.idcurso"
+                  >
+                    {{ deletingCursoId === curso.idcurso ? 'Eliminando...' : 'Eliminar' }}
+                  </button>
                 </div>
               </div>
             </td>
@@ -295,7 +341,7 @@
 
         <section class="detail-card">
           <h4>Empresa</h4>
-          <p>{{ selectedCourseDetail.companyTag || '-' }}</p>
+          <p>{{ (selectedCourseDetail.companyTag || '-') | uppercase }}</p>
         </section>
 
         <section class="detail-card">
@@ -314,7 +360,7 @@
           <h4>Instructores asignados</h4>
 
           <div class="selected-chips" *ngIf="selectedCourseDetail.instructorIds?.length; else noDetailInstructors">
-            <span class="chip chip-static" *ngFor="let instructorId of selectedCourseDetail.instructorIds">
+            <span class="chip chip-static" *ngFor="let instructorId of selectedCourseDetail.instructorIds; trackBy: trackByString">
               {{ getInstructorName(instructorId) }}
             </span>
           </div>

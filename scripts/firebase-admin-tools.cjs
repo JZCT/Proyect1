@@ -56,6 +56,16 @@ function parseCsv(value) {
     .filter(Boolean);
 }
 
+function chunkArray(items, chunkSize) {
+  const chunks = [];
+
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+
+  return chunks;
+}
+
 function toBoolean(value, defaultValue = false) {
   if (value === undefined) {
     return defaultValue;
@@ -70,6 +80,55 @@ function resolveFile(filePath) {
 
 function loadServiceAccount(filePath) {
   return JSON.parse(fs.readFileSync(resolveFile(filePath), 'utf8'));
+}
+
+function loadCorsConfiguration(filePath) {
+  const resolvedFile = resolveFile(filePath);
+  const parsed = JSON.parse(fs.readFileSync(resolvedFile, 'utf8'));
+
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    throw new Error('El archivo CORS debe contener un arreglo JSON con al menos una regla.');
+  }
+
+  return parsed.map((rule) => {
+    const origin = Array.isArray(rule.origin)
+      ? rule.origin.map((item) => String(item || '').trim()).filter(Boolean)
+      : [];
+    const method = Array.isArray(rule.method)
+      ? rule.method.map((item) => String(item || '').trim().toUpperCase()).filter(Boolean)
+      : [];
+    const responseHeader = Array.isArray(rule.responseHeader)
+      ? rule.responseHeader.map((item) => String(item || '').trim()).filter(Boolean)
+      : [];
+    const maxAgeSeconds = Number(rule.maxAgeSeconds);
+
+    if (origin.length === 0) {
+      throw new Error('Cada regla CORS debe incluir al menos un origen valido.');
+    }
+
+    if (method.length === 0) {
+      throw new Error('Cada regla CORS debe incluir al menos un metodo valido.');
+    }
+
+    return {
+      origin,
+      method,
+      responseHeader,
+      maxAgeSeconds: Number.isFinite(maxAgeSeconds) && maxAgeSeconds > 0
+        ? Math.floor(maxAgeSeconds)
+        : 3600
+    };
+  });
+}
+
+function normalizeCompanyTag(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .trim();
 }
 
 function initAdminApp(name, serviceAccountPath) {
@@ -89,10 +148,14 @@ function printHelp() {
 Uso:
   node scripts/firebase-admin-tools.cjs bootstrap-admin --dest-key DEST.json --email admin@empresa.com --password admin123! --nombre "Administrador"
   node scripts/firebase-admin-tools.cjs migrate-firestore --source-key SOURCE.json --dest-key DEST.json --collections users,cursos,instructores,personas,usuarios
+  node scripts/firebase-admin-tools.cjs normalize-users --dest-key DEST.json
+  node scripts/firebase-admin-tools.cjs backfill-persona-company-tags --dest-key DEST.json
 
 Comandos:
   bootstrap-admin   Crea o actualiza el primer admin en Auth y Firestore/users del proyecto destino.
   migrate-firestore Copia colecciones de Firestore entre dos proyectos, preservando IDs y subcolecciones.
+  normalize-users   Reescribe users/{uid} a partir de cualquier doc legacy con campo uid.
+  backfill-persona-company-tags   Agrega companyTag normalizado a las personas existentes.
 
 Variables opcionales:
   FIREBASE_SOURCE_KEY
@@ -243,6 +306,93 @@ async function migrateFirestore(args) {
   }
 }
 
+async function normalizeUsers(args) {
+  const destinationKey = requireArg(args, 'dest-key', process.env.FIREBASE_DEST_KEY);
+  const app = initAdminApp('destination-admin', destinationKey);
+
+  try {
+    const db = getFirestore(app);
+    const usersSnapshot = await db.collection('users').get();
+    const movedDocs = [];
+    const skippedDocs = [];
+
+    for (const documentSnapshot of usersSnapshot.docs) {
+      const data = documentSnapshot.data();
+      const uid = String(data.uid || '').trim();
+
+      if (!uid) {
+        skippedDocs.push(documentSnapshot.id);
+        continue;
+      }
+
+      const payload = {
+        ...data,
+        uid,
+        companyTag: data.role === 'company' ? normalizeCompanyTag(data.companyTag || data.nombre || data.email || '') : '',
+        instructorId: data.role === 'instructor' ? String(data.instructorId || '').trim() : '',
+        assignedCourseIds: Array.isArray(data.assignedCourseIds)
+          ? Array.from(new Set(data.assignedCourseIds.map((item) => String(item || '').trim()).filter(Boolean)))
+          : []
+      };
+
+      await db.collection('users').doc(uid).set(payload, { merge: true });
+
+      if (documentSnapshot.id !== uid) {
+        await documentSnapshot.ref.delete();
+        movedDocs.push({ from: documentSnapshot.id, to: uid });
+      }
+    }
+
+    console.log(JSON.stringify({
+      ok: true,
+      command: 'normalize-users',
+      projectId: app.options.projectId,
+      movedDocs,
+      skippedDocs
+    }, null, 2));
+  } finally {
+    await deleteApp(app);
+  }
+}
+
+async function backfillPersonaCompanyTags(args) {
+  const destinationKey = requireArg(args, 'dest-key', process.env.FIREBASE_DEST_KEY);
+  const app = initAdminApp('destination-admin', destinationKey);
+
+  try {
+    const db = getFirestore(app);
+    const personasSnapshot = await db.collection('personas').get();
+    const updatedDocs = [];
+    const skippedDocs = [];
+
+    for (const documentSnapshot of personasSnapshot.docs) {
+      const data = documentSnapshot.data();
+      const companyTag = normalizeCompanyTag(data.companyTag || data.empresa || '');
+
+      if (!companyTag) {
+        skippedDocs.push(documentSnapshot.id);
+        continue;
+      }
+
+      await documentSnapshot.ref.set({
+        companyTag
+      }, { merge: true });
+
+      updatedDocs.push(documentSnapshot.id);
+    }
+
+    console.log(JSON.stringify({
+      ok: true,
+      command: 'backfill-persona-company-tags',
+      projectId: app.options.projectId,
+      updatedDocs,
+      skippedDocs
+    }, null, 2));
+  } finally {
+    await deleteApp(app);
+  }
+}
+
 async function main() {
   const command = process.argv[2];
   const args = parseArgs(process.argv.slice(3));
@@ -258,6 +408,12 @@ async function main() {
       return;
     case 'migrate-firestore':
       await migrateFirestore(args);
+      return;
+    case 'normalize-users':
+      await normalizeUsers(args);
+      return;
+    case 'backfill-persona-company-tags':
+      await backfillPersonaCompanyTags(args);
       return;
     default:
       throw new Error(`Comando no soportado: ${command}`);

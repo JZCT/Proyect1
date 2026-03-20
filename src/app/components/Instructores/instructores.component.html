@@ -5,7 +5,7 @@
         <h2 class="page-title">{{ editIndex !== null ? 'Editar Instructor' : 'Nuevo Instructor' }}</h2>
         <p class="page-subtitle">Captura datos basicos y asigna cursos desde la misma vista.</p>
       </div>
-      <button *ngIf="editIndex !== null" type="button" class="cancelar btn-close" (click)="cancelar()">Cerrar</button>
+      <button *ngIf="editIndex !== null" type="button" class="btn btn-secondary btn-sm btn-close" (click)="cancelar()">Cerrar</button>
     </div>
 
     <input type="text" placeholder="Nombre" [(ngModel)]="nuevoInstructor.nombre">
@@ -51,9 +51,72 @@
       <button type="button" class="btn-stop" (click)="detenerCamara()">Cerrar camara</button>
     </div>
 
+    <div class="cursos-editor">
+      <div class="cursos-editor-header">
+        <label>Cursos asignados</label>
+        <span class="badge">{{ nuevoInstructor.cursosIds?.length || 0 }}</span>
+      </div>
+
+      <div class="cursos-editor-search" *ngIf="cursos.length > 0">
+        <input
+          type="text"
+          placeholder="Buscar curso por nombre, empresa o representante..."
+          [ngModel]="courseSearchTerm"
+          (ngModelChange)="onCourseSearchTermChange($event)"
+          name="course_search"
+          autocomplete="off"
+        >
+        <span class="badge">{{ visibleCursosForEdit.length }}/{{ cursos.length }}</span>
+      </div>
+
+      <div class="cursos-editor-list" *ngIf="cursos.length > 0; else noCursosDisponibles">
+        <ng-container *ngIf="visibleCursosForEdit.length > 0; else noCursosFiltrados">
+          <label class="curso-toggle" *ngFor="let curso of visibleCursosForEdit; trackBy: trackByCursoId">
+          <input
+            type="checkbox"
+            [checked]="isCursoSelected(curso.idcurso)"
+            (change)="toggleCursoSelection(curso.idcurso)"
+          >
+          <span>
+            {{ curso.nombre }}
+            <small>{{ (curso.companyTag || 'Sin empresa') | uppercase }}</small>
+          </span>
+          </label>
+        </ng-container>
+      </div>
+
+      <div class="selected-chips" *ngIf="(nuevoInstructor.cursosIds || []).length > 0">
+        <button
+          type="button"
+          class="badge chip"
+          *ngFor="let cursoId of (nuevoInstructor.cursosIds || []); trackBy: trackByString"
+          (click)="removeCursoSelection(cursoId)"
+        >
+          {{ getCursoNombre(cursoId) }} x
+        </button>
+      </div>
+
+      <ng-template #noCursosDisponibles>
+        <p class="sin-cursos">No hay cursos cargados.</p>
+      </ng-template>
+
+      <ng-template #noCursosFiltrados>
+        <p class="sin-cursos">No hay cursos que coincidan con la busqueda.</p>
+      </ng-template>
+
+      <p class="panel-note">Selecciona aqui los cursos que tendra este instructor.</p>
+    </div>
+
     <div class="acciones-form">
-      <button (click)="guardarInstructor()" class="guardar">Guardar</button>
-      <button (click)="cancelar()" class="cancelar">Cancelar</button>
+      <button
+        type="button"
+        (click)="guardarInstructor()"
+        class="btn btn-success guardar"
+        [disabled]="savingInstructor"
+      >
+        {{ savingInstructor ? (editIndex !== null ? 'Actualizando...' : 'Guardando...') : (editIndex !== null ? 'Actualizar' : 'Guardar') }}
+      </button>
+      <button type="button" (click)="cancelar()" class="btn btn-secondary cancelar" [disabled]="savingInstructor">Cancelar</button>
     </div>
   </ng-template>
 
@@ -64,18 +127,23 @@
   <div class="panel-derecho">
     <div class="buscador-box">
       <h2>Buscar Instructor</h2>
-      <input type="text" placeholder="Nombre, telefono o curso..." [(ngModel)]="searchTerm">
+      <input
+        type="text"
+        placeholder="Nombre, telefono o curso..."
+        [ngModel]="searchTerm"
+        (ngModelChange)="onSearchTermChange($event)"
+      >
       <div class="sort-tools">
         <div class="field">
           <label>Ordenar por</label>
-          <select [(ngModel)]="sortBy" name="instructor_sort_by">
+          <select [ngModel]="sortBy" (ngModelChange)="onSortByChange($event)" name="instructor_sort_by">
             <option value="nombre">Alfabetico (Nombre)</option>
             <option value="cursos">Cantidad de cursos</option>
           </select>
         </div>
         <div class="field">
           <label>Direccion</label>
-          <select [(ngModel)]="sortDirection" name="instructor_sort_direction">
+          <select [ngModel]="sortDirection" (ngModelChange)="onSortDirectionChange($event)" name="instructor_sort_direction">
             <option value="asc">Menor a mayor / A-Z</option>
             <option value="desc">Mayor a menor / Z-A</option>
           </select>
@@ -84,9 +152,9 @@
       <p class="panel-note">La lista se actualiza mientras escribes.</p>
     </div>
 
-    <div class="grid">
-      <p *ngIf="filteredInstructores.length === 0" class="empty-grid">No hay instructores para la busqueda actual.</p>
-      <article class="card" *ngFor="let instructor of filteredInstructores; let i = index">
+    <div class="grid scrollable-results">
+      <p *ngIf="visibleInstructores.length === 0" class="empty-grid">No hay instructores para la busqueda actual.</p>
+      <article class="card" *ngFor="let instructor of visibleInstructores; let i = index; trackBy: trackByInstructorId">
         <img class="avatar" [src]="instructor.foto || defaultImg" (error)="onImgError($event)">
 
         <div class="info">
@@ -98,7 +166,7 @@
             <span class="badge">{{ instructor.cursosIds?.length || 0 }}</span>
 
             <ul class="cursos-list" *ngIf="instructor.cursosIds && instructor.cursosIds.length > 0">
-              <li *ngFor="let cursoId of instructor.cursosIds">{{ getCursoNombre(cursoId) }}</li>
+              <li *ngFor="let cursoId of instructor.cursosIds; trackBy: trackByString">{{ getCursoNombre(cursoId) }}</li>
             </ul>
 
             <p *ngIf="!instructor.cursosIds || instructor.cursosIds.length === 0" class="sin-cursos">
@@ -110,7 +178,7 @@
             <label>Curso:</label>
             <select [(ngModel)]="selectedCursoByInstructor[instructor.id]">
               <option value="">Selecciona un curso</option>
-              <option *ngFor="let curso of cursos" [value]="curso.idcurso">
+              <option *ngFor="let curso of cursos; trackBy: trackByCursoId" [value]="curso.idcurso">
                 {{ curso.nombre }}
               </option>
             </select>
@@ -128,8 +196,22 @@
         </div>
 
         <div class="acciones">
-          <button (click)="editarInstructor(instructor)">Editar</button>
-          <button (click)="eliminarInstructor(instructor)">Eliminar</button>
+          <button
+            type="button"
+            class="btn btn-info btn-sm"
+            (click)="editarInstructor(instructor)"
+            [disabled]="savingInstructor || loadingAssignment || deletingInstructorId === instructor.id"
+          >
+            Editar
+          </button>
+          <button
+            type="button"
+            class="btn btn-danger btn-sm"
+            (click)="eliminarInstructor(instructor)"
+            [disabled]="savingInstructor || loadingAssignment || deletingInstructorId === instructor.id"
+          >
+            {{ deletingInstructorId === instructor.id ? 'Eliminando...' : 'Eliminar' }}
+          </button>
         </div>
       </article>
     </div>

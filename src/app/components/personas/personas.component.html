@@ -5,9 +5,9 @@
       <p class="page-subtitle">Registro claro de participantes con CURP obligatoria, foto, archivos y calificaciones.</p>
     </div>
     <div class="header-actions">
-      <button class="btn btn-success" (click)="triggerBulkImport()" *ngIf="isAdmin" title="Importar desde Excel">Carga masiva</button>
-      <button class="btn btn-info" (click)="toggleReports()" *ngIf="canGenerateReports" title="Generar reportes">Reportes</button>
-      <button class="btn btn-primary" (click)="toggleForm()" *ngIf="canEditPersonas">{{ showForm ? 'Cerrar' : 'Agregar persona' }}</button>
+      <button type="button" class="btn btn-success" (click)="triggerBulkImport()" *ngIf="isAdmin" title="Importar desde Excel">Carga masiva</button>
+      <button type="button" class="btn btn-info" (click)="toggleReports()" *ngIf="canGenerateReports" title="Generar reportes">Reportes</button>
+      <button type="button" class="btn btn-primary" (click)="toggleForm()" *ngIf="canEditPersonas">{{ showForm ? 'Cerrar' : 'Agregar persona' }}</button>
     </div>
   </div>
 
@@ -26,7 +26,7 @@
       <div class="modal-section">
         <p>Descargar plantilla: <a href="javascript:void(0)" (click)="downloadTemplate()">clic aqui</a></p>
         <p class="selected-file" *ngIf="selectedExcelFileName">Archivo: {{ selectedExcelFileName }}</p>
-        <button class="btn btn-primary btn-sm" (click)="triggerBulkImport()">Seleccionar archivo Excel</button>
+        <button type="button" class="btn btn-primary btn-sm" (click)="triggerBulkImport()">Seleccionar archivo Excel</button>
       </div>
 
       <div class="modal-section">
@@ -72,12 +72,12 @@
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let p of bulkPersonas.slice(0, 5)">
+              <tr *ngFor="let p of bulkPersonas.slice(0, 5); trackBy: trackByBulkPersona">
                 <td>{{ p.nombre }}</td>
                 <td>{{ p.curp || '-' }}</td>
                 <td>{{ p.email }}</td>
                 <td>{{ p.telefono || '-' }}</td>
-                <td>{{ p.empresa || '-' }}</td>
+                <td>{{ (p.empresa || '-') | uppercase }}</td>
                 <td>{{ p.lugar || '-' }}</td>
               </tr>
             </tbody>
@@ -90,10 +90,10 @@
         </div>
 
         <div class="modal-actions">
-          <button class="btn btn-success" (click)="confirmBulkImport()" [disabled]="bulkImportLoading">
+          <button type="button" class="btn btn-success" (click)="confirmBulkImport()" [disabled]="bulkImportLoading">
             {{ bulkImportLoading ? 'Importando...' : 'Importar ' + bulkPersonas.length + ' personas' }}
           </button>
-          <button class="btn btn-secondary" (click)="cancelBulkImport()" [disabled]="bulkImportLoading">Cancelar</button>
+          <button type="button" class="btn btn-secondary" (click)="cancelBulkImport()" [disabled]="bulkImportLoading">Cancelar</button>
         </div>
       </div>
 
@@ -134,11 +134,11 @@
     </div>
 
     <div class="report-actions">
-      <button class="btn btn-primary" (click)="generateReport()">Ver</button>
-      <button class="btn btn-secondary" (click)="exportReportCSV()">CSV</button>
-      <button class="btn btn-secondary" (click)="exportReportExcel()">Excel</button>
-      <button class="btn btn-secondary" (click)="exportReportPDF()">PDF</button>
-      <button class="btn btn-light" (click)="showReports = false">Cerrar</button>
+      <button type="button" class="btn btn-primary" (click)="generateReport()">Ver</button>
+      <button type="button" class="btn btn-secondary" (click)="exportReportCSV()">CSV</button>
+      <button type="button" class="btn btn-secondary" (click)="exportReportExcel()">Excel</button>
+      <button type="button" class="btn btn-secondary" (click)="exportReportPDF()">PDF</button>
+      <button type="button" class="btn btn-light" (click)="showReports = false">Cerrar</button>
     </div>
   </div>
 
@@ -152,7 +152,7 @@
     </div>
 
     <div class="photo-preview-wrapper">
-      <div class="photo-box">
+      <div class="photo-box" [class.edit-mode]="!!editingId">
         <img [src]="getFotoUrl(editingId ? editingPersona.foto : newPersona.foto)" class="main-preview">
         <button type="button" class="btn btn-primary btn-sm photo-btn" (click)="triggerCamera()">
           {{ loadingFile ? '...' : 'Foto' }}
@@ -272,10 +272,10 @@
           <label>Documentos adicionales</label>
           <input type="file" (change)="onFilesSelected($event)" multiple class="file-input" />
 
-          <div class="file-preview-grid" *ngIf="getCurrentArchivos().length > 0; else noFilesSelected">
+          <div class="file-preview-grid" *ngIf="getCurrentArchivos().length > 0">
             <div class="file-preview-card" *ngFor="let file of getCurrentArchivos(); let i = index">
               <div class="file-thumb">
-                <img *ngIf="isImageFile(file.tipo); else genericFileThumb" [src]="file.url" [alt]="file.nombre">
+                <img *ngIf="isImageFile(file); else genericFileThumb" [src]="file.url" [alt]="file.nombre">
                 <ng-template #genericFileThumb>
                   <span>ARCHIVO</span>
                 </ng-template>
@@ -287,20 +287,26 @@
               </div>
 
               <div class="file-preview-actions">
-                <button type="button" class="btn btn-info btn-sm" (click)="openArchivo(file)">Ver</button>
+                <button
+                  type="button"
+                  class="btn btn-info btn-sm"
+                  (click)="openArchivo(file)"
+                  [disabled]="!canPreviewArchivo(file)"
+                  [title]="getArchivoPreviewTooltip(file)"
+                >
+                  {{ getArchivoActionLabel(file) }}
+                </button>
                 <button type="button" class="btn btn-danger btn-sm" (click)="removeArchivo(i)">Quitar</button>
               </div>
             </div>
           </div>
-
-          <ng-template #noFilesSelected>
-            <div class="empty-files">Sin archivos seleccionados.</div>
-          </ng-template>
         </div>
       </div>
 
       <div class="form-actions">
-        <button type="submit" class="btn btn-success" [disabled]="loadingFile">{{ editingId ? 'Actualizar' : 'Guardar' }}</button>
+        <button type="submit" class="btn btn-success" [disabled]="loadingFile || savingPersona">
+          {{ savingPersona ? (editingId ? 'Actualizando...' : 'Guardando...') : (editingId ? 'Actualizar' : 'Guardar') }}
+        </button>
         <button type="button" class="btn btn-secondary" (click)="resetForm()">Cancelar</button>
       </div>
     </form>
@@ -320,15 +326,26 @@
     <div class="modal-content file-preview-modal" (click)="$event.stopPropagation()">
       <div class="file-preview-header">
         <h4>{{ previewFile?.nombre || 'Vista previa' }}</h4>
-        <button type="button" class="btn btn-secondary btn-sm" (click)="closeArchivoPreview()">Cerrar</button>
+        <div class="actions">
+          <a
+            *ngIf="previewOpenUrl"
+            class="btn btn-secondary btn-sm"
+            [href]="previewOpenUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Abrir
+          </a>
+          <button type="button" class="btn btn-secondary btn-sm" (click)="closeArchivoPreview()">Cerrar</button>
+        </div>
       </div>
 
       <div class="file-preview-body" *ngIf="previewType === 'image'">
-        <img [src]="previewFile?.url" [alt]="previewFile?.nombre || 'archivo'" />
+        <img *ngIf="previewFile?.url; else previewUnavailable" [src]="previewFile?.url" [alt]="previewFile?.nombre || 'archivo'" (error)="onPreviewImageError()" />
       </div>
 
       <div class="file-preview-body pdf-preview" *ngIf="previewType === 'pdf'">
-        <iframe *ngIf="previewResourceUrl" [src]="previewResourceUrl"></iframe>
+        <iframe *ngIf="previewResourceUrl; else previewUnavailable" [src]="previewResourceUrl"></iframe>
       </div>
 
       <div class="file-preview-body text-preview" *ngIf="previewType === 'text'">
@@ -336,8 +353,18 @@
       </div>
 
       <div class="file-preview-body empty-state" *ngIf="previewType === 'unsupported'">
-        No hay vista previa integrada para este tipo de archivo.
+        {{ previewError || 'No hay vista previa integrada para este tipo de archivo.' }}
       </div>
+
+      <ng-template #previewUnavailable>
+        <div class="file-preview-body empty-state" style="display:grid;place-items:center;">
+          {{ previewError || 'No se pudo mostrar la vista previa de este archivo.' }}
+        </div>
+      </ng-template>
+
+      <p class="empty-state" *ngIf="previewType === 'pdf' && previewOpenUrl">
+        Si el PDF no se carga incrustado, usa Abrir para verlo directamente.
+      </p>
     </div>
   </div>
 
@@ -408,7 +435,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let persona of filteredPersonas">
+          <tr *ngFor="let persona of filteredPersonas; trackBy: trackByPersonaId">
             <td class="select-col" *ngIf="isAdmin">
               <input
                 type="checkbox"
@@ -420,7 +447,7 @@
             <td><img [src]="getFotoUrl(persona.foto)" class="table-avatar"></td>
             <td>
               <div class="primary-text">{{ persona.nombre }}</div>
-              <div class="secondary-text">{{ persona.empresa || '-' }}</div>
+              <div class="secondary-text">{{ (persona.empresa || '-') | uppercase }}</div>
             </td>
             <td>{{ persona.curp || '-' }}</td>
             <td>
@@ -438,14 +465,31 @@
             </td>
             <td>
               <div class="file-badges" *ngIf="persona.archivos && persona.archivos.length > 0; else noFiles">
-                <button type="button" class="file-tag file-link" *ngFor="let f of persona.archivos" (click)="openArchivo(f)">Ver {{ f.nombre }}</button>
+                <button
+                  type="button"
+                  class="file-tag file-link"
+                  *ngFor="let f of persona.archivos; trackBy: trackByArchivo"
+                  (click)="openArchivo(f)"
+                  [disabled]="!canPreviewArchivo(f)"
+                  [title]="getArchivoPreviewTooltip(f)"
+                >
+                  {{ getArchivoActionLabel(f) }} {{ f.nombre }}
+                </button>
               </div>
               <ng-template #noFiles><span class="empty-files">Sin archivos</span></ng-template>
             </td>
             <td>
               <div class="actions">
-                <button class="btn btn-info btn-sm" (click)="startEdit(persona)" *ngIf="canEditPersonas">Editar</button>
-                <button class="btn btn-danger btn-sm" (click)="deletePersona(persona.id)" *ngIf="isAdmin">Eliminar</button>
+                <button type="button" class="btn btn-info btn-sm" (click)="startEdit(persona)" *ngIf="canEditPersonas">Editar</button>
+                <button
+                  type="button"
+                  class="btn btn-danger btn-sm"
+                  (click)="deletePersona(persona.id)"
+                  *ngIf="isAdmin"
+                  [disabled]="deletingPersonaId === persona.id"
+                >
+                  {{ deletingPersonaId === persona.id ? 'Eliminando...' : 'Eliminar' }}
+                </button>
               </div>
             </td>
           </tr>

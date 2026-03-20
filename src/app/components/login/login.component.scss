@@ -57,6 +57,16 @@ label {
   color: #b91c1c;
 }
 
+.login-hint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.login-hint--warning {
+  color: #b45309;
+}
+
 .btn-link {
   width: 100%;
   background: transparent;

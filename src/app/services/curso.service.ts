@@ -18,6 +18,9 @@ import { Curso } from '../models/curso.model';
   providedIn: 'root'
 })
 export class CursoService {
+  private readonly MIN_INSTRUCTORES = 1;
+  private readonly MAX_INSTRUCTORES = 3;
+
   private cursosCollection;
 
   constructor(private firestore: Firestore) {
@@ -29,11 +32,14 @@ export class CursoService {
   }
 
   async addCurso(curso: Curso): Promise<void> {
+    const instructorIds = this.normalizeInstructorIds(curso.instructorIds);
+    this.ensureInstructorCountInRange(instructorIds);
+
     try {
       const newCurso = {
         ...curso,
         personasIds: curso.personasIds || [],
-        instructorIds: curso.instructorIds || [],
+        instructorIds,
         createdAt: new Date()
       };
       await addDoc(this.cursosCollection, newCurso);
@@ -44,9 +50,17 @@ export class CursoService {
   }
 
   async updateCurso(id: string, curso: Partial<Curso>): Promise<void> {
+    const payload: Partial<Curso> = { ...curso };
+
+    if (payload.instructorIds !== undefined) {
+      const instructorIds = this.normalizeInstructorIds(payload.instructorIds);
+      this.ensureInstructorCountInRange(instructorIds);
+      payload.instructorIds = instructorIds;
+    }
+
     try {
       const cursoDoc = doc(this.firestore, `cursos/${id}`);
-      await updateDoc(cursoDoc, { ...curso });
+      await updateDoc(cursoDoc, { ...payload });
     } catch (error) {
       console.error('Error actualizando curso:', error);
       throw error;
@@ -112,9 +126,12 @@ export class CursoService {
   }
 
   async assignInstructoresToCurso(cursoId: string, instructorIds: string[]): Promise<void> {
+    const normalizedInstructorIds = this.normalizeInstructorIds(instructorIds);
+    this.ensureInstructorCountInRange(normalizedInstructorIds);
+
     try {
       const cursoDoc = doc(this.firestore, `cursos/${cursoId}`);
-      await updateDoc(cursoDoc, { instructorIds: Array.from(new Set(instructorIds)) });
+      await updateDoc(cursoDoc, { instructorIds: normalizedInstructorIds });
     } catch (error) {
       console.error('Error asignando instructores al curso:', error);
       throw error;
@@ -122,14 +139,18 @@ export class CursoService {
   }
 
   async addInstructorToCurso(cursoId: string, instructorId: string): Promise<void> {
+    const curso = await this.getCursoById(cursoId);
+
+    if (!curso) {
+      return;
+    }
+
+    const instructorIds = this.normalizeInstructorIds([...(curso.instructorIds || []), instructorId]);
+    this.ensureInstructorCountInRange(instructorIds);
+
     try {
       const cursoDoc = doc(this.firestore, `cursos/${cursoId}`);
-      const curso = await this.getCursoById(cursoId);
-
-      if (curso) {
-        const instructorIds = Array.from(new Set([...(curso.instructorIds || []), instructorId]));
-        await updateDoc(cursoDoc, { instructorIds });
-      }
+      await updateDoc(cursoDoc, { instructorIds });
     } catch (error) {
       console.error('Error agregando instructor al curso:', error);
       throw error;
@@ -137,17 +158,36 @@ export class CursoService {
   }
 
   async removeInstructorFromCurso(cursoId: string, instructorId: string): Promise<void> {
+    const curso = await this.getCursoById(cursoId);
+
+    if (!curso) {
+      return;
+    }
+
+    const currentInstructorIds = this.normalizeInstructorIds(curso.instructorIds || []);
+    const instructorIds = currentInstructorIds.filter((id) => id !== instructorId);
+    this.ensureInstructorCountInRange(instructorIds);
+
     try {
       const cursoDoc = doc(this.firestore, `cursos/${cursoId}`);
-      const curso = await this.getCursoById(cursoId);
-
-      if (curso && curso.instructorIds) {
-        const instructorIds = curso.instructorIds.filter(id => id !== instructorId);
-        await updateDoc(cursoDoc, { instructorIds });
-      }
+      await updateDoc(cursoDoc, { instructorIds });
     } catch (error) {
       console.error('Error removiendo instructor del curso:', error);
       throw error;
+    }
+  }
+
+  private normalizeInstructorIds(instructorIds?: string[]): string[] {
+    return Array.from(
+      new Set((instructorIds || []).map((id) => (id || '').trim()).filter(Boolean))
+    );
+  }
+
+  private ensureInstructorCountInRange(instructorIds: string[]): void {
+    if (instructorIds.length < this.MIN_INSTRUCTORES || instructorIds.length > this.MAX_INSTRUCTORES) {
+      throw new Error(
+        `El curso debe tener entre ${this.MIN_INSTRUCTORES} y ${this.MAX_INSTRUCTORES} instructores`
+      );
     }
   }
 }

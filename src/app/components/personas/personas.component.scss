@@ -85,6 +85,22 @@
   cursor: not-allowed;
 }
 
+.header-actions .btn,
+.table-tools .btn,
+.report-actions .btn,
+.actions .btn,
+.modal-actions .btn {
+  min-width: 112px;
+}
+
+.actions .btn-danger {
+  box-shadow: 0 8px 18px rgba(220, 38, 38, 0.14);
+}
+
+.actions .btn-info {
+  box-shadow: 0 8px 18px rgba(0, 131, 251, 0.14);
+}
+
 .form-grid,
 .report-filters {
   margin-top: 10px;
@@ -140,7 +156,11 @@ select:focus {
   object-fit: cover;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: var(--surface-elevated);
+}
+
+.photo-box.edit-mode img {
+  width: 112px;
+  height: 112px;
 }
 
 .photo-btn {
