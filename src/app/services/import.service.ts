@@ -1,18 +1,27 @@
 import { Injectable } from '@angular/core';
 import { Persona } from '../models/persona.model';
 
+export interface BulkImportOptions {
+  defaultEmpresa?: string;
+  defaultLugar?: string;
+  defaultTelefono?: string;
+  emailDomain?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class ImportService {
   private xlsxLoader: Promise<any> | null = null;
   private readonly xlsxScriptId = 'xlsx-cdn-script';
+  private readonly fallbackEmailDomain = 'import.cecapta.local';
 
   constructor() {}
 
-  async parseExcelFile(file: File): Promise<Persona[]> {
+  async parseExcelFile(file: File, options: BulkImportOptions = {}): Promise<Persona[]> {
     try {
       this.validateFile(file);
+      const importOptions = this.normalizeImportOptions(options);
 
       const XLSX = await this.loadXLSX();
       const data = await this.fileToArrayBuffer(file);
@@ -30,11 +39,18 @@ export class ImportService {
 
       for (const row of jsonData) {
         const normalizedRow = this.normalizeRow(row);
-        const nombre = normalizedRow['nombre'] || '';
-        const email = (normalizedRow['email'] || normalizedRow['correo'] || '').toLowerCase();
-        const curp = this.normalizeCurp(normalizedRow['curp'] || '');
+        const rowIndex = personas.length + 1;
+        const nombre = this.extractNombre(normalizedRow);
+        const parsedEmail = (normalizedRow['email'] || normalizedRow['correo'] || '').toLowerCase();
+        const normalizedEmail = this.isValidEmail(parsedEmail)
+          ? parsedEmail
+          : this.buildFallbackEmail(nombre, rowIndex, importOptions.emailDomain);
+        const email = this.ensureUniqueEmail(normalizedEmail, seenEmails);
 
-        if (!nombre || !curp || !this.isValidCurp(curp) || !email || !this.isValidEmail(email) || seenEmails.has(email)) {
+        const parsedCurp = this.normalizeCurp(normalizedRow['curp'] || '');
+        const curp = this.isValidCurp(parsedCurp) ? parsedCurp : this.buildFallbackCurp(rowIndex);
+
+        if (!nombre || !email || !this.isValidEmail(email)) {
           continue;
         }
 
@@ -44,9 +60,9 @@ export class ImportService {
           nombre,
           curp,
           email,
-          telefono: normalizedRow['telefono'] || normalizedRow['celular'] || '',
-          empresa: normalizedRow['empresa'] || '',
-          lugar: normalizedRow['lugar'] || normalizedRow['ubicacion'] || normalizedRow['ciudad'] || '',
+          telefono: normalizedRow['telefono'] || normalizedRow['celular'] || importOptions.defaultTelefono || '',
+          empresa: normalizedRow['empresa'] || importOptions.defaultEmpresa || '',
+          lugar: normalizedRow['lugar'] || normalizedRow['ubicacion'] || normalizedRow['ciudad'] || importOptions.defaultLugar || '',
           archivos: [],
           cursoIds: []
         });
@@ -126,7 +142,7 @@ export class ImportService {
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\s+/g, '');
+      .replace(/[^a-z0-9]/g, '');
   }
 
   private normalizeValue(value: unknown): string {
@@ -136,6 +152,79 @@ export class ImportService {
 
   private isValidEmail(email: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  private extractNombre(row: Record<string, string>): string {
+    const fullName =
+      row['nombre'] ||
+      row['nombrecompleto'] ||
+      row['persona'] ||
+      row['empleado'];
+
+    if (fullName) return this.normalizeValue(fullName);
+
+    const nombres = row['nombres'] || row['name'];
+    const apellidos = row['apellidos'] || row['apellido'] || row['lastname'];
+    const combined = [nombres, apellidos].filter(Boolean).join(' ').trim();
+    if (combined) return this.normalizeValue(combined);
+
+    // Fallback: tomar la primera celda con texto util.
+    const firstText = Object.values(row).find((value) => this.normalizeValue(value).length > 0);
+    return firstText ? this.normalizeValue(firstText) : '';
+  }
+
+  private buildFallbackEmail(nombre: string, index: number, emailDomain: string): string {
+    const safeDomain = this.normalizeEmailDomain(emailDomain) || this.fallbackEmailDomain;
+    const local = this.slugify(nombre) || `persona${index}`;
+    return `${local}.${index}@${safeDomain}`;
+  }
+
+  private ensureUniqueEmail(email: string, seenEmails: Set<string>): string {
+    if (!seenEmails.has(email)) return email;
+
+    const [localPartRaw, domainPartRaw] = email.split('@');
+    const localPart = localPartRaw || 'persona';
+    const domainPart = domainPartRaw || this.fallbackEmailDomain;
+
+    let suffix = 2;
+    let candidate = `${localPart}+${suffix}@${domainPart}`;
+    while (seenEmails.has(candidate)) {
+      suffix++;
+      candidate = `${localPart}+${suffix}@${domainPart}`;
+    }
+
+    return candidate;
+  }
+
+  private buildFallbackCurp(index: number): string {
+    return `TMP${String(index).padStart(15, '0')}`;
+  }
+
+  private slugify(value: string): string {
+    return (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '.')
+      .replace(/^\.|\.$/g, '')
+      .replace(/\.{2,}/g, '.');
+  }
+
+  private normalizeEmailDomain(value: string): string {
+    return (value || '')
+      .toLowerCase()
+      .trim()
+      .replace(/^@+/, '')
+      .replace(/[^a-z0-9.-]/g, '');
+  }
+
+  private normalizeImportOptions(options: BulkImportOptions): Required<BulkImportOptions> {
+    return {
+      defaultEmpresa: this.normalizeValue(options.defaultEmpresa || ''),
+      defaultLugar: this.normalizeValue(options.defaultLugar || ''),
+      defaultTelefono: this.normalizeValue(options.defaultTelefono || ''),
+      emailDomain: this.normalizeEmailDomain(options.emailDomain || this.fallbackEmailDomain)
+    };
   }
 
   private normalizeCurp(curp: string): string {

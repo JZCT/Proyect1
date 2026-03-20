@@ -15,7 +15,7 @@ import './utils/asset-url.util';
   styleUrl: './app.component.scss'
 })
 export class AppComponent {
-  title = 'CecaptaINS - Sistema de Gestion';
+  title = 'CECAPTA Analistyc Center';
   currentUser$ = this.authService.currentUserData$;
   mobileNavOpen = false;
   @HostBinding('class.login-page') isLoginPage: boolean = false;

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Persona } from '../models/persona.model';
 import { Curso } from '../models/curso.model';
-import { resolveAppAssetUrl } from '../utils/asset-url.util';
+import { APP_LOGO_URL } from '../utils/branding.util';
 
 export interface ReportFilter {
   empresa?: string;
@@ -50,7 +50,7 @@ export class ReportService {
   private readonly xlsxScriptId = 'xlsx-cdn-script';
   private readonly reportBrand = 'Sistema de Capacitacion';
   private readonly reportArea = 'Control documental y seguimiento';
-  private readonly reportLogoUrl = resolveAppAssetUrl('assets/cecaptalogo.png');
+  private readonly reportLogoUrl = APP_LOGO_URL;
 
   constructor() {}
 
@@ -575,7 +575,7 @@ export class ReportService {
 
       .letterhead__identity {
         display: flex;
-        gap: 16px;
+        gap: 20px;
         align-items: center;
       }
 
@@ -605,18 +605,18 @@ export class ReportService {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 138px;
-        min-width: 138px;
-        height: 92px;
-        padding: 10px;
-        border-radius: 18px;
+        width: 176px;
+        min-width: 176px;
+        height: 122px;
+        padding: 12px;
+        border-radius: 22px;
         border: 1px dashed rgba(255, 255, 255, 0.48);
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.1);
       }
 
       .logo-slot__image {
-        max-width: 100%;
-        max-height: 100%;
+        width: 100%;
+        height: 100%;
         object-fit: contain;
         display: block;
       }
@@ -836,6 +836,12 @@ export class ReportService {
         .letterhead__identity {
           align-items: flex-start;
           flex-direction: column;
+        }
+
+        .logo-slot {
+          width: 152px;
+          min-width: 152px;
+          height: 108px;
         }
 
         .footer {

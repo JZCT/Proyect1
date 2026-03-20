@@ -6,6 +6,7 @@ import {
   collectionData,
   doc,
   deleteDoc,
+  updateDoc,
   query,
   where,
   getDocs
@@ -141,6 +142,23 @@ export class AuthService {
     }
   }
 
+  async updateUserCompanyTag(
+    userId: string,
+    userData: Pick<User, 'nombre' | 'email' | 'role'> & { companyTag?: string }
+  ): Promise<void> {
+    try {
+      const userDoc = doc(this.firestore, `users/${userId}`);
+      const companyTag = userData.role === 'company'
+        ? this.resolveCompanyTag(userData)
+        : '';
+
+      await updateDoc(userDoc, { companyTag });
+    } catch (error) {
+      console.error('Error actualizando etiqueta de empresa:', error);
+      throw error;
+    }
+  }
+
   login(email: string, password: string) {
     return signInWithEmailAndPassword(this.auth, email, password);
   }
@@ -178,7 +196,7 @@ export class AuthService {
     return from(this.getUserData(uid));
   }
 
-  private resolveCompanyTag(userData: User): string {
+  private resolveCompanyTag(userData: Pick<User, 'nombre' | 'email'> & { companyTag?: string }): string {
     const explicitTag = this.normalizeCompanyTag(userData.companyTag || '');
     if (explicitTag) return explicitTag;
 

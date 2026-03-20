@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { PersonaService } from '../../services/persona.service';
 import { AuthService } from '../../services/auth.service';
-import { ImportService } from '../../services/import.service';
+import { BulkImportOptions, ImportService } from '../../services/import.service';
 import { ReportService } from '../../services/report.service';
 import { NotificationService } from '../../services/notification.service';
 import { Persona } from '../../models/persona.model';
@@ -59,6 +59,12 @@ export class PersonasComponent implements OnInit, OnDestroy {
   bulkImportProgress = 0;
   bulkImportError = '';
   selectedExcelFileName = '';
+  bulkImportDefaults = {
+    empresa: '',
+    lugar: '',
+    telefono: '',
+    emailDomain: 'import.cecapta.local'
+  };
 
   // Propiedades para reportes
   showReports = false;
@@ -206,7 +212,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   toggleForm() {
-    if (!this.isAdmin) {
+    if (!this.canEditPersonas) {
       this.showMessage('No tienes permisos para realizar esta acción');
       return;
     }
@@ -385,7 +391,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   async addPersona() {
-    if (!this.isAdmin) return;
+    if (!this.canEditPersonas) return;
 
     if (!this.newPersona.nombre || !this.newPersona.email) {
       this.showMessage('Nombre y email son requeridos');
@@ -410,7 +416,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
       this.showForm = false;
     } catch (error) {
       console.error('Error agregando persona:', error);
-      this.showMessage('Error al agregar persona');
+      this.showMessage(this.getPersonaSaveErrorMessage(error, 'agregar'));
     }
   }
 
@@ -449,7 +455,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
       this.resetForm();
     } catch (error) {
       console.error('Error actualizando persona:', error);
-      this.showMessage('Error al actualizar persona');
+      this.showMessage(this.getPersonaSaveErrorMessage(error, 'actualizar'));
     }
   }
 
@@ -687,12 +693,35 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
   private preparePersonaForSave(persona: Partial<Persona>): Partial<Persona> {
     return {
-      ...persona,
+      nombre: this.normalizeTextField(persona.nombre),
       curp: this.normalizeCurp(persona.curp),
+      email: this.normalizeTextField(persona.email),
       telefono: sanitizePhoneInput(persona.telefono),
+      empresa: this.normalizeOptionalTextField(persona.empresa),
+      lugar: this.normalizeOptionalTextField(persona.lugar),
       clfPractica: this.normalizeScoreForStorage(persona.clfPractica),
-      clfTeorica: this.normalizeScoreForStorage(persona.clfTeorica)
+      clfTeorica: this.normalizeScoreForStorage(persona.clfTeorica),
+      foto: this.normalizeOptionalTextField(persona.foto),
+      archivos: (persona.archivos || []).map((archivo) => ({
+        nombre: this.normalizeTextField(archivo.nombre),
+        url: this.normalizeTextField(archivo.url),
+        tipo: this.normalizeOptionalTextField(archivo.tipo) || 'application/octet-stream'
+      }))
     };
+  }
+
+  private normalizeTextField(value: unknown): string {
+    return String(value ?? '').trim();
+  }
+
+  private normalizeOptionalTextField(value: unknown): string | undefined {
+    const normalized = this.normalizeTextField(value);
+    return normalized || undefined;
+  }
+
+  private getPersonaSaveErrorMessage(error: unknown, action: 'agregar' | 'actualizar'): string {
+    const message = error instanceof Error ? error.message.trim() : '';
+    return message ? `Error al ${action} persona: ${message}` : `Error al ${action} persona`;
   }
 
   private normalizeScoreForStorage(value: unknown): number | undefined {
@@ -722,6 +751,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
       return;
     }
 
+    this.syncBulkDefaultsFromCurrentForm();
     this.bulkImportError = '';
     this.bulkImportProgress = 0;
     this.bulkPersonas = [];
@@ -745,7 +775,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
       this.showBulkImport = true;
       this.bulkImportLoading = true;
       this.bulkImportError = '';
-      this.bulkPersonas = await this.importService.parseExcelFile(file);
+      this.bulkPersonas = await this.importService.parseExcelFile(file, this.getBulkImportOptions());
       
       if (this.bulkPersonas.length === 0) {
         this.bulkImportError = 'El archivo no contiene datos validos';
@@ -802,6 +832,23 @@ export class PersonasComponent implements OnInit, OnDestroy {
     this.bulkImportError = '';
     this.bulkImportProgress = 0;
     this.selectedExcelFileName = '';
+  }
+
+  private syncBulkDefaultsFromCurrentForm(): void {
+    const source = this.editingId ? this.editingPersona : this.newPersona;
+    this.bulkImportDefaults.empresa = this.normalizeTextField(source.empresa);
+    this.bulkImportDefaults.lugar = this.normalizeTextField(source.lugar);
+    this.bulkImportDefaults.telefono = sanitizePhoneInput(source.telefono);
+    this.bulkImportDefaults.emailDomain = this.normalizeEmailDomain(this.bulkImportDefaults.emailDomain);
+  }
+
+  private getBulkImportOptions(): BulkImportOptions {
+    return {
+      defaultEmpresa: this.normalizeTextField(this.bulkImportDefaults.empresa),
+      defaultLugar: this.normalizeTextField(this.bulkImportDefaults.lugar),
+      defaultTelefono: sanitizePhoneInput(this.bulkImportDefaults.telefono),
+      emailDomain: this.normalizeEmailDomain(this.bulkImportDefaults.emailDomain)
+    };
   }
 
   async downloadTemplate() {
@@ -988,10 +1035,20 @@ export class PersonasComponent implements OnInit, OnDestroy {
       .trim();
   }
 
+  private normalizeEmailDomain(value: string): string {
+    return (value || '')
+      .toLowerCase()
+      .trim()
+      .replace(/^@+/, '')
+      .replace(/[^a-z0-9.-]/g, '') || 'import.cecapta.local';
+  }
+
   private isValidCurp(value?: string): boolean {
     return this.CURP_REGEX.test(this.normalizeCurp(value));
   }
 }
+
+
 
 
 

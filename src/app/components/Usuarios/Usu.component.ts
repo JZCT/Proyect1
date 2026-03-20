@@ -20,6 +20,9 @@ export class UsersComponent implements OnInit {
   currentUser: User | null = null;
   loading: boolean = false;
   searchTerm: string = '';
+  editingCompanyTagUserId: string | null = null;
+  editingCompanyTagValue: string = '';
+  savingCompanyTagUserId: string | null = null;
 
   newUser: Partial<User> = {
     nombre: '',
@@ -183,6 +186,44 @@ export class UsersComponent implements OnInit {
       } finally {
         this.loading = false;
       }
+    }
+  }
+
+  startCompanyTagEdit(user: User) {
+    if (!this.isAdmin || user.role !== 'company' || !user.id) return;
+
+    this.editingCompanyTagUserId = user.id;
+    this.editingCompanyTagValue = user.companyTag || '';
+  }
+
+  cancelCompanyTagEdit() {
+    this.editingCompanyTagUserId = null;
+    this.editingCompanyTagValue = '';
+  }
+
+  getAutoCompanyTagPreviewForUser(user: User): string {
+    if (!user.nombre && !user.email) return 'empresa';
+    return this.normalizeCompanyTag(user.nombre || user.email.split('@')[0] || '') || 'empresa';
+  }
+
+  async saveCompanyTag(user: User) {
+    if (!this.isAdmin || user.role !== 'company' || !user.id) return;
+
+    try {
+      this.savingCompanyTagUserId = user.id;
+      await this.authService.updateUserCompanyTag(user.id, {
+        nombre: user.nombre,
+        email: user.email,
+        role: user.role,
+        companyTag: this.editingCompanyTagValue
+      });
+      alert('Etiqueta de empresa actualizada correctamente');
+      this.cancelCompanyTagEdit();
+    } catch (error: any) {
+      console.error('Error actualizando etiqueta de empresa:', error);
+      alert('Error al actualizar la etiqueta: ' + (error.message || 'Error desconocido'));
+    } finally {
+      this.savingCompanyTagUserId = null;
     }
   }
 

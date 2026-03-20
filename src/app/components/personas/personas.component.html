@@ -7,7 +7,7 @@
     <div class="header-actions">
       <button class="btn btn-success" (click)="triggerBulkImport()" *ngIf="isAdmin" title="Importar desde Excel">Carga masiva</button>
       <button class="btn btn-info" (click)="toggleReports()" *ngIf="canGenerateReports" title="Generar reportes">Reportes</button>
-      <button class="btn btn-primary" (click)="toggleForm()" *ngIf="isAdmin">{{ showForm ? 'Cerrar' : 'Agregar persona' }}</button>
+      <button class="btn btn-primary" (click)="toggleForm()" *ngIf="canEditPersonas">{{ showForm ? 'Cerrar' : 'Agregar persona' }}</button>
     </div>
   </div>
 
@@ -27,6 +27,32 @@
         <p>Descargar plantilla: <a href="javascript:void(0)" (click)="downloadTemplate()">clic aqui</a></p>
         <p class="selected-file" *ngIf="selectedExcelFileName">Archivo: {{ selectedExcelFileName }}</p>
         <button class="btn btn-primary btn-sm" (click)="triggerBulkImport()">Seleccionar archivo Excel</button>
+      </div>
+
+      <div class="modal-section">
+        <h4>Valores por defecto para esta carga</h4>
+        <p class="field-help">
+          Si una fila no trae todos los datos, se completan con estos valores.
+          Si no trae email o CURP, el sistema genera temporales.
+        </p>
+        <div class="report-filters">
+          <div class="form-group">
+            <label>Empresa por defecto</label>
+            <input type="text" [(ngModel)]="bulkImportDefaults.empresa" name="bulk_default_empresa" />
+          </div>
+          <div class="form-group">
+            <label>Ubicacion por defecto</label>
+            <input type="text" [(ngModel)]="bulkImportDefaults.lugar" name="bulk_default_lugar" />
+          </div>
+          <div class="form-group">
+            <label>Telefono por defecto</label>
+            <input type="text" inputmode="numeric" [(ngModel)]="bulkImportDefaults.telefono" name="bulk_default_telefono" />
+          </div>
+          <div class="form-group">
+            <label>Dominio email fallback</label>
+            <input type="text" [(ngModel)]="bulkImportDefaults.emailDomain" name="bulk_default_email_domain" />
+          </div>
+        </div>
       </div>
 
       <div *ngIf="bulkImportError" class="alert alert-danger">{{ bulkImportError }}</div>

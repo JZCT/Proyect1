@@ -81,16 +81,61 @@
     <div *ngIf="filteredUsers.length === 0" class="empty-state">No hay usuarios para la busqueda actual.</div>
 
     <div *ngIf="filteredUsers.length > 0" class="users-list">
-        <div *ngFor="let user of filteredUsers" class="user-item">
-          <div class="user-main">
-            <strong>{{ user.nombre }}</strong>
-            <span>{{ user.email }}</span>
-            <span class="role" [ngClass]="'role-' + user.role">{{ getRoleLabel(user.role) }}</span>
-            <span *ngIf="user.role === 'company' && user.companyTag">Etiqueta: {{ user.companyTag }}</span>
-            <span *ngIf="user.role === 'instructor'">Instructor: {{ getInstructorNameById(user.instructorId) }}</span>
-          </div>
+      <div *ngFor="let user of filteredUsers" class="user-item">
+        <div class="user-main">
+          <strong>{{ user.nombre }}</strong>
+          <span>{{ user.email }}</span>
+          <span class="role" [ngClass]="'role-' + user.role">{{ getRoleLabel(user.role) }}</span>
+          <span *ngIf="user.role === 'company' && user.companyTag && editingCompanyTagUserId !== user.id">Etiqueta: {{ user.companyTag }}</span>
+          <span *ngIf="user.role === 'instructor'">Instructor: {{ getInstructorNameById(user.instructorId) }}</span>
 
-        <button (click)="deleteUser(user.id)" [disabled]="loading" class="btn btn-danger">Eliminar</button>
+          <div class="company-tag-edit" *ngIf="user.role === 'company' && editingCompanyTagUserId === user.id">
+            <label>Etiqueta empresa</label>
+            <input
+              type="text"
+              placeholder="Ej. empresa-norte"
+              [(ngModel)]="editingCompanyTagValue"
+              [disabled]="loading || savingCompanyTagUserId === user.id"
+            />
+            <small class="field-help">
+              Si queda vacia, se regenera automaticamente: <strong>{{ getAutoCompanyTagPreviewForUser(user) }}</strong>
+            </small>
+          </div>
+        </div>
+
+        <div class="user-actions">
+          <ng-container *ngIf="user.role === 'company'">
+            <button
+              *ngIf="editingCompanyTagUserId !== user.id"
+              type="button"
+              class="btn btn-secondary"
+              [disabled]="loading"
+              (click)="startCompanyTagEdit(user)"
+            >
+              Editar etiqueta
+            </button>
+            <button
+              *ngIf="editingCompanyTagUserId === user.id"
+              type="button"
+              class="btn btn-primary"
+              [disabled]="loading || savingCompanyTagUserId === user.id"
+              (click)="saveCompanyTag(user)"
+            >
+              {{ savingCompanyTagUserId === user.id ? 'Guardando...' : 'Guardar' }}
+            </button>
+            <button
+              *ngIf="editingCompanyTagUserId === user.id"
+              type="button"
+              class="btn btn-secondary"
+              [disabled]="loading || savingCompanyTagUserId === user.id"
+              (click)="cancelCompanyTagEdit()"
+            >
+              Cancelar
+            </button>
+          </ng-container>
+
+          <button (click)="deleteUser(user.id)" [disabled]="loading" class="btn btn-danger">Eliminar</button>
+        </div>
       </div>
     </div>
   </section>
