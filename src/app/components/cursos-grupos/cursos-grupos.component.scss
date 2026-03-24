@@ -11,6 +11,63 @@
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
 }
 
+.executive-summary {
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.08), rgba(37, 99, 235, 0.02));
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+  display: grid;
+  gap: 10px;
+}
+
+.executive-summary__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.executive-summary__header h3 {
+  margin: 0 0 4px;
+  color: var(--text);
+}
+
+.executive-summary__header p,
+.executive-summary__note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.executive-summary__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.executive-summary__card {
+  background: var(--surface);
+  border: 1px solid var(--surface-elevated);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.executive-summary__value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+
+.executive-summary__label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .header h2 {
   margin: 0;
   color: var(--text);

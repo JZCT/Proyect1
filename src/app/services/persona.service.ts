@@ -13,6 +13,13 @@ import {
   where,
   getDocs
 } from '@angular/fire/firestore';
+import {
+  Storage,
+  deleteObject,
+  getDownloadURL,
+  ref,
+  uploadBytes
+} from '@angular/fire/storage';
 import { Observable } from 'rxjs';
 import { Persona, PersonaArchivo } from '../models/persona.model';
 import { normalizeDateInput } from '../utils/date.util';
@@ -22,9 +29,11 @@ import { normalizeDateInput } from '../utils/date.util';
 })
 export class PersonaService {
   private readonly MAX_DOCUMENT_SIZE_BYTES = 900_000;
+  private readonly STORAGE_ROOT = 'personas';
+  private readonly STORAGE_FILES_FOLDER = 'archivos';
   private personasCollection;
 
-  constructor(private firestore: Firestore) {
+  constructor(private firestore: Firestore, private storage: Storage) {
     this.personasCollection = collection(this.firestore, 'personas');
   }
 
@@ -34,19 +43,21 @@ export class PersonaService {
 
   async addPersona(persona: Persona): Promise<void> {
     const personaDoc = doc(this.personasCollection);
+    const uploadedStoragePaths: string[] = [];
 
     try {
-      const preparedPersona = this.preparePersonaForFirestore({
+      const preparedPersona = await this.preparePersonaForFirestore({
         ...persona,
         createdAt: new Date(),
         cursoIds: persona.cursoIds || []
-      });
+      }, personaDoc.id, uploadedStoragePaths);
 
       const payload = this.sanitizeForFirestore(preparedPersona) as Record<string, unknown>;
       this.ensureDocumentSize(payload, 'agregar');
 
       await setDoc(personaDoc, payload as any);
     } catch (error) {
+      await this.deleteStoragePaths(uploadedStoragePaths);
       console.error('Error agregando persona:', error);
       throw error;
     }
@@ -54,20 +65,25 @@ export class PersonaService {
 
   async updatePersona(id: string, persona: Partial<Persona>): Promise<void> {
     const personaDoc = doc(this.firestore, `personas/${id}`);
+    const uploadedStoragePaths: string[] = [];
 
     try {
       const existingPersona = await this.getPersonaById(id);
-      const preparedPersona = this.preparePersonaForFirestore({
+      const preparedPersona = await this.preparePersonaForFirestore({
         ...(existingPersona || {}),
         ...persona
-      });
+      }, id, uploadedStoragePaths);
 
       const payload = this.sanitizeForFirestore(preparedPersona) as Record<string, unknown>;
       if (Object.keys(payload).length === 0) return;
 
       this.ensureDocumentSize(payload, 'actualizar');
       await setDoc(personaDoc, payload as any, { merge: true });
+
+      const removedStoragePaths = this.getRemovedStoragePaths(existingPersona?.archivos, preparedPersona.archivos);
+      await this.deleteStoragePaths(removedStoragePaths);
     } catch (error) {
+      await this.deleteStoragePaths(uploadedStoragePaths);
       console.error('Error actualizando persona:', error);
       throw error;
     }
@@ -75,7 +91,9 @@ export class PersonaService {
 
   async deletePersona(id: string): Promise<void> {
     try {
+      const persona = await this.getPersonaById(id);
       await deleteDoc(doc(this.firestore, `personas/${id}`));
+      await this.deleteStoragePaths(this.getStoragePathsFromArchivos(persona?.archivos));
     } catch (error) {
       console.error('Error eliminando persona:', error);
       throw error;
@@ -89,6 +107,8 @@ export class PersonaService {
     }
 
     try {
+      const personas = await Promise.all(uniqueIds.map((id) => this.getPersonaById(id)));
+      const storagePaths = personas.flatMap((persona) => this.getStoragePathsFromArchivos(persona?.archivos));
       const chunkSize = 450;
 
       for (let index = 0; index < uniqueIds.length; index += chunkSize) {
@@ -101,6 +121,8 @@ export class PersonaService {
 
         await batch.commit();
       }
+
+      await this.deleteStoragePaths(storagePaths);
     } catch (error) {
       console.error('Error eliminando personas en lote:', error);
       throw error;
@@ -176,8 +198,12 @@ export class PersonaService {
     }
   }
 
-  private preparePersonaForFirestore(persona: Partial<Persona>): Persona {
-    const normalizedArchivos = this.normalizeArchivos(persona.archivos);
+  private async preparePersonaForFirestore(
+    persona: Partial<Persona>,
+    personaId: string,
+    uploadedStoragePaths: string[]
+  ): Promise<Persona> {
+    const normalizedArchivos = await this.normalizeArchivos(personaId, persona.archivos, uploadedStoragePaths);
     const normalizedCursoIds = Array.from(
       new Set((persona.cursoIds || []).map((id) => this.normalizeTextValue(id)).filter(Boolean))
     );
@@ -199,25 +225,21 @@ export class PersonaService {
     };
   }
 
-  private normalizeArchivos(archivos: PersonaArchivo[] | undefined): PersonaArchivo[] {
-    return (archivos || [])
-      .map((archivo) => {
-        const nombre = this.normalizeTextValue(archivo.nombre);
-        const url = this.normalizeAttachmentUrl(archivo.url);
+  private async normalizeArchivos(
+    personaId: string,
+    archivos: PersonaArchivo[] | undefined,
+    uploadedStoragePaths: string[]
+  ): Promise<PersonaArchivo[]> {
+    const normalizedArchivos: PersonaArchivo[] = [];
 
-        if (!nombre || !url) {
-          return null;
-        }
+    for (const archivo of archivos || []) {
+      const normalizedArchivo = await this.normalizeArchivo(personaId, archivo, uploadedStoragePaths);
+      if (normalizedArchivo) {
+        normalizedArchivos.push(normalizedArchivo);
+      }
+    }
 
-        return {
-          nombre,
-          url,
-          tipo: this.normalizeTextValue(archivo.tipo) || 'application/octet-stream',
-          uploadedAt: normalizeDateInput(archivo.uploadedAt),
-          size: this.normalizeNumberValue(archivo.size)
-        } as PersonaArchivo;
-      })
-      .filter((archivo): archivo is PersonaArchivo => archivo !== null);
+    return normalizedArchivos;
   }
 
   private ensureDocumentSize(payload: Record<string, unknown>, action: 'agregar' | 'actualizar'): void {
@@ -260,6 +282,189 @@ export class PersonaService {
     }
 
     return normalized;
+  }
+
+  private async normalizeArchivo(
+    personaId: string,
+    archivo: PersonaArchivo | undefined,
+    uploadedStoragePaths: string[]
+  ): Promise<PersonaArchivo | null> {
+    if (!archivo) {
+      return null;
+    }
+
+    if (archivo.file) {
+      return await this.uploadArchivo(personaId, archivo, uploadedStoragePaths);
+    }
+
+    const nombre = this.normalizeTextValue(archivo.nombre);
+    const url = this.normalizeAttachmentUrl(archivo.url);
+
+    if (!nombre || !url) {
+      return null;
+    }
+
+    return {
+      nombre,
+      url,
+      tipo: this.normalizeTextValue(archivo.tipo) || 'application/octet-stream',
+      uploadedAt: normalizeDateInput(archivo.uploadedAt),
+      size: this.normalizeNumberValue(archivo.size),
+      storagePath: this.normalizeOptionalTextField(archivo.storagePath)
+    } as PersonaArchivo;
+  }
+
+  private async uploadArchivo(
+    personaId: string,
+    archivo: PersonaArchivo,
+    uploadedStoragePaths: string[]
+  ): Promise<PersonaArchivo | null> {
+    const file = archivo.file;
+    if (!file) {
+      return null;
+    }
+
+    const nombre = this.normalizeTextValue(archivo.nombre || file.name);
+    if (!nombre) {
+      return null;
+    }
+
+    const contentType = this.resolveAttachmentContentType(file, archivo.tipo);
+    if (!contentType) {
+      throw new Error('Solo se permiten archivos PDF');
+    }
+
+    const storagePath = this.getAttachmentStoragePath(personaId, file.name || nombre);
+    const storageRef = ref(this.storage, storagePath);
+    const uploadResult = await uploadBytes(storageRef, file, {
+      contentType
+    });
+    const url = await getDownloadURL(uploadResult.ref);
+
+    uploadedStoragePaths.push(storagePath);
+
+    return {
+      nombre,
+      url,
+      tipo: this.normalizeTextValue(file.type || archivo.tipo) || 'application/octet-stream',
+      uploadedAt: normalizeDateInput(archivo.uploadedAt, new Date()) ?? new Date(),
+      size: this.normalizeNumberValue(file.size ?? archivo.size),
+      storagePath
+    };
+  }
+
+  private getAttachmentStoragePath(personaId: string, fileName: string): string {
+    const uniqueName = this.createSafeFileName(fileName);
+    const randomSuffix = Math.random().toString(36).slice(2, 10);
+    return `${this.STORAGE_ROOT}/${personaId}/${this.STORAGE_FILES_FOLDER}/${Date.now()}-${randomSuffix}-${uniqueName}`;
+  }
+
+  private createSafeFileName(fileName: string): string {
+    const normalized = this.normalizeTextValue(fileName).toLowerCase();
+    const segments = normalized.split('.');
+    const extension = segments.length > 1 ? segments.pop() || '' : '';
+    const baseName = segments.join('.').trim() || 'archivo';
+
+    const safeBase = baseName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'archivo';
+
+    const safeExtension = extension
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '');
+
+    return safeExtension ? `${safeBase}.${safeExtension}` : safeBase;
+  }
+
+  private getStoragePathsFromArchivos(archivos: PersonaArchivo[] | undefined): string[] {
+    return [...new Set(
+      (archivos || [])
+        .map((archivo) => this.getStoragePathFromArchivo(archivo))
+        .filter((storagePath): storagePath is string => !!storagePath)
+    )];
+  }
+
+  private getStoragePathFromArchivo(archivo: PersonaArchivo): string | undefined {
+    const explicitStoragePath = this.normalizeTextValue(archivo.storagePath);
+    if (explicitStoragePath) {
+      return explicitStoragePath;
+    }
+
+    return this.extractStoragePathFromUrl(this.normalizeTextValue(archivo.url));
+  }
+
+  private extractStoragePathFromUrl(url: string): string | undefined {
+    if (!url) return undefined;
+
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.toLowerCase();
+
+      if (host === 'firebasestorage.googleapis.com') {
+        const match = parsed.pathname.match(/^\/v0\/b\/[^/]+\/o\/(.+)$/);
+        if (match?.[1]) {
+          try {
+            return decodeURIComponent(match[1]);
+          } catch {
+            return match[1];
+          }
+        }
+      }
+
+      if (host === 'storage.googleapis.com') {
+        const match = parsed.pathname.match(/^\/[^/]+\/(.+)$/);
+        if (match?.[1]) {
+          try {
+            return decodeURIComponent(match[1]);
+          } catch {
+            return match[1];
+          }
+        }
+      }
+
+      return undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private resolveAttachmentContentType(file: File, fallbackType?: string): string {
+    const normalizedType = this.normalizeTextValue(file.type || fallbackType).toLowerCase();
+    if (normalizedType === 'application/pdf') {
+      return normalizedType;
+    }
+
+    if (file.name.toLowerCase().endsWith('.pdf')) {
+      return 'application/pdf';
+    }
+
+    return '';
+  }
+
+  private getRemovedStoragePaths(
+    existingArchivos: PersonaArchivo[] | undefined,
+    nextArchivos: PersonaArchivo[] | undefined
+  ): string[] {
+    const nextStoragePaths = new Set(this.getStoragePathsFromArchivos(nextArchivos));
+
+    return this.getStoragePathsFromArchivos(existingArchivos).filter(
+      (storagePath) => !nextStoragePaths.has(storagePath)
+    );
+  }
+
+  private async deleteStoragePaths(storagePaths: string[]): Promise<void> {
+    const uniquePaths = [...new Set(storagePaths.filter(Boolean))];
+
+    for (const storagePath of uniquePaths) {
+      try {
+        await deleteObject(ref(this.storage, storagePath));
+      } catch (error) {
+        console.warn('No se pudo eliminar el archivo en Storage:', storagePath, error);
+      }
+    }
   }
 
   private getUrlProtocol(url: string): string {

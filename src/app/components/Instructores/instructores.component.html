@@ -71,16 +71,21 @@
 
       <div class="cursos-editor-list" *ngIf="cursos.length > 0; else noCursosDisponibles">
         <ng-container *ngIf="visibleCursosForEdit.length > 0; else noCursosFiltrados">
-          <label class="curso-toggle" *ngFor="let curso of visibleCursosForEdit; trackBy: trackByCursoId">
-          <input
-            type="checkbox"
-            [checked]="isCursoSelected(curso.idcurso)"
-            (change)="toggleCursoSelection(curso.idcurso)"
+          <label
+            class="curso-toggle"
+            *ngFor="let curso of visibleCursosForEdit; trackBy: trackByCursoId"
+            [attr.title]="getCursoTooltip(curso)"
           >
-          <span>
-            {{ curso.nombre }}
-            <small>{{ (curso.companyTag || 'Sin empresa') | uppercase }}</small>
-          </span>
+            <input
+              type="checkbox"
+              [checked]="isCursoSelected(curso.idcurso)"
+              (change)="toggleCursoSelection(curso.idcurso)"
+            >
+            <span>
+              <strong>{{ curso.nombre }}</strong>
+              <small>{{ (curso.companyTag || 'Sin empresa') | uppercase }}</small>
+              <small class="curso-description">{{ curso.descripcion || 'Sin descripcion' }}</small>
+            </span>
           </label>
         </ng-container>
       </div>
@@ -91,6 +96,7 @@
           class="badge chip"
           *ngFor="let cursoId of (nuevoInstructor.cursosIds || []); trackBy: trackByString"
           (click)="removeCursoSelection(cursoId)"
+          [attr.title]="getCursoNombre(cursoId) + ' - ' + getCursoDescripcion(cursoId)"
         >
           {{ getCursoNombre(cursoId) }} x
         </button>
@@ -104,7 +110,7 @@
         <p class="sin-cursos">No hay cursos que coincidan con la busqueda.</p>
       </ng-template>
 
-      <p class="panel-note">Selecciona aqui los cursos que tendra este instructor.</p>
+      <p class="panel-note">Selecciona aqui los cursos que tendra este instructor. Cada opcion muestra nombre, empresa y descripcion.</p>
     </div>
 
     <div class="acciones-form">
@@ -166,7 +172,13 @@
             <span class="badge">{{ instructor.cursosIds?.length || 0 }}</span>
 
             <ul class="cursos-list" *ngIf="instructor.cursosIds && instructor.cursosIds.length > 0">
-              <li *ngFor="let cursoId of instructor.cursosIds; trackBy: trackByString">{{ getCursoNombre(cursoId) }}</li>
+              <li
+                *ngFor="let cursoId of instructor.cursosIds; trackBy: trackByString"
+                [attr.title]="getCursoNombre(cursoId) + ' - ' + getCursoDescripcion(cursoId)"
+              >
+                <strong>{{ getCursoNombre(cursoId) }}</strong>
+                <small>{{ getCursoDescripcion(cursoId) }}</small>
+              </li>
             </ul>
 
             <p *ngIf="!instructor.cursosIds || instructor.cursosIds.length === 0" class="sin-cursos">

@@ -97,6 +97,12 @@ export class CursoService {
 
   async addPersonaToCurso(cursoId: string, personaId: string): Promise<void> {
     try {
+      const assignedCursos = await this.getCursosByPersonaId(personaId);
+      const assignedElsewhere = assignedCursos.some((curso) => curso.idcurso && curso.idcurso !== cursoId);
+      if (assignedElsewhere) {
+        throw new Error('La persona ya esta asignada a otro curso');
+      }
+
       const cursoDoc = doc(this.firestore, `cursos/${cursoId}`);
       const curso = await this.getCursoById(cursoId);
 
@@ -174,6 +180,21 @@ export class CursoService {
     } catch (error) {
       console.error('Error removiendo instructor del curso:', error);
       throw error;
+    }
+  }
+
+  private async getCursosByPersonaId(personaId: string): Promise<Curso[]> {
+    try {
+      const q = query(this.cursosCollection, where('personasIds', 'array-contains', personaId));
+      const querySnapshot = await getDocs(q);
+
+      return querySnapshot.docs.map((cursoDoc) => ({
+        idcurso: cursoDoc.id,
+        ...(cursoDoc.data() as Curso)
+      }));
+    } catch (error) {
+      console.error('Error buscando curso por persona:', error);
+      return [];
     }
   }
 

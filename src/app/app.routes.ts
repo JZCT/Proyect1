@@ -18,13 +18,13 @@ export const routes: Routes = [
     path: 'home',
     component: HomeComponent,
     canActivate: [roleGuard],
-    data: { roles: ['admin', 'company'] }
+    data: { roles: ['admin', 'company', 'director'] }
   },
   {
     path: '',
     component: CursosGruposComponent,
     canActivate: [roleGuard],
-    data: { roles: ['admin', 'instructor', 'company'] }
+    data: { roles: ['admin', 'instructor', 'company', 'director'] }
   },
   {
     path: 'personas',

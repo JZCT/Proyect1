@@ -1,10 +1,10 @@
 <div class="home-page">
-  <section class="welcome-card">
+  <section class="welcome-card" [class.executive]="currentUser?.role === 'director'">
     <div class="page-title-group">
       <h2 class="page-title">{{ title }}</h2>
       <p class="page-subtitle">{{ description }}</p>
     </div>
-    <p class="hint-chip">Interfaz simple: primero selecciona modulo, luego usa el buscador.</p>
+    <p class="hint-chip">{{ calloutText }}</p>
   </section>
 
   <section class="modules">

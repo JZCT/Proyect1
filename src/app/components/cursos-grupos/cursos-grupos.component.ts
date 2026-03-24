@@ -142,6 +142,10 @@ export class CursosGruposComponent implements OnInit {
     return this.currentUser?.role === 'instructor';
   }
 
+  isDirector(): boolean {
+    return this.currentUser?.role === 'director';
+  }
+
   canManageCurso(): boolean {
     return this.isAdmin();
   }
@@ -221,10 +225,15 @@ export class CursosGruposComponent implements OnInit {
     }
 
     const assignedIds = this.selectedCurso.personasIds || [];
+    const assignedElsewhere = this.getGlobalAssignedPersonaIds(this.selectedCurso.idcurso);
 
     this.personasEnCurso = this.personas.filter((p) => assignedIds.includes(p.id || ''));
 
-    this.personasDisponibles = this.personas.filter((p) => !assignedIds.includes(p.id || ''));
+    this.personasDisponibles = this.personas.filter((p) => {
+      const personaId = p.id || '';
+      if (!personaId) return false;
+      return !assignedIds.includes(personaId) && !assignedElsewhere.has(personaId);
+    });
 
     this.updateResumenCalificaciones();
     this.updateInstructoresEnCurso();
@@ -416,7 +425,17 @@ export class CursosGruposComponent implements OnInit {
     }
 
     try {
-      await this.cursoService.addPersonaToCurso(this.selectedCurso.idcurso || '', personaId);
+      const cursoId = this.selectedCurso.idcurso || '';
+      await this.cursoService.addPersonaToCurso(cursoId, personaId);
+
+      const updatedPersonasIds = Array.from(new Set([...(this.selectedCurso.personasIds || []), personaId]));
+      this.selectedCurso.personasIds = updatedPersonasIds;
+      this.allCursos = this.allCursos.map((curso) =>
+        curso.idcurso === cursoId
+          ? { ...curso, personasIds: [...updatedPersonasIds] }
+          : curso
+      );
+
       this.updatePersonasEnCurso();
       this.selectNextPersonaPendiente();
       this.notificationService.success('Persona asignada al curso');
@@ -431,7 +450,17 @@ export class CursosGruposComponent implements OnInit {
     if (!this.canManagePersonas()) return;
 
     try {
-      await this.cursoService.removePersonaFromCurso(this.selectedCurso.idcurso || '', personaId);
+      const cursoId = this.selectedCurso.idcurso || '';
+      await this.cursoService.removePersonaFromCurso(cursoId, personaId);
+
+      const updatedPersonasIds = (this.selectedCurso.personasIds || []).filter((id) => id !== personaId);
+      this.selectedCurso.personasIds = updatedPersonasIds;
+      this.allCursos = this.allCursos.map((curso) =>
+        curso.idcurso === cursoId
+          ? { ...curso, personasIds: [...updatedPersonasIds] }
+          : curso
+      );
+
       this.updatePersonasEnCurso();
       this.notificationService.info('Persona removida del curso');
     } catch (error) {
@@ -570,6 +599,12 @@ export class CursosGruposComponent implements OnInit {
     }
 
     if (this.currentUser.role === 'admin') {
+      this.cursos = this.allCursos;
+      this.syncSelectedCurso();
+      return;
+    }
+
+    if (this.currentUser.role === 'director') {
       this.cursos = this.allCursos;
       this.syncSelectedCurso();
       return;
@@ -718,12 +753,7 @@ export class CursosGruposComponent implements OnInit {
   }
 
   get filteredPersonasAsignacion(): Persona[] {
-    const term = this.normalizeSearch(this.personaDisponibleSearchTerm);
-    const filtered = this.personas.filter((persona) =>
-      !term || this.getPersonaSearchTarget(persona).includes(term)
-    );
-
-    return [...filtered].sort((a, b) => this.comparePersonas(a, b));
+    return this.filteredPersonasDisponibles;
   }
 
   isPersonaAsignada(personaId: string | null | undefined): boolean {
@@ -731,12 +761,22 @@ export class CursosGruposComponent implements OnInit {
     return (this.selectedCurso.personasIds || []).includes(personaId);
   }
 
+  isPersonaDisponibleSeleccionada(personaId: string | null | undefined): boolean {
+    if (!personaId) return false;
+    return this.filteredPersonasDisponibles.some((persona) => persona.id === personaId);
+  }
+
+  isPersonaAsignadaEnOtroCurso(personaId: string | null | undefined): boolean {
+    if (!personaId || !this.selectedCurso?.idcurso) return false;
+    return this.getGlobalAssignedPersonaIds(this.selectedCurso.idcurso).has(personaId);
+  }
+
   get personasAsignadasEnBusqueda(): number {
-    return this.filteredPersonasAsignacion.filter((persona) => this.isPersonaAsignada(persona.id)).length;
+    return 0;
   }
 
   get personasPendientesEnBusqueda(): number {
-    return this.filteredPersonasAsignacion.length - this.personasAsignadasEnBusqueda;
+    return this.filteredPersonasDisponibles.length;
   }
 
   getPersonaAsignacionLabel(persona: Persona): string {
@@ -745,8 +785,24 @@ export class CursosGruposComponent implements OnInit {
   }
 
   private selectNextPersonaPendiente(): void {
-    const siguiente = this.filteredPersonasAsignacion.find((persona) => !this.isPersonaAsignada(persona.id));
+    const siguiente = this.filteredPersonasDisponibles.find((persona) => !this.isPersonaAsignada(persona.id));
     this.selectedPersonaToAdd = siguiente?.id || null;
+  }
+
+  private getGlobalAssignedPersonaIds(excludedCursoId?: string): Set<string> {
+    const assignedIds = new Set<string>();
+
+    for (const curso of this.allCursos) {
+      if (excludedCursoId && curso.idcurso === excludedCursoId) continue;
+
+      for (const personaId of curso.personasIds || []) {
+        if (personaId) {
+          assignedIds.add(personaId);
+        }
+      }
+    }
+
+    return assignedIds;
   }
 
   private getPersonaSearchTarget(persona: Persona): string {

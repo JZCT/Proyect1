@@ -3,8 +3,50 @@
     <div class="header">
       <div class="page-title-group">
         <h2 class="page-title">Gestion de Cursos y Personas</h2>
-        <p class="page-subtitle">1) Selecciona un curso. 2) Asigna personas. 3) Revisa resultados y aprobados.</p>
+        <p class="page-subtitle" *ngIf="user.role === 'director'">
+          Vista ejecutiva de solo lectura. Revisa el estado general y entra al detalle solo cuando lo necesites.
+        </p>
+        <p class="page-subtitle" *ngIf="user.role === 'admin'">
+          1) Selecciona un curso. 2) Asigna personas. 3) Revisa resultados y aprobados.
+        </p>
+        <p class="page-subtitle" *ngIf="user.role === 'company'">
+          Consulta los cursos de tu empresa y revisa el avance de sus grupos.
+        </p>
+        <p class="page-subtitle" *ngIf="user.role === 'instructor'">
+          Revisa tus cursos, administra personas y calificaciones desde una sola vista.
+        </p>
       </div>
+    </div>
+
+    <div *ngIf="isDirector()" class="executive-summary">
+      <div class="executive-summary__header">
+        <div>
+          <h3>Resumen ejecutivo</h3>
+          <p>Indicadores simples para dirección.</p>
+        </div>
+        <span class="status-badge status-sin-evaluar">Solo lectura</span>
+      </div>
+
+      <div class="executive-summary__grid">
+        <div class="executive-summary__card">
+          <span class="executive-summary__value">{{ cursos.length }}</span>
+          <span class="executive-summary__label">Cursos visibles</span>
+        </div>
+        <div class="executive-summary__card">
+          <span class="executive-summary__value">{{ personas.length }}</span>
+          <span class="executive-summary__label">Personas visibles</span>
+        </div>
+        <div class="executive-summary__card">
+          <span class="executive-summary__value">{{ instructores.length }}</span>
+          <span class="executive-summary__label">Instructores</span>
+        </div>
+        <div class="executive-summary__card">
+          <span class="executive-summary__value">{{ selectedCurso ? personasEnCurso.length : 0 }}</span>
+          <span class="executive-summary__label">Personas del curso activo</span>
+        </div>
+      </div>
+
+      <p class="executive-summary__note">La edicion sigue reservada a administradores. Selecciona un curso para revisar su detalle.</p>
     </div>
 
     <div class="content-wrapper">
@@ -16,7 +58,8 @@
           </button>
           <small *ngIf="user.role === 'company'">Ves solo los cursos asignados a tu empresa.</small>
           <small *ngIf="user.role === 'instructor'">Puedes administrar personas y calificaciones, sin editar datos del curso.</small>
-          <small *ngIf="user.role !== 'company'">Selecciona un curso para cargar su grupo de personas.</small>
+          <small *ngIf="user.role === 'director'">Selecciona un curso para revisar su detalle sin editarlo.</small>
+          <small *ngIf="user.role === 'admin'">Selecciona un curso para cargar su grupo de personas.</small>
         </div>
 
         <ng-template #cursoFormContent>
@@ -291,30 +334,33 @@
           </div>
 
           <div class="assign-progress">
-            <span class="status-badge status-apto">Asignadas: {{ personasAsignadasEnBusqueda }}</span>
-            <span class="status-badge status-sin-evaluar">Pendientes: {{ personasPendientesEnBusqueda }}</span>
+            <span class="status-badge status-apto">Disponibles: {{ filteredPersonasDisponibles.length }}</span>
           </div>
 
           <div class="form-group">
-            <label>Personas (palomita = ya asignada)</label>
+            <label>Personas disponibles</label>
+            <p class="field-help">Las personas ya asignadas a otro curso no aparecen en esta lista.</p>
             <select [(ngModel)]="selectedPersonaToAdd" name="persona_select">
               <option [ngValue]="null">Seleccionar</option>
               <option
-                *ngFor="let p of filteredPersonasAsignacion; trackBy: trackByPersonaId"
+                *ngFor="let p of filteredPersonasDisponibles; trackBy: trackByPersonaId"
                 [ngValue]="p.id"
-                [disabled]="isPersonaAsignada(p.id)"
               >
-                {{ getPersonaAsignacionLabel(p) }}
+                {{ p.nombre }} ({{ p.email }})
               </option>
             </select>
             <button
               type="button"
               class="btn btn-sm btn-primary"
               (click)="addPersonaToCurso(selectedPersonaToAdd)"
-              [disabled]="!selectedPersonaToAdd || isPersonaAsignada(selectedPersonaToAdd)"
+              [disabled]="!selectedPersonaToAdd || !isPersonaDisponibleSeleccionada(selectedPersonaToAdd)"
             >
               Agregar
             </button>
+          </div>
+
+          <div *ngIf="filteredPersonasDisponibles.length === 0" class="empty-state">
+            No hay personas disponibles para esta busqueda.
           </div>
         </div>
 

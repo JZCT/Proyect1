@@ -269,8 +269,9 @@
         </div>
 
         <div class="form-group files-group">
-          <label>Documentos adicionales</label>
-          <input type="file" (change)="onFilesSelected($event)" multiple class="file-input" />
+          <label>Documentos PDF</label>
+          <input type="file" accept=".pdf,application/pdf" (change)="onFilesSelected($event)" multiple class="file-input" />
+          <p class="field-help">Solo se aceptan PDFs. Se guardan en Firebase Storage al guardar la persona.</p>
 
           <div class="file-preview-grid" *ngIf="getCurrentArchivos().length > 0">
             <div class="file-preview-card" *ngFor="let file of getCurrentArchivos(); let i = index">

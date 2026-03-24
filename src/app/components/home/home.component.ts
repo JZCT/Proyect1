@@ -14,14 +14,15 @@ import { User } from '../../models/user.model';
 export class HomeComponent {
   title = 'Panel Principal';
   description = 'Selecciona una vista para continuar. Todo esta organizado para operar rapido y sin complicaciones.';
+  calloutText = 'Interfaz simple: primero selecciona modulo, luego usa el buscador.';
   currentUser: User | null = null;
 
   modules = [
     {
       title: 'Cursos y Personas',
-      description: 'Asigna participantes, revisa resultados y seguimiento por curso.',
+      description: 'Resumen general de cursos, participantes e instructores en una sola vista.',
       route: '/',
-      roles: ['admin', 'company', 'instructor']
+      roles: ['admin', 'company', 'instructor', 'director']
     },
     {
       title: 'Cursos',
@@ -52,6 +53,16 @@ export class HomeComponent {
   constructor(private authService: AuthService) {
     this.authService.currentUserData$.subscribe((user) => {
       this.currentUser = user;
+      if (user?.role === 'director') {
+        this.title = 'Panel Ejecutivo';
+        this.description = 'Vista de solo lectura para revisar el estado general sin entrar en configuracion.';
+        this.calloutText = 'Empieza por el resumen. La edicion esta reservada a administradores.';
+        return;
+      }
+
+      this.title = 'Panel Principal';
+      this.description = 'Selecciona una vista para continuar. Todo esta organizado para operar rapido y sin complicaciones.';
+      this.calloutText = 'Interfaz simple: primero selecciona modulo, luego usa el buscador.';
     });
   }
 

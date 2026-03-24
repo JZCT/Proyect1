@@ -386,6 +386,20 @@ export class InstructorComponent implements OnInit, OnDestroy {
     return curso ? curso.nombre : 'Curso desconocido';
   }
 
+  getCursoDescripcion(cursoId: string): string {
+    const curso = this.cursosById[cursoId];
+    return curso ? curso.descripcion || 'Sin descripcion' : 'Descripcion no disponible';
+  }
+
+  getCursoTooltip(curso: Curso): string {
+    const descripcion = curso.descripcion?.trim() || 'Sin descripcion';
+    const empresa = curso.companyTag?.trim();
+
+    return empresa
+      ? `${curso.nombre} - ${descripcion} - ${empresa.toUpperCase()}`
+      : `${curso.nombre} - ${descripcion}`;
+  }
+
   getSelectedCursoId(instructor: Instructor): string {
     if (!instructor.id) return '';
     return this.selectedCursoByInstructor[instructor.id] || '';

@@ -373,15 +373,29 @@ export class PersonasComponent implements OnInit, OnDestroy {
     const files = input.files;
     if (!files?.length) return;
 
+    const selectedFiles = Array.from(files);
+    const validFiles = selectedFiles.filter((file) => this.isAllowedAttachmentFile(file));
+    const rejectedCount = selectedFiles.length - validFiles.length;
+
+    if (rejectedCount > 0) {
+      this.showMessage('Solo se permiten archivos PDF. Se omitieron archivos no compatibles.');
+    }
+
+    if (validFiles.length === 0) {
+      input.value = '';
+      return;
+    }
+
     this.loadingFile = true;
 
     try {
-      const archivos = await Promise.all(Array.from(files).map(async (file) => ({
+      const archivos = await Promise.all(validFiles.map(async (file) => ({
         nombre: file.name,
         url: await this.readFileAsDataUrl(file),
         tipo: file.type || this.getFileTypeFromName(file.name),
         size: file.size,
-        uploadedAt: new Date()
+        uploadedAt: new Date(),
+        file
       })));
 
       const target = this.editingId ? this.editingPersona : this.newPersona;
@@ -818,9 +832,11 @@ export class PersonasComponent implements OnInit, OnDestroy {
           url: this.normalizeAttachmentUrl(archivo.url),
           tipo: this.normalizeOptionalTextField(archivo.tipo) || 'application/octet-stream',
           uploadedAt: normalizeDateInput(archivo.uploadedAt),
-          size: this.normalizeNumberField(archivo.size)
+          size: this.normalizeNumberField(archivo.size),
+          storagePath: this.normalizeOptionalTextField(archivo.storagePath),
+          file: archivo.file
         }))
-        .filter((archivo) => !!archivo.nombre && !!archivo.url)
+        .filter((archivo) => !!archivo.nombre && (!!archivo.url || !!archivo.file))
     };
   }
 
@@ -833,16 +849,16 @@ export class PersonasComponent implements OnInit, OnDestroy {
     if (!normalizedUrl) return false;
 
     const protocol = this.getUrlProtocol(normalizedUrl);
+    if (protocol === 'blob:') {
+      return true;
+    }
+
     if (protocol === 'data:') {
       return true;
     }
 
     if (protocol === 'http:' || protocol === 'https:') {
-      try {
-        return new URL(normalizedUrl, window.location.origin).origin === window.location.origin;
-      } catch {
-        return false;
-      }
+      return this.isTrustedHttpPreviewUrl(normalizedUrl);
     }
 
     return false;
@@ -939,10 +955,28 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
     try {
       const parsed = new URL(normalized, window.location.origin);
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return false;
+      }
+
+      if (parsed.origin === window.location.origin) {
+        return true;
+      }
+
+      return this.isFirebaseStorageUrl(parsed);
     } catch {
       return false;
     }
+  }
+
+  private isFirebaseStorageUrl(url: URL): boolean {
+    const host = url.hostname.toLowerCase();
+    return (
+      host === 'firebasestorage.googleapis.com' ||
+      host === 'storage.googleapis.com' ||
+      host === 'firebasestorage.app' ||
+      host.endsWith('.firebasestorage.app')
+    );
   }
 
   private getDataUrlMime(url: string): string {
@@ -996,7 +1030,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
     const protocol = this.getUrlProtocol(file.url || '');
     const previewType = this.getPreviewType(file);
 
-    if (protocol === 'blob:') {
+    if (protocol === 'blob:' && file.file) {
       return 'Este archivo se guardo con una URL temporal y ya no se puede previsualizar. Vuelve a cargarlo.';
     }
 
@@ -1110,6 +1144,10 @@ export class PersonasComponent implements OnInit, OnDestroy {
     if (name.endsWith('.webp')) return 'image/webp';
 
     return 'application/octet-stream';
+  }
+
+  private isAllowedAttachmentFile(file: File): boolean {
+    return (file.type || '').toLowerCase() === 'application/pdf' || this.getFileTypeFromName(file.name) === 'application/pdf';
   }
 
   // ==================== CARGA MASIVA ====================
@@ -1351,7 +1389,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   trackByArchivo(index: number, archivo: PersonaArchivo): string {
-    return `${archivo.nombre || 'archivo'}|${archivo.url || ''}|${archivo.tipo || ''}|${index}`;
+    return `${archivo.storagePath || ''}|${archivo.nombre || 'archivo'}|${archivo.url || ''}|${archivo.tipo || ''}|${index}`;
   }
 
   trackByBulkPersona(index: number, persona: Persona): string {

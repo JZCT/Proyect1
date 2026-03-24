@@ -4,6 +4,8 @@ export interface PersonaArchivo {
   tipo: string;
   uploadedAt?: Date;
   size?: number;
+  storagePath?: string;
+  file?: File;
 }
 
 export interface Persona {
