@@ -218,17 +218,8 @@
             <label>Buscar curso</label>
             <input
               type="text"
-              placeholder="Nombre, descripcion, empresa o representante..."
+              placeholder="Nombre, empresa, etiqueta, ciudad, representante..."
               [(ngModel)]="cursoSearchTerm"
-            />
-          </div>
-
-          <div class="form-group">
-            <label>Buscar por etiqueta</label>
-            <input
-              type="text"
-              placeholder="Ej. empresa-sur"
-              [(ngModel)]="cursoTagSearchTerm"
             />
           </div>
 
@@ -283,23 +274,29 @@
                 </ng-container>
               </div>
 
-              <div class="curso-actions" *ngIf="user.role === 'admin'">
-                <button
-                  type="button"
-                  class="btn btn-sm btn-info"
-                  (click)="startEditCurso(curso); $event.stopPropagation()"
-                  [disabled]="deletingCursoId === curso.idcurso"
-                >
-                  Editar
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-sm btn-danger"
-                  (click)="deleteCurso(curso.idcurso); $event.stopPropagation()"
-                  [disabled]="deletingCursoId === curso.idcurso"
-                >
-                  {{ deletingCursoId === curso.idcurso ? 'Eliminando...' : 'Eliminar' }}
-                </button>
+              <div class="curso-side">
+                <span class="status-badge status-personas">
+                  Personas: {{ curso.personasIds?.length || 0 }}
+                </span>
+
+                <div class="curso-actions" *ngIf="user.role === 'admin'">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-info"
+                    (click)="startEditCurso(curso); $event.stopPropagation()"
+                    [disabled]="deletingCursoId === curso.idcurso"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger"
+                    (click)="deleteCurso(curso.idcurso); $event.stopPropagation()"
+                    [disabled]="deletingCursoId === curso.idcurso"
+                  >
+                    {{ deletingCursoId === curso.idcurso ? 'Eliminando...' : 'Eliminar' }}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

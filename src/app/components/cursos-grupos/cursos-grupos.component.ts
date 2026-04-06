@@ -22,7 +22,7 @@ import { sanitizePhoneInput, sanitizeScoreInput } from '../../utils/input-saniti
 type CursoArchivo = NonNullable<Curso['archivos']>[number] & {
   file?: File;
 };
-type FilePreviewType = 'image' | 'pdf' | 'text' | 'unsupported';
+type FilePreviewType = 'pdf' | 'image' | 'text' | 'unsupported';
 
 @Component({
   selector: 'app-cursos-grupos',
@@ -55,8 +55,8 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   defaultInstructorImg = resolveAppAssetUrl('assets/default-avatar.png');
 
   selectedPersonaToAdd: string | null = null;
+  autoAssigningPersonas = false;
   cursoSearchTerm: string = '';
-  cursoTagSearchTerm: string = '';
   cursoSortBy: 'nombre' | 'empresa' | 'inicio' | 'fin' = 'nombre';
   cursoSortDirection: 'asc' | 'desc' = 'asc';
   personaSearchTerm: string = '';
@@ -204,7 +204,10 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     this.personaService.getPersonas().subscribe({
       next: (personas) => {
         this.personas = personas;
-        if (this.selectedCurso) this.updatePersonasEnCurso();
+        if (this.selectedCurso) {
+          this.updatePersonasEnCurso();
+          void this.autoAssignPersonasByEmpresaYUbicacion();
+        }
       },
       error: (error) => {
         console.error('Error cargando personas:', error);
@@ -243,6 +246,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     this.resultadoFilter = 'all';
     this.updatePersonasEnCurso();
     this.updateInstructoresEnCurso();
+    void this.autoAssignPersonasByEmpresaYUbicacion();
   }
 
   updatePersonasEnCurso() {
@@ -510,6 +514,62 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('Error removiendo persona del curso:', error);
       this.notificationService.error('Error al remover persona del curso');
+    }
+  }
+
+  async autoAssignPersonasByEmpresaYUbicacion(): Promise<void> {
+    if (!this.selectedCurso?.idcurso || !this.canManagePersonas() || this.autoAssigningPersonas) return;
+
+    const companyTag = this.normalizeCompanyTag(this.selectedCurso.companyTag);
+    const locationTerm = this.getCursoAutoAssignLocation(this.selectedCurso);
+
+    if (!companyTag || !locationTerm) {
+      return;
+    }
+
+    const candidatos = this.getAutoAssignCandidates(companyTag, locationTerm);
+    const nuevosIds = candidatos
+      .map((persona) => (persona.id || '').trim())
+      .filter(Boolean);
+
+    if (nuevosIds.length === 0) {
+      return;
+    }
+
+    const cursoId = this.selectedCurso.idcurso;
+    const currentCount = (this.selectedCurso.personasIds || []).length;
+    const updatedPersonasIds = Array.from(new Set([...(this.selectedCurso.personasIds || []), ...nuevosIds]));
+
+    if (updatedPersonasIds.length === currentCount) {
+      return;
+    }
+
+    try {
+      this.autoAssigningPersonas = true;
+      await this.cursoService.updateCurso(cursoId, { personasIds: updatedPersonasIds });
+
+      this.selectedCurso = {
+        ...this.selectedCurso,
+        personasIds: [...updatedPersonasIds]
+      };
+
+      this.allCursos = this.allCursos.map((curso) =>
+        curso.idcurso === cursoId
+          ? { ...curso, personasIds: [...updatedPersonasIds] }
+          : curso
+      );
+
+      this.applyCursoFilter();
+      this.updatePersonasEnCurso();
+      this.selectNextPersonaPendiente();
+      this.notificationService.success(
+        `Autoasignacion completada: ${nuevosIds.length} persona(s) asignadas por empresa y ubicacion`
+      );
+    } catch (error) {
+      console.error('Error en autoasignacion de personas:', error);
+      this.notificationService.error('No se pudo completar la autoasignacion automatica');
+    } finally {
+      this.autoAssigningPersonas = false;
     }
   }
 
@@ -1209,6 +1269,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
 
     this.updatePersonasEnCurso();
     this.updateInstructoresEnCurso();
+    void this.autoAssignPersonasByEmpresaYUbicacion();
   }
 
   private normalizeCompanyTag(tag?: string): string {
@@ -1261,21 +1322,21 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
 
   get filteredCursosList(): Curso[] {
     const term = this.normalizeSearch(this.cursoSearchTerm);
-    const tagTerm = this.normalizeSearch(this.cursoTagSearchTerm);
     const filtered = this.cursos.filter((curso) => {
+      const parsedLocation = this.parseLocation(curso.descripcion || '');
       const target = this.normalizeText([
         curso.nombre,
         curso.descripcion,
         curso.companyTag || '',
         curso.nom_representante,
-        curso.num_represnetantes
+        curso.num_represnetantes,
+        parsedLocation.city,
+        parsedLocation.state
       ]
         .join(' '));
 
-      const normalizedTag = this.normalizeSearch(curso.companyTag || '');
       const matchesGeneral = !term || target.includes(term);
-      const matchesTag = !tagTerm || normalizedTag.includes(tagTerm);
-      return matchesGeneral && matchesTag;
+      return matchesGeneral;
     });
 
     return [...filtered].sort((a, b) => this.compareCursos(a, b));
@@ -1365,6 +1426,106 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
       this.getResultadoTexto(persona)
       ]
       .join(' '));
+  }
+
+  private getAutoAssignCandidates(companyTag: string, locationTerm: string): Persona[] {
+    return this.personasDisponibles.filter((persona) => this.matchesAutoAssignCriteria(persona, companyTag, locationTerm));
+  }
+
+  private getCursoAutoAssignLocation(curso: Curso | null | undefined): string {
+    if (!curso) return '';
+    return this.normalizeSearch(curso.descripcion || '');
+  }
+
+  private matchesAutoAssignCriteria(persona: Persona, companyTag: string, locationTerm: string): boolean {
+    const personaId = (persona.id || '').trim();
+    if (!personaId) return false;
+
+    if (this.isPersonaAsignada(personaId) || this.isPersonaAsignadaEnOtroCurso(personaId)) {
+      return false;
+    }
+
+    const personaCompanyTag = this.normalizeCompanyTag(persona.companyTag || persona.empresa || '');
+    if (!personaCompanyTag || personaCompanyTag !== companyTag) {
+      return false;
+    }
+
+    const personaLocation = this.parseLocation(this.getPersonaAutoAssignLocation(persona));
+    const cursoLocation = this.parseLocation(locationTerm);
+    if (!personaLocation.raw || !cursoLocation.raw) return false;
+
+    if (personaLocation.raw === cursoLocation.raw) {
+      return true;
+    }
+
+    // Si el curso viene como "ciudad, estado", exigimos coincidencia exacta de ambas partes.
+    if (cursoLocation.hasCityState) {
+      if (!personaLocation.hasCityState) return false;
+      return (
+        personaLocation.city === cursoLocation.city &&
+        personaLocation.state === cursoLocation.state
+      );
+    }
+
+    return this.hasSharedLocationToken(personaLocation.raw, cursoLocation.raw);
+  }
+
+  private getPersonaAutoAssignLocation(persona: Persona): string {
+    const legacyPersona = persona as Persona & { ubicacion?: string; ubicación?: string };
+    return String(
+      persona.lugar ||
+      legacyPersona.ubicacion ||
+      legacyPersona['ubicación'] ||
+      ''
+    );
+  }
+
+  private parseLocation(value: string): {
+    raw: string;
+    parts: string[];
+    city: string;
+    state: string;
+    hasCityState: boolean;
+  } {
+    const normalized = this.normalizeSearch(value);
+    if (!normalized) {
+      return { raw: '', parts: [], city: '', state: '', hasCityState: false };
+    }
+
+    const rawParts = normalized
+      .split(/[;,]+/g)
+      .map((part) => part.trim().replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, ''))
+      .filter(Boolean);
+
+    const hasCityState = rawParts.length >= 2;
+    const city = hasCityState ? rawParts[0] : '';
+    const state = hasCityState ? rawParts[rawParts.length - 1] : '';
+
+    return {
+      raw: normalized,
+      parts: rawParts.length > 0 ? rawParts : [normalized],
+      city,
+      state,
+      hasCityState
+    };
+  }
+
+  private hasSharedLocationToken(a: string, b: string): boolean {
+    const tokensA = new Set(this.tokenizeLocation(a));
+    const tokensB = [...new Set(this.tokenizeLocation(b))];
+
+    if (tokensA.size === 0 || tokensB.length === 0) {
+      return false;
+    }
+
+    return tokensB.every((token) => tokensA.has(token));
+  }
+
+  private tokenizeLocation(value: string): string[] {
+    return value
+      .split(/[^a-z0-9]+/g)
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 3);
   }
 
   private normalizeSearch(value?: string): string {

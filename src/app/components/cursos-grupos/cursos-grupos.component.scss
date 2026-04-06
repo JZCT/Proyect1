@@ -317,6 +317,12 @@ select:focus {
   border-color: var(--border-strong);
 }
 
+.status-personas {
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--primary-strong);
+  border-color: rgba(37, 99, 235, 0.35);
+}
+
 .instructores-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -415,6 +421,13 @@ select:focus {
   display: flex;
   gap: 6px;
   align-items: flex-start;
+}
+
+.curso-side {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+  align-content: flex-start;
 }
 
 .report-actions .btn,
@@ -668,6 +681,15 @@ select:focus {
   .curso-actions,
   .grupo-actions {
     width: 100%;
+  }
+
+  .curso-side {
+    width: 100%;
+    justify-items: stretch;
+  }
+
+  .curso-side .status-badge {
+    justify-self: flex-start;
   }
 
   .calificacion-editor {
