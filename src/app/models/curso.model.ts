@@ -1,3 +1,13 @@
+export interface CursoArchivo {
+  nombre: string;
+  url: string;
+  tipo: string;
+  uploadedAt?: Date;
+  size?: number;
+  storagePath?: string;
+  file?: File;
+}
+
 export interface Curso {
   idcurso?: string;
   nombre: string;
@@ -9,6 +19,7 @@ export interface Curso {
   companyTag?: string;
   personasIds?: string[];
   instructorIds?: string[];
+  archivos?: CursoArchivo[];
   createdAt?: Date;
   createdBy?: string;
 }

@@ -154,11 +154,51 @@
               />
             </div>
 
+            <div class="form-group files-group">
+              <label>Archivos del curso</label>
+              <input
+                type="file"
+                accept=".pdf,application/pdf"
+                (change)="onFilesSelected($event)"
+                multiple
+                class="file-input"
+                [disabled]="savingCurso || loadingArchivos"
+              />
+              <p class="field-help">Solo PDFs. Puedes seleccionar varios a la vez y volver a seleccionar para agregar mas.</p>
+
+              <div class="file-preview-grid" *ngIf="getCurrentArchivos().length > 0; else noCurrentCursoFiles">
+                <div class="file-preview-card" *ngFor="let file of getCurrentArchivos(); let i = index; trackBy: trackByArchivo">
+                  <div class="file-meta">
+                    <div class="file-name">{{ file.nombre }}</div>
+                    <div class="file-type">{{ file.tipo || 'tipo no disponible' }} | {{ formatArchivoSize(file.size) }}</div>
+                  </div>
+                  <div class="file-preview-actions">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-info"
+                      (click)="openArchivo(file)"
+                      [disabled]="!canPreviewArchivo(file)"
+                      [title]="getArchivoPreviewTooltip(file)"
+                    >
+                      {{ getArchivoActionLabel(file) }}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-danger" (click)="removeArchivo(i)" [disabled]="savingCurso">
+                      Quitar
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <ng-template #noCurrentCursoFiles>
+                <div class="empty-state file-empty-inline">Sin archivos cargados para este curso.</div>
+              </ng-template>
+            </div>
+
             <div class="form-actions">
-              <button type="submit" class="btn btn-success" [disabled]="savingCurso">
+              <button type="submit" class="btn btn-success" [disabled]="savingCurso || loadingArchivos">
                 {{ savingCurso ? (editingCursoId ? 'Actualizando...' : 'Guardando...') : (editingCursoId ? 'Actualizar' : 'Guardar') }}
               </button>
-              <button type="button" class="btn btn-secondary" (click)="resetCursoForm()" [disabled]="savingCurso">Cancelar</button>
+              <button type="button" class="btn btn-secondary" (click)="resetCursoForm()" [disabled]="savingCurso || loadingArchivos">Cancelar</button>
             </div>
           </form>
         </ng-template>
@@ -227,6 +267,7 @@
                 <p>Empresa: {{ (curso.companyTag || '-') | uppercase }}</p>
                 <p>Inicio: {{ curso.Fecha_inicio | date }} | Fin: {{ curso.Fecha_fin | date }}</p>
                 <p>Representante: {{ curso.nom_representante }} | Telefono: {{ curso.num_represnetantes }}</p>
+                <p>Archivos: {{ curso.archivos?.length || 0 }}</p>
 
                 <ng-container *ngIf="getInstructoresByCurso(curso) as cursoInstructores">
                   <div class="curso-instructores-avatars" *ngIf="cursoInstructores.length > 0">
@@ -294,6 +335,65 @@
           <span class="status-badge status-apto">Aptos: {{ resumenCalificaciones.aptos }}</span>
           <span class="status-badge status-no-apto">No aptos: {{ resumenCalificaciones.noAptos }}</span>
           <span class="status-badge status-sin-evaluar">Sin evaluar: {{ resumenCalificaciones.sinEvaluar }}</span>
+        </div>
+
+        <div *ngIf="selectedCurso" class="curso-files-section">
+          <h4>Archivos del curso seleccionado</h4>
+
+          <div *ngIf="canManageCursoFiles()" class="curso-files-upload">
+            <input
+              type="file"
+              accept=".pdf,application/pdf"
+              (change)="onFilesSelectedForSelectedCurso($event)"
+              multiple
+              class="file-input"
+              [disabled]="loadingArchivos || savingCurso"
+            />
+            <p class="field-help">Sube aqui PDFs adicionales para el curso seleccionado.</p>
+          </div>
+          <p *ngIf="!canManageCursoFiles()" class="field-help">Solo administradores pueden subir o eliminar archivos.</p>
+
+          <div class="file-list" *ngIf="selectedCurso.archivos?.length; else noCursoFiles">
+            <div class="file-list-item" *ngFor="let file of selectedCurso.archivos; let i = index; trackBy: trackByArchivo">
+              <div class="file-meta">
+                <div class="file-name">{{ file.nombre }}</div>
+                <div class="file-type">{{ file.tipo || 'tipo no disponible' }} | {{ formatArchivoSize(file.size) }}</div>
+              </div>
+              <div class="file-preview-actions">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-info"
+                  (click)="openArchivo(file)"
+                  [disabled]="!canPreviewArchivo(file)"
+                  [title]="getArchivoPreviewTooltip(file)"
+                >
+                  {{ getArchivoActionLabel(file) }}
+                </button>
+                <a
+                  *ngIf="file.url"
+                  class="btn btn-sm btn-secondary"
+                  [href]="file.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Abrir
+                </a>
+                <button
+                  *ngIf="canManageCursoFiles()"
+                  type="button"
+                  class="btn btn-sm btn-danger"
+                  (click)="removeArchivoFromSelectedCurso(file, i)"
+                  [disabled]="deletingArchivoKey === getArchivoDeleteKey(file, i)"
+                >
+                  {{ deletingArchivoKey === getArchivoDeleteKey(file, i) ? 'Eliminando...' : 'Eliminar' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <ng-template #noCursoFiles>
+            <div class="empty-state">Este curso no tiene archivos cargados.</div>
+          </ng-template>
         </div>
 
         <div *ngIf="selectedCurso" class="instructores-section">
@@ -491,6 +591,48 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div *ngIf="showFilePreview" class="modal-overlay" (click)="closeArchivoPreview()">
+      <div class="modal-content file-preview-modal" (click)="$event.stopPropagation()">
+        <div class="file-preview-header">
+          <h4>{{ previewFile?.nombre || 'Vista previa' }}</h4>
+          <div class="file-preview-actions">
+            <a
+              *ngIf="previewOpenUrl"
+              class="btn btn-sm btn-secondary"
+              [href]="previewOpenUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Abrir
+            </a>
+            <button type="button" class="btn btn-sm btn-secondary" (click)="closeArchivoPreview()">Cerrar</button>
+          </div>
+        </div>
+
+        <div class="file-preview-body" *ngIf="previewType === 'image'">
+          <img *ngIf="previewFile?.url; else previewUnavailable" [src]="previewFile?.url" [alt]="previewFile?.nombre || 'archivo'" (error)="onPreviewImageError()" />
+        </div>
+
+        <div class="file-preview-body pdf-preview" *ngIf="previewType === 'pdf'">
+          <iframe *ngIf="previewResourceUrl; else previewUnavailable" [src]="previewResourceUrl"></iframe>
+        </div>
+
+        <div class="file-preview-body text-preview" *ngIf="previewType === 'text'">
+          <pre>{{ previewText || 'Cargando vista previa...' }}</pre>
+        </div>
+
+        <div class="file-preview-body empty-state" *ngIf="previewType === 'unsupported'">
+          {{ previewError || 'No hay vista previa integrada para este tipo de archivo.' }}
+        </div>
+
+        <ng-template #previewUnavailable>
+          <div class="file-preview-body empty-state" style="display:grid;place-items:center;">
+            {{ previewError || 'No se pudo mostrar la vista previa de este archivo.' }}
+          </div>
+        </ng-template>
       </div>
     </div>
   </div>

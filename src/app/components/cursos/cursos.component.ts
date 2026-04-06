@@ -1,6 +1,7 @@
-import { Component, HostListener, OnInit } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { CursoService } from '../../services/curso.service';
 import { InstructorService } from '../../services/instructor.service';
 import { AuthService } from '../../services/auth.service';
@@ -9,7 +10,13 @@ import { NotificationService } from '../../services/notification.service';
 import { Curso } from '../../models/curso.model';
 import { Instructor } from '../../models/instructor.model';
 import { User } from '../../models/user.model';
+import { coerceDate } from '../../utils/date.util';
 import { sanitizePhoneInput } from '../../utils/input-sanitizers.util';
+
+type CursoArchivo = NonNullable<Curso['archivos']>[number] & {
+  file?: File;
+};
+type FilePreviewType = 'image' | 'pdf' | 'text' | 'unsupported';
 
 @Component({
   selector: 'app-cursos',
@@ -18,7 +25,7 @@ import { sanitizePhoneInput } from '../../utils/input-sanitizers.util';
   templateUrl: './cursos.component.html',
   styleUrl: './cursos.component.scss'
 })
-export class CursosComponent implements OnInit {
+export class CursosComponent implements OnInit, OnDestroy {
   private readonly MIN_INSTRUCTORES = 1;
   private readonly MAX_INSTRUCTORES = 3;
 
@@ -44,6 +51,14 @@ export class CursosComponent implements OnInit {
   sortBy: 'nombre' | 'empresa' | 'inicio' | 'fin' = 'nombre';
   sortDirection: 'asc' | 'desc' = 'asc';
   exportingReport = false;
+  loadingArchivos = false;
+  showFilePreview = false;
+  previewFile: CursoArchivo | null = null;
+  previewType: FilePreviewType = 'unsupported';
+  previewText = '';
+  previewResourceUrl: SafeResourceUrl | null = null;
+  previewOpenUrl: string | null = null;
+  previewError = '';
 
   updateCurrentRepresentativePhone(value: unknown): void {
     const telefono = sanitizePhoneInput(value);
@@ -64,7 +79,8 @@ export class CursosComponent implements OnInit {
     nom_representante: '',
     num_represnetantes: '',
     companyTag: '',
-    instructorIds: []
+    instructorIds: [],
+    archivos: []
   };
 
   editingCurso: Partial<Curso> = {
@@ -75,7 +91,8 @@ export class CursosComponent implements OnInit {
     nom_representante: '',
     num_represnetantes: '',
     companyTag: '',
-    instructorIds: []
+    instructorIds: [],
+    archivos: []
   };
 
   constructor(
@@ -83,7 +100,8 @@ export class CursosComponent implements OnInit {
     private instructorService: InstructorService,
     private authService: AuthService,
     private reportService: ReportService,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    private sanitizer: DomSanitizer
   ) {}
 
   ngOnInit(): void {
@@ -92,6 +110,12 @@ export class CursosComponent implements OnInit {
     this.loadCompanyTags();
     this.loadCursos();
     this.loadInstructores();
+  }
+
+  ngOnDestroy(): void {
+    this.closeArchivoPreview();
+    this.revokeObjectUrls(this.newCurso.archivos as CursoArchivo[] | undefined);
+    this.revokeObjectUrls(this.editingCurso.archivos as CursoArchivo[] | undefined);
   }
 
   @HostListener('document:click')
@@ -103,6 +127,11 @@ export class CursosComponent implements OnInit {
   onEscapeKey(): void {
     if (this.showInstructorDropdown) {
       this.showInstructorDropdown = false;
+      return;
+    }
+
+    if (this.showFilePreview) {
+      this.closeArchivoPreview();
       return;
     }
 
@@ -201,7 +230,8 @@ export class CursosComponent implements OnInit {
       nom_representante: '',
       num_represnetantes: '',
       companyTag: '',
-      instructorIds: []
+      instructorIds: [],
+      archivos: []
     };
     this.selectedInstructors = [];
     this.editingInstructors = [];
@@ -257,10 +287,12 @@ export class CursosComponent implements OnInit {
     this.editingId = curso.idcurso || null;
     this.editingCurso = {
       ...curso,
-      num_represnetantes: sanitizePhoneInput(curso.num_represnetantes)
+      num_represnetantes: sanitizePhoneInput(curso.num_represnetantes),
+      archivos: (curso.archivos || []).map((archivo) => ({ ...archivo }))
     };
     this.editingInstructors = this.normalizeInstructorIds(curso.instructorIds || []);
     this.showInstructorDropdown = false;
+    this.closeArchivoPreview();
     this.showForm = true;
   }
 
@@ -328,6 +360,10 @@ export class CursosComponent implements OnInit {
   }
 
   resetForm() {
+    this.closeArchivoPreview();
+    this.revokeObjectUrls(this.newCurso.archivos as CursoArchivo[] | undefined);
+    this.revokeObjectUrls(this.editingCurso.archivos as CursoArchivo[] | undefined);
+
     this.newCurso = {
       nombre: '',
       descripcion: '',
@@ -336,7 +372,8 @@ export class CursosComponent implements OnInit {
       nom_representante: '',
       num_represnetantes: '',
       companyTag: '',
-      instructorIds: []
+      instructorIds: [],
+      archivos: []
     };
 
     this.editingCurso = {
@@ -347,7 +384,8 @@ export class CursosComponent implements OnInit {
       nom_representante: '',
       num_represnetantes: '',
       companyTag: '',
-      instructorIds: []
+      instructorIds: [],
+      archivos: []
     };
 
     this.selectedInstructors = [];
@@ -506,10 +544,408 @@ export class CursosComponent implements OnInit {
     return this.editingId ? this.editingInstructors : this.selectedInstructors;
   }
 
+  async onFilesSelected(event: Event): Promise<void> {
+    if (!this.isAdmin) return;
+
+    const input = event.target as HTMLInputElement;
+    const files = input.files;
+    if (!files?.length) return;
+
+    const selectedFiles = Array.from(files);
+    const validFiles = selectedFiles.filter((file) => this.isAllowedAttachmentFile(file));
+    const rejectedCount = selectedFiles.length - validFiles.length;
+
+    if (rejectedCount > 0) {
+      this.notificationService.warning('Solo se permiten archivos PDF. Se omitieron archivos no compatibles.');
+    }
+
+    if (validFiles.length === 0) {
+      input.value = '';
+      return;
+    }
+
+    this.loadingArchivos = true;
+
+    try {
+      const archivos = await Promise.all(validFiles.map(async (file) => ({
+        nombre: file.name,
+        url: await this.readFileAsDataUrl(file),
+        tipo: file.type || this.getFileTypeFromName(file.name),
+        size: file.size,
+        uploadedAt: new Date(),
+        file
+      })));
+
+      const target = this.editingId ? this.editingCurso : this.newCurso;
+      target.archivos = [
+        ...(target.archivos || []),
+        ...archivos
+      ];
+    } catch (error) {
+      console.error('Error leyendo archivos del curso:', error);
+      this.notificationService.error('No se pudieron leer uno o mas archivos');
+    } finally {
+      this.loadingArchivos = false;
+      input.value = '';
+    }
+  }
+
+  getCurrentArchivos(): CursoArchivo[] {
+    return (this.editingId ? this.editingCurso.archivos : this.newCurso.archivos) || [];
+  }
+
+  removeArchivo(index: number): void {
+    const target = this.editingId ? this.editingCurso : this.newCurso;
+    const archivos = [...(target.archivos || [])];
+    const [removed] = archivos.splice(index, 1);
+
+    if (removed?.url?.startsWith('blob:')) {
+      URL.revokeObjectURL(removed.url);
+    }
+
+    target.archivos = archivos;
+  }
+
+  canPreviewArchivo(file: CursoArchivo): boolean {
+    const previewType = this.getPreviewType(file);
+    return this.isSafeAttachmentUrl(file.url || '', previewType);
+  }
+
+  getArchivoActionLabel(file: CursoArchivo): string {
+    const previewType = this.getPreviewType(file);
+    if (previewType === 'unsupported') return 'Abrir';
+    if (previewType === 'text' && !this.canLoadTextPreview(file.url || '')) return 'Abrir';
+    return 'Ver';
+  }
+
+  getArchivoPreviewTooltip(file: CursoArchivo): string {
+    if (!this.canPreviewArchivo(file)) {
+      return this.getArchivoPreviewError(file);
+    }
+
+    const previewType = this.getPreviewType(file);
+    if (previewType === 'unsupported') {
+      return 'Abrir archivo';
+    }
+
+    if (previewType === 'text' && !this.canLoadTextPreview(file.url || '')) {
+      return 'Abrir archivo';
+    }
+
+    return 'Ver archivo';
+  }
+
+  openArchivo(file: CursoArchivo): void {
+    if (!file?.url) return;
+
+    this.previewFile = file;
+    this.previewType = this.getPreviewType(file);
+    this.previewText = '';
+    this.previewResourceUrl = null;
+    this.previewOpenUrl = null;
+    this.previewError = '';
+
+    const previewType = this.getPreviewType(file);
+    const safeAttachment = this.isSafeAttachmentUrl(file.url || '', previewType);
+    this.previewOpenUrl = safeAttachment ? file.url : null;
+
+    if (!safeAttachment) {
+      this.previewType = 'unsupported';
+      this.previewError = this.getArchivoPreviewError(file);
+      this.showFilePreview = true;
+      return;
+    }
+
+    if (previewType === 'pdf') {
+      this.previewResourceUrl = this.sanitizer.bypassSecurityTrustResourceUrl(file.url);
+      this.showFilePreview = true;
+      return;
+    }
+
+    if (previewType === 'text') {
+      if (!this.canLoadTextPreview(file.url || '')) {
+        this.previewType = 'unsupported';
+        this.previewError = 'La vista previa de texto no esta disponible para este archivo. Usa Abrir.';
+        this.showFilePreview = true;
+        return;
+      }
+
+      this.loadTextPreview(file);
+    }
+
+    this.previewType = previewType;
+    this.showFilePreview = true;
+  }
+
+  onPreviewImageError(): void {
+    this.previewType = 'unsupported';
+    this.previewError = 'No se pudo cargar la imagen de este archivo.';
+  }
+
+  closeArchivoPreview(): void {
+    this.showFilePreview = false;
+    this.previewFile = null;
+    this.previewType = 'unsupported';
+    this.previewText = '';
+    this.previewResourceUrl = null;
+    this.previewOpenUrl = null;
+    this.previewError = '';
+  }
+
+  formatArchivoSize(value: unknown): string {
+    const size = Number(value);
+    if (!Number.isFinite(size) || size <= 0) return '-';
+
+    if (size < 1024) return `${size} B`;
+
+    const kb = size / 1024;
+    if (kb < 1024) return `${kb.toFixed(1)} KB`;
+
+    const mb = kb / 1024;
+    return `${mb.toFixed(2)} MB`;
+  }
+
+  trackByArchivo(index: number, archivo: CursoArchivo): string {
+    return `${archivo.storagePath || ''}|${archivo.nombre || 'archivo'}|${archivo.url || ''}|${archivo.tipo || ''}|${index}`;
+  }
+
   formatDate(date: Date | string | null | undefined): string | null {
-    if (!date) return null;
-    const d = new Date(date);
-    return d.toISOString().split('T')[0];
+    const parsed = coerceDate(date);
+    if (!parsed) return null;
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private getPreviewType(file: CursoArchivo): FilePreviewType {
+    const tipo = (file.tipo || '').toLowerCase();
+    const nombre = (file.nombre || '').toLowerCase();
+
+    if (tipo.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(nombre)) {
+      return 'image';
+    }
+
+    if (tipo === 'application/pdf' || nombre.endsWith('.pdf')) {
+      return 'pdf';
+    }
+
+    if (
+      tipo.startsWith('text/') ||
+      tipo === 'application/json' ||
+      tipo === 'application/xml' ||
+      /\.(txt|csv|json|xml|md)$/i.test(nombre)
+    ) {
+      return 'text';
+    }
+
+    return 'unsupported';
+  }
+
+  private async loadTextPreview(file: CursoArchivo): Promise<void> {
+    try {
+      if (!this.canLoadTextPreview(file.url || '')) {
+        this.previewText = 'La vista previa de texto no esta disponible para este archivo. Usa Abrir.';
+        return;
+      }
+
+      const response = await fetch(file.url || '');
+      this.previewText = await response.text();
+    } catch (error) {
+      console.error('Error cargando vista previa de texto:', error);
+      this.previewText = 'No se pudo mostrar la vista previa de este archivo.';
+    }
+  }
+
+  private canLoadTextPreview(url: string): boolean {
+    const normalizedUrl = this.normalizeTextField(url);
+    if (!normalizedUrl) return false;
+
+    const protocol = this.getUrlProtocol(normalizedUrl);
+    if (protocol === 'data:') {
+      return true;
+    }
+
+    if (protocol === 'http:' || protocol === 'https:') {
+      return this.isTrustedHttpPreviewUrl(normalizedUrl);
+    }
+
+    return false;
+  }
+
+  private getArchivoPreviewError(file: CursoArchivo): string {
+    const protocol = this.getUrlProtocol(file.url || '');
+    const previewType = this.getPreviewType(file);
+
+    if (protocol === 'javascript:' || protocol === 'file:' || protocol === 'vbscript:' || protocol === 'blob:') {
+      return 'La URL de este archivo no es segura y fue bloqueada.';
+    }
+
+    if ((protocol === 'http:' || protocol === 'https:') && !this.isTrustedHttpPreviewUrl(file.url || '')) {
+      return 'La URL de este archivo apunta a otro origen y fue bloqueada.';
+    }
+
+    if (!previewType || previewType === 'unsupported') {
+      return 'No hay vista previa integrada para este tipo de archivo. Usa Abrir para verlo.';
+    }
+
+    return 'No se pudo abrir este archivo.';
+  }
+
+  private normalizeTextField(value: unknown): string {
+    return String(value ?? '').trim();
+  }
+
+  private getUrlProtocol(url: string): string {
+    const normalized = this.normalizeTextField(url);
+    if (!normalized) return '';
+
+    try {
+      return new URL(normalized, window.location.origin).protocol.toLowerCase();
+    } catch {
+      return '';
+    }
+  }
+
+  private isTrustedHttpPreviewUrl(url: string): boolean {
+    const normalized = this.normalizeTextField(url);
+    if (!normalized) return false;
+
+    try {
+      const parsed = new URL(normalized, window.location.origin);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return false;
+      }
+
+      if (parsed.origin === window.location.origin) {
+        return true;
+      }
+
+      return this.isFirebaseStorageUrl(parsed);
+    } catch {
+      return false;
+    }
+  }
+
+  private isFirebaseStorageUrl(url: URL): boolean {
+    const host = url.hostname.toLowerCase();
+    return (
+      host === 'firebasestorage.googleapis.com' ||
+      host === 'storage.googleapis.com' ||
+      host === 'firebasestorage.app' ||
+      host.endsWith('.firebasestorage.app')
+    );
+  }
+
+  private isSafeAttachmentUrl(url: string, previewType?: FilePreviewType): boolean {
+    const normalizedUrl = this.normalizeTextField(url);
+    if (!normalizedUrl) return false;
+
+    const protocol = this.getUrlProtocol(normalizedUrl);
+    if (!protocol) return false;
+
+    if (protocol === 'javascript:' || protocol === 'file:' || protocol === 'vbscript:' || protocol === 'blob:') {
+      return false;
+    }
+
+    if (protocol === 'http:' || protocol === 'https:') {
+      return this.isTrustedHttpPreviewUrl(normalizedUrl);
+    }
+
+    if (protocol === 'data:') {
+      if (!previewType) {
+        return false;
+      }
+
+      return this.isAllowedDataUrlForPreview(normalizedUrl, previewType);
+    }
+
+    return false;
+  }
+
+  private getDataUrlMime(url: string): string {
+    const normalized = this.normalizeTextField(url);
+    if (!normalized.toLowerCase().startsWith('data:')) {
+      return '';
+    }
+
+    const commaIndex = normalized.indexOf(',');
+    const header = commaIndex >= 0 ? normalized.slice(5, commaIndex) : normalized.slice(5);
+    const mime = header.split(';')[0].trim().toLowerCase();
+    return mime;
+  }
+
+  private isAllowedDataUrlForPreview(url: string, previewType: FilePreviewType): boolean {
+    const mime = this.getDataUrlMime(url);
+    if (!mime) return false;
+
+    if (previewType === 'image') {
+      return mime.startsWith('image/') && mime !== 'image/svg+xml';
+    }
+
+    if (previewType === 'pdf') {
+      return mime === 'application/pdf';
+    }
+
+    if (previewType === 'text') {
+      return mime.startsWith('text/') || mime === 'application/json' || mime === 'application/xml';
+    }
+
+    return false;
+  }
+
+  private async readFileAsDataUrl(file: File): Promise<string> {
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === 'string') {
+          resolve(result);
+          return;
+        }
+
+        reject(new Error('No se pudo leer el archivo'));
+      };
+
+      reader.onerror = () => {
+        reject(reader.error || new Error('No se pudo leer el archivo'));
+      };
+
+      reader.readAsDataURL(file);
+    });
+  }
+
+  private getFileTypeFromName(fileName: string): string {
+    const name = (fileName || '').toLowerCase();
+    if (name.endsWith('.pdf')) return 'application/pdf';
+    if (name.endsWith('.txt')) return 'text/plain';
+    if (name.endsWith('.csv')) return 'text/csv';
+    if (name.endsWith('.json')) return 'application/json';
+    if (name.endsWith('.xml')) return 'application/xml';
+    if (name.endsWith('.md')) return 'text/markdown';
+    if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
+    if (name.endsWith('.png')) return 'image/png';
+    if (name.endsWith('.gif')) return 'image/gif';
+    if (name.endsWith('.webp')) return 'image/webp';
+    return 'application/octet-stream';
+  }
+
+  private isAllowedAttachmentFile(file: File): boolean {
+    return (
+      (file.type || '').toLowerCase() === 'application/pdf' ||
+      this.getFileTypeFromName(file.name) === 'application/pdf'
+    );
+  }
+
+  private revokeObjectUrls(archivos: CursoArchivo[] | undefined): void {
+    if (!archivos?.length) return;
+
+    for (const archivo of archivos) {
+      if (archivo.url?.startsWith('blob:')) {
+        URL.revokeObjectURL(archivo.url);
+      }
+    }
   }
 
   private applyCursoFilter() {

@@ -383,6 +383,142 @@
   padding: 2px 0 4px;
 }
 
+.files-group {
+  grid-column: 1 / -1;
+}
+
+.file-input {
+  font-size: 12px;
+}
+
+.file-preview-grid {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.file-preview-card {
+  border: 1px solid var(--surface-elevated);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.file-meta {
+  min-width: 0;
+}
+
+.file-name,
+.file-type {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.file-type {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.file-preview-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.file-list {
+  display: grid;
+  gap: 8px;
+}
+
+.file-list-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--surface-elevated);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 8px;
+  flex-wrap: wrap;
+}
+
+.file-list-item .actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  width: auto;
+}
+
+.file-preview-modal {
+  width: min(900px, 100%);
+}
+
+.file-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.file-preview-header h4 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.file-preview-header .actions {
+  display: flex;
+  gap: 8px;
+  width: auto;
+}
+
+.file-preview-body {
+  border: 1px solid var(--surface-elevated);
+  border-radius: 10px;
+  min-height: 320px;
+  max-height: 70vh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--surface-soft);
+}
+
+.file-preview-body img {
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+}
+
+.pdf-preview iframe {
+  width: 100%;
+  height: min(72vh, 760px);
+  border: 0;
+  background: #ffffff;
+}
+
+.text-preview pre {
+  width: 100%;
+  height: min(72vh, 760px);
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  color: var(--text);
+}
+
 .chip {
   border: 1px solid rgba(0, 131, 251, 0.24);
   border-radius: 999px;

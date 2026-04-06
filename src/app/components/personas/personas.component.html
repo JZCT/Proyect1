@@ -2,7 +2,7 @@
   <div class="header">
     <div class="page-title-group">
       <h2 class="page-title">Gestion de Personas</h2>
-      <p class="page-subtitle">Registro claro de participantes con CURP obligatoria, foto, archivos y calificaciones.</p>
+      <p class="page-subtitle">Registro claro de participantes con CURP obligatoria, foto y calificaciones.</p>
     </div>
     <div class="header-actions">
       <button type="button" class="btn btn-success" (click)="triggerBulkImport()" *ngIf="isAdmin" title="Importar desde Excel">Carga masiva</button>
@@ -268,40 +268,6 @@
           </div>
         </div>
 
-        <div class="form-group files-group">
-          <label>Documentos PDF</label>
-          <input type="file" accept=".pdf,application/pdf" (change)="onFilesSelected($event)" multiple class="file-input" />
-          <p class="field-help">Solo se aceptan PDFs. Se guardan en Firebase Storage al guardar la persona.</p>
-
-          <div class="file-preview-grid" *ngIf="getCurrentArchivos().length > 0">
-            <div class="file-preview-card" *ngFor="let file of getCurrentArchivos(); let i = index">
-              <div class="file-thumb">
-                <img *ngIf="isImageFile(file); else genericFileThumb" [src]="file.url" [alt]="file.nombre">
-                <ng-template #genericFileThumb>
-                  <span>ARCHIVO</span>
-                </ng-template>
-              </div>
-
-              <div class="file-meta">
-                <div class="file-name">{{ file.nombre }}</div>
-                <div class="file-type">{{ file.tipo || 'tipo no disponible' }}</div>
-              </div>
-
-              <div class="file-preview-actions">
-                <button
-                  type="button"
-                  class="btn btn-info btn-sm"
-                  (click)="openArchivo(file)"
-                  [disabled]="!canPreviewArchivo(file)"
-                  [title]="getArchivoPreviewTooltip(file)"
-                >
-                  {{ getArchivoActionLabel(file) }}
-                </button>
-                <button type="button" class="btn btn-danger btn-sm" (click)="removeArchivo(i)">Quitar</button>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       <div class="form-actions">
@@ -320,52 +286,6 @@
   <div *ngIf="showForm && editingId" class="modal-overlay" (click)="resetForm()">
     <div class="modal-content form-modal" (click)="$event.stopPropagation()">
       <ng-container *ngTemplateOutlet="personaFormContent"></ng-container>
-    </div>
-  </div>
-
-  <div *ngIf="showFilePreview" class="modal-overlay" (click)="closeArchivoPreview()">
-    <div class="modal-content file-preview-modal" (click)="$event.stopPropagation()">
-      <div class="file-preview-header">
-        <h4>{{ previewFile?.nombre || 'Vista previa' }}</h4>
-        <div class="actions">
-          <a
-            *ngIf="previewOpenUrl"
-            class="btn btn-secondary btn-sm"
-            [href]="previewOpenUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Abrir
-          </a>
-          <button type="button" class="btn btn-secondary btn-sm" (click)="closeArchivoPreview()">Cerrar</button>
-        </div>
-      </div>
-
-      <div class="file-preview-body" *ngIf="previewType === 'image'">
-        <img *ngIf="previewFile?.url; else previewUnavailable" [src]="previewFile?.url" [alt]="previewFile?.nombre || 'archivo'" (error)="onPreviewImageError()" />
-      </div>
-
-      <div class="file-preview-body pdf-preview" *ngIf="previewType === 'pdf'">
-        <iframe *ngIf="previewResourceUrl; else previewUnavailable" [src]="previewResourceUrl"></iframe>
-      </div>
-
-      <div class="file-preview-body text-preview" *ngIf="previewType === 'text'">
-        <pre>{{ previewText || 'Cargando vista previa...' }}</pre>
-      </div>
-
-      <div class="file-preview-body empty-state" *ngIf="previewType === 'unsupported'">
-        {{ previewError || 'No hay vista previa integrada para este tipo de archivo.' }}
-      </div>
-
-      <ng-template #previewUnavailable>
-        <div class="file-preview-body empty-state" style="display:grid;place-items:center;">
-          {{ previewError || 'No se pudo mostrar la vista previa de este archivo.' }}
-        </div>
-      </ng-template>
-
-      <p class="empty-state" *ngIf="previewType === 'pdf' && previewOpenUrl">
-        Si el PDF no se carga incrustado, usa Abrir para verlo directamente.
-      </p>
     </div>
   </div>
 
@@ -431,7 +351,6 @@
             <th>Teorica</th>
             <th>Final</th>
             <th>Resultado</th>
-            <th>Archivos</th>
             <th>Acciones</th>
           </tr>
         </thead>
@@ -463,21 +382,6 @@
               <span class="status-badge" [ngClass]="getResultadoClase(persona)">
                 {{ getResultadoTexto(persona) }}
               </span>
-            </td>
-            <td>
-              <div class="file-badges" *ngIf="persona.archivos && persona.archivos.length > 0; else noFiles">
-                <button
-                  type="button"
-                  class="file-tag file-link"
-                  *ngFor="let f of persona.archivos; trackBy: trackByArchivo"
-                  (click)="openArchivo(f)"
-                  [disabled]="!canPreviewArchivo(f)"
-                  [title]="getArchivoPreviewTooltip(f)"
-                >
-                  {{ getArchivoActionLabel(f) }} {{ f.nombre }}
-                </button>
-              </div>
-              <ng-template #noFiles><span class="empty-files">Sin archivos</span></ng-template>
             </td>
             <td>
               <div class="actions">

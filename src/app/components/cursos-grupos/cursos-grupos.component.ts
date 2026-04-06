@@ -1,6 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Observable } from 'rxjs';
 
 import { CursoService } from '../../services/curso.service';
@@ -14,8 +15,14 @@ import { Curso } from '../../models/curso.model';
 import { Instructor } from '../../models/instructor.model';
 import { Persona } from '../../models/persona.model';
 import { User } from '../../models/user.model';
+import { coerceDate } from '../../utils/date.util';
 import { resolveAppAssetUrl } from '../../utils/asset-url.util';
 import { sanitizePhoneInput, sanitizeScoreInput } from '../../utils/input-sanitizers.util';
+
+type CursoArchivo = NonNullable<Curso['archivos']>[number] & {
+  file?: File;
+};
+type FilePreviewType = 'image' | 'pdf' | 'text' | 'unsupported';
 
 @Component({
   selector: 'app-cursos-grupos',
@@ -24,7 +31,7 @@ import { sanitizePhoneInput, sanitizeScoreInput } from '../../utils/input-saniti
   templateUrl: './cursos-grupos.component.html',
   styleUrl: './cursos-grupos.component.scss'
 })
-export class CursosGruposComponent implements OnInit {
+export class CursosGruposComponent implements OnInit, OnDestroy {
   private readonly MIN_CALIFICACION_APTO = 80;
   currentUser$: Observable<User | null>;
   currentUser: User | null = null;
@@ -61,6 +68,15 @@ export class CursosGruposComponent implements OnInit {
   exportingCursoReport = false;
   savingCurso = false;
   deletingCursoId: string | null = null;
+  deletingArchivoKey: string | null = null;
+  loadingArchivos = false;
+  showFilePreview = false;
+  previewFile: CursoArchivo | null = null;
+  previewType: FilePreviewType = 'unsupported';
+  previewText = '';
+  previewResourceUrl: SafeResourceUrl | null = null;
+  previewOpenUrl: string | null = null;
+  previewError = '';
 
   showCursoForm = false;
 
@@ -71,7 +87,8 @@ export class CursosGruposComponent implements OnInit {
     Fecha_fin: undefined,
     nom_representante: '',
     num_represnetantes: '',
-    companyTag: ''
+    companyTag: '',
+    archivos: []
   };
 
   editingCursoId: string | null = null;
@@ -83,7 +100,8 @@ export class CursosGruposComponent implements OnInit {
     Fecha_fin: undefined,
     nom_representante: '',
     num_represnetantes: '',
-    companyTag: ''
+    companyTag: '',
+    archivos: []
   };
 
   constructor(
@@ -92,7 +110,8 @@ export class CursosGruposComponent implements OnInit {
     private personaService: PersonaService,
     private authService: AuthService,
     private reportService: ReportService,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    private sanitizer: DomSanitizer
   ) {
     this.currentUser$ = this.authService.currentUserData$;
   }
@@ -116,6 +135,12 @@ export class CursosGruposComponent implements OnInit {
     this.loadInstructores();
   }
 
+  ngOnDestroy(): void {
+    this.closeArchivoPreview();
+    this.revokeObjectUrls(this.newCurso.archivos as CursoArchivo[] | undefined);
+    this.revokeObjectUrls(this.editingCurso.archivos as CursoArchivo[] | undefined);
+  }
+
   private loadCurrentUser() {
     this.currentUser$.subscribe((userData) => {
       this.currentUser = userData;
@@ -124,12 +149,11 @@ export class CursosGruposComponent implements OnInit {
   }
 
   formatDate(date: Date | string | null | undefined): string | null {
-    if (!date) return null;
-
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    const parsed = coerceDate(date);
+    if (!parsed) return null;
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
 
     return `${year}-${month}-${day}`;
   }
@@ -148,6 +172,10 @@ export class CursosGruposComponent implements OnInit {
 
   canManageCurso(): boolean {
     return this.isAdmin();
+  }
+
+  canManageCursoFiles(): boolean {
+    return this.currentUser?.role === 'admin';
   }
 
   canManagePersonas(): boolean {
@@ -209,6 +237,8 @@ export class CursosGruposComponent implements OnInit {
   }
 
   selectCurso(curso: Curso) {
+    this.closeArchivoPreview();
+    this.deletingArchivoKey = null;
     this.selectedCurso = curso;
     this.resultadoFilter = 'all';
     this.updatePersonasEnCurso();
@@ -276,6 +306,10 @@ export class CursosGruposComponent implements OnInit {
     return value || `${index}`;
   }
 
+  trackByArchivo(index: number, archivo: CursoArchivo): string {
+    return `${archivo.storagePath || ''}|${archivo.nombre || 'archivo'}|${archivo.url || ''}|${archivo.tipo || ''}|${index}`;
+  }
+
   onInstructorImgError(event: Event) {
     const img = event.target as HTMLImageElement;
     img.onerror = null;
@@ -333,8 +367,10 @@ export class CursosGruposComponent implements OnInit {
     this.editingCursoId = curso.idcurso || null;
     this.editingCurso = {
       ...curso,
-      num_represnetantes: sanitizePhoneInput(curso.num_represnetantes)
+      num_represnetantes: sanitizePhoneInput(curso.num_represnetantes),
+      archivos: (curso.archivos || []).map((archivo) => ({ ...archivo }))
     };
+    this.closeArchivoPreview();
     this.showCursoForm = true;
   }
 
@@ -390,6 +426,10 @@ export class CursosGruposComponent implements OnInit {
   }
 
   resetCursoForm() {
+    this.closeArchivoPreview();
+    this.revokeObjectUrls(this.newCurso.archivos as CursoArchivo[] | undefined);
+    this.revokeObjectUrls(this.editingCurso.archivos as CursoArchivo[] | undefined);
+
     this.newCurso = {
       nombre: '',
       descripcion: '',
@@ -397,7 +437,8 @@ export class CursosGruposComponent implements OnInit {
       Fecha_fin: undefined,
       nom_representante: '',
       num_represnetantes: '',
-      companyTag: ''
+      companyTag: '',
+      archivos: []
     };
 
     this.editingCurso = {
@@ -407,12 +448,15 @@ export class CursosGruposComponent implements OnInit {
       Fecha_fin: undefined,
       nom_representante: '',
       num_represnetantes: '',
-      companyTag: ''
+      companyTag: '',
+      archivos: []
     };
 
     this.editingCursoId = null;
     this.showCursoForm = false;
     this.savingCurso = false;
+    this.deletingArchivoKey = null;
+    this.loadingArchivos = false;
   }
 
   async addPersonaToCurso(personaId: string | null) {
@@ -466,6 +510,511 @@ export class CursosGruposComponent implements OnInit {
     } catch (error) {
       console.error('Error removiendo persona del curso:', error);
       this.notificationService.error('Error al remover persona del curso');
+    }
+  }
+
+  async onFilesSelected(event: Event): Promise<void> {
+    if (!this.canManageCursoFiles()) return;
+
+    const input = event.target as HTMLInputElement;
+    if (!input.files?.length) return;
+
+    this.loadingArchivos = true;
+
+    try {
+      const archivos = await this.readPdfFilesFromInput(input);
+      if (archivos.length === 0) return;
+
+      const target = this.editingCursoId ? this.editingCurso : this.newCurso;
+      target.archivos = [
+        ...(target.archivos || []),
+        ...archivos
+      ];
+
+      this.notificationService.success(
+        `Se agregaron ${archivos.length} archivo(s) PDF. Puedes seguir agregando mas.`
+      );
+    } catch (error) {
+      console.error('Error leyendo archivos del curso:', error);
+      this.notificationService.error('No se pudieron leer uno o mas archivos');
+    } finally {
+      this.loadingArchivos = false;
+      input.value = '';
+    }
+  }
+
+  async onFilesSelectedForSelectedCurso(event: Event): Promise<void> {
+    if (!this.canManageCursoFiles() || !this.selectedCurso?.idcurso) return;
+
+    const input = event.target as HTMLInputElement;
+    if (!input.files?.length) return;
+
+    const cursoId = this.selectedCurso.idcurso;
+    this.loadingArchivos = true;
+
+    try {
+      const nuevosArchivos = await this.readPdfFilesFromInput(input);
+      if (nuevosArchivos.length === 0) return;
+
+      const archivosActualizados = [
+        ...(this.selectedCurso.archivos || []),
+        ...nuevosArchivos
+      ];
+
+      await this.cursoService.updateCurso(cursoId, { archivos: archivosActualizados });
+
+      this.selectedCurso = {
+        ...this.selectedCurso,
+        archivos: [...archivosActualizados]
+      };
+      this.allCursos = this.allCursos.map((curso) =>
+        curso.idcurso === cursoId
+          ? { ...curso, archivos: [...archivosActualizados] }
+          : curso
+      );
+      this.applyCursoFilter();
+
+      if (this.editingCursoId === cursoId) {
+        this.editingCurso = {
+          ...this.editingCurso,
+          archivos: archivosActualizados.map((archivo) => ({ ...archivo }))
+        };
+      }
+
+      this.notificationService.success(
+        `Se agregaron ${nuevosArchivos.length} archivo(s) PDF al curso seleccionado.`
+      );
+    } catch (error) {
+      console.error('Error agregando archivos al curso seleccionado:', error);
+      this.notificationService.error('No se pudieron agregar los archivos al curso');
+    } finally {
+      this.loadingArchivos = false;
+      input.value = '';
+    }
+  }
+
+  private async readPdfFilesFromInput(input: HTMLInputElement): Promise<CursoArchivo[]> {
+    const files = input.files;
+    if (!files?.length) return [];
+
+    const selectedFiles = Array.from(files);
+    const validFiles = selectedFiles.filter((file) => this.isAllowedAttachmentFile(file));
+    const rejectedCount = selectedFiles.length - validFiles.length;
+
+    if (rejectedCount > 0) {
+      this.notificationService.warning('Solo se permiten archivos PDF. Se omitieron archivos no compatibles.');
+    }
+
+    if (validFiles.length === 0) {
+      return [];
+    }
+
+    return await Promise.all(validFiles.map(async (file) => ({
+      nombre: file.name,
+      url: await this.readFileAsDataUrl(file),
+      tipo: file.type || this.getFileTypeFromName(file.name),
+      size: file.size,
+      uploadedAt: new Date(),
+      file
+    })));
+  }
+
+  getCurrentArchivos(): CursoArchivo[] {
+    return (this.editingCursoId ? this.editingCurso.archivos : this.newCurso.archivos) || [];
+  }
+
+  removeArchivo(index: number): void {
+    if (!this.canManageCursoFiles()) return;
+
+    const target = this.editingCursoId ? this.editingCurso : this.newCurso;
+    const archivos = [...(target.archivos || [])];
+    const [removed] = archivos.splice(index, 1);
+
+    if (removed?.url?.startsWith('blob:')) {
+      URL.revokeObjectURL(removed.url);
+    }
+
+    target.archivos = archivos;
+  }
+
+  getArchivoDeleteKey(file: CursoArchivo, index: number): string {
+    return `${file.storagePath || file.url || file.nombre || 'archivo'}|${index}`;
+  }
+
+  async removeArchivoFromSelectedCurso(file: CursoArchivo, index: number): Promise<void> {
+    if (!this.canManageCursoFiles() || !this.selectedCurso?.idcurso) return;
+
+    const cursoId = this.selectedCurso.idcurso;
+    const archivosActuales = [...(this.selectedCurso.archivos || [])];
+    if (index < 0 || index >= archivosActuales.length) return;
+
+    const archivoObjetivo = archivosActuales[index];
+    const archivoNombre = archivoObjetivo?.nombre || file?.nombre || 'archivo';
+    const deleteKey = this.getArchivoDeleteKey(archivoObjetivo, index);
+    if (this.deletingArchivoKey === deleteKey) return;
+
+    if (!confirm(`Estas seguro de eliminar el archivo "${archivoNombre}"?`)) {
+      return;
+    }
+
+    try {
+      this.deletingArchivoKey = deleteKey;
+      const archivosActualizados = archivosActuales.filter((_, i) => i !== index);
+
+      await this.cursoService.updateCurso(cursoId, { archivos: archivosActualizados });
+
+      if (this.previewFile?.url && archivoObjetivo?.url && this.previewFile.url === archivoObjetivo.url) {
+        this.closeArchivoPreview();
+      }
+
+      this.allCursos = this.allCursos.map((curso) =>
+        curso.idcurso === cursoId
+          ? { ...curso, archivos: [...archivosActualizados] }
+          : curso
+      );
+      this.applyCursoFilter();
+
+      if (this.editingCursoId === cursoId) {
+        this.editingCurso = {
+          ...this.editingCurso,
+          archivos: archivosActualizados.map((archivo) => ({ ...archivo }))
+        };
+      }
+
+      this.notificationService.success('Archivo eliminado del curso');
+    } catch (error) {
+      console.error('Error eliminando archivo del curso:', error);
+      this.notificationService.error('No se pudo eliminar el archivo');
+    } finally {
+      this.deletingArchivoKey = null;
+    }
+  }
+
+  canPreviewArchivo(file: CursoArchivo): boolean {
+    const previewType = this.getPreviewType(file);
+    return this.isSafeAttachmentUrl(file.url || '', previewType);
+  }
+
+  getArchivoActionLabel(file: CursoArchivo): string {
+    const previewType = this.getPreviewType(file);
+    if (previewType === 'unsupported') return 'Abrir';
+    if (previewType === 'text' && !this.canLoadTextPreview(file.url || '')) return 'Abrir';
+    return 'Ver';
+  }
+
+  getArchivoPreviewTooltip(file: CursoArchivo): string {
+    if (!this.canPreviewArchivo(file)) {
+      return this.getArchivoPreviewError(file);
+    }
+
+    const previewType = this.getPreviewType(file);
+    if (previewType === 'unsupported') {
+      return 'Abrir archivo';
+    }
+
+    if (previewType === 'text' && !this.canLoadTextPreview(file.url || '')) {
+      return 'Abrir archivo';
+    }
+
+    return 'Ver archivo';
+  }
+
+  openArchivo(file: CursoArchivo): void {
+    if (!file?.url) return;
+
+    this.previewFile = file;
+    this.previewType = this.getPreviewType(file);
+    this.previewText = '';
+    this.previewResourceUrl = null;
+    this.previewOpenUrl = null;
+    this.previewError = '';
+
+    const previewType = this.getPreviewType(file);
+    const safeAttachment = this.isSafeAttachmentUrl(file.url || '', previewType);
+    this.previewOpenUrl = safeAttachment ? file.url : null;
+
+    if (!safeAttachment) {
+      this.previewType = 'unsupported';
+      this.previewError = this.getArchivoPreviewError(file);
+      this.showFilePreview = true;
+      return;
+    }
+
+    if (previewType === 'pdf') {
+      this.previewResourceUrl = this.sanitizer.bypassSecurityTrustResourceUrl(file.url);
+      this.showFilePreview = true;
+      return;
+    }
+
+    if (previewType === 'text') {
+      if (!this.canLoadTextPreview(file.url || '')) {
+        this.previewType = 'unsupported';
+        this.previewError = 'La vista previa de texto no esta disponible para este archivo. Usa Abrir.';
+        this.showFilePreview = true;
+        return;
+      }
+
+      this.loadTextPreview(file);
+    }
+
+    this.previewType = previewType;
+    this.showFilePreview = true;
+  }
+
+  onPreviewImageError(): void {
+    this.previewType = 'unsupported';
+    this.previewError = 'No se pudo cargar la imagen de este archivo.';
+  }
+
+  closeArchivoPreview(): void {
+    this.showFilePreview = false;
+    this.previewFile = null;
+    this.previewType = 'unsupported';
+    this.previewText = '';
+    this.previewResourceUrl = null;
+    this.previewOpenUrl = null;
+    this.previewError = '';
+  }
+
+  formatArchivoSize(value: unknown): string {
+    const size = Number(value);
+    if (!Number.isFinite(size) || size <= 0) return '-';
+    if (size < 1024) return `${size} B`;
+
+    const kb = size / 1024;
+    if (kb < 1024) return `${kb.toFixed(1)} KB`;
+
+    const mb = kb / 1024;
+    return `${mb.toFixed(2)} MB`;
+  }
+
+  private getPreviewType(file: CursoArchivo): FilePreviewType {
+    const tipo = (file.tipo || '').toLowerCase();
+    const nombre = (file.nombre || '').toLowerCase();
+
+    if (tipo.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(nombre)) {
+      return 'image';
+    }
+
+    if (tipo === 'application/pdf' || nombre.endsWith('.pdf')) {
+      return 'pdf';
+    }
+
+    if (
+      tipo.startsWith('text/') ||
+      tipo === 'application/json' ||
+      tipo === 'application/xml' ||
+      /\.(txt|csv|json|xml|md)$/i.test(nombre)
+    ) {
+      return 'text';
+    }
+
+    return 'unsupported';
+  }
+
+  private async loadTextPreview(file: CursoArchivo): Promise<void> {
+    try {
+      if (!this.canLoadTextPreview(file.url || '')) {
+        this.previewText = 'La vista previa de texto no esta disponible para este archivo. Usa Abrir.';
+        return;
+      }
+
+      const response = await fetch(file.url || '');
+      this.previewText = await response.text();
+    } catch (error) {
+      console.error('Error cargando vista previa de texto:', error);
+      this.previewText = 'No se pudo mostrar la vista previa de este archivo.';
+    }
+  }
+
+  private canLoadTextPreview(url: string): boolean {
+    const normalizedUrl = this.normalizeTextField(url);
+    if (!normalizedUrl) return false;
+
+    const protocol = this.getUrlProtocol(normalizedUrl);
+    if (protocol === 'data:') {
+      return true;
+    }
+
+    if (protocol === 'http:' || protocol === 'https:') {
+      return this.isTrustedHttpPreviewUrl(normalizedUrl);
+    }
+
+    return false;
+  }
+
+  private getArchivoPreviewError(file: CursoArchivo): string {
+    const protocol = this.getUrlProtocol(file.url || '');
+    const previewType = this.getPreviewType(file);
+
+    if (protocol === 'javascript:' || protocol === 'file:' || protocol === 'vbscript:' || protocol === 'blob:') {
+      return 'La URL de este archivo no es segura y fue bloqueada.';
+    }
+
+    if ((protocol === 'http:' || protocol === 'https:') && !this.isTrustedHttpPreviewUrl(file.url || '')) {
+      return 'La URL de este archivo apunta a otro origen y fue bloqueada.';
+    }
+
+    if (!previewType || previewType === 'unsupported') {
+      return 'No hay vista previa integrada para este tipo de archivo. Usa Abrir para verlo.';
+    }
+
+    return 'No se pudo abrir este archivo.';
+  }
+
+  private normalizeTextField(value: unknown): string {
+    return String(value ?? '').trim();
+  }
+
+  private getUrlProtocol(url: string): string {
+    const normalized = this.normalizeTextField(url);
+    if (!normalized) return '';
+
+    try {
+      return new URL(normalized, window.location.origin).protocol.toLowerCase();
+    } catch {
+      return '';
+    }
+  }
+
+  private isTrustedHttpPreviewUrl(url: string): boolean {
+    const normalized = this.normalizeTextField(url);
+    if (!normalized) return false;
+
+    try {
+      const parsed = new URL(normalized, window.location.origin);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return false;
+      }
+
+      if (parsed.origin === window.location.origin) {
+        return true;
+      }
+
+      return this.isFirebaseStorageUrl(parsed);
+    } catch {
+      return false;
+    }
+  }
+
+  private isFirebaseStorageUrl(url: URL): boolean {
+    const host = url.hostname.toLowerCase();
+    return (
+      host === 'firebasestorage.googleapis.com' ||
+      host === 'storage.googleapis.com' ||
+      host === 'firebasestorage.app' ||
+      host.endsWith('.firebasestorage.app')
+    );
+  }
+
+  private isSafeAttachmentUrl(url: string, previewType?: FilePreviewType): boolean {
+    const normalizedUrl = this.normalizeTextField(url);
+    if (!normalizedUrl) return false;
+
+    const protocol = this.getUrlProtocol(normalizedUrl);
+    if (!protocol) return false;
+
+    if (protocol === 'javascript:' || protocol === 'file:' || protocol === 'vbscript:' || protocol === 'blob:') {
+      return false;
+    }
+
+    if (protocol === 'http:' || protocol === 'https:') {
+      return this.isTrustedHttpPreviewUrl(normalizedUrl);
+    }
+
+    if (protocol === 'data:') {
+      if (!previewType) {
+        return false;
+      }
+
+      return this.isAllowedDataUrlForPreview(normalizedUrl, previewType);
+    }
+
+    return false;
+  }
+
+  private getDataUrlMime(url: string): string {
+    const normalized = this.normalizeTextField(url);
+    if (!normalized.toLowerCase().startsWith('data:')) {
+      return '';
+    }
+
+    const commaIndex = normalized.indexOf(',');
+    const header = commaIndex >= 0 ? normalized.slice(5, commaIndex) : normalized.slice(5);
+    const mime = header.split(';')[0].trim().toLowerCase();
+    return mime;
+  }
+
+  private isAllowedDataUrlForPreview(url: string, previewType: FilePreviewType): boolean {
+    const mime = this.getDataUrlMime(url);
+    if (!mime) return false;
+
+    if (previewType === 'image') {
+      return mime.startsWith('image/') && mime !== 'image/svg+xml';
+    }
+
+    if (previewType === 'pdf') {
+      return mime === 'application/pdf';
+    }
+
+    if (previewType === 'text') {
+      return mime.startsWith('text/') || mime === 'application/json' || mime === 'application/xml';
+    }
+
+    return false;
+  }
+
+  private async readFileAsDataUrl(file: File): Promise<string> {
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === 'string') {
+          resolve(result);
+          return;
+        }
+
+        reject(new Error('No se pudo leer el archivo'));
+      };
+
+      reader.onerror = () => {
+        reject(reader.error || new Error('No se pudo leer el archivo'));
+      };
+
+      reader.readAsDataURL(file);
+    });
+  }
+
+  private getFileTypeFromName(fileName: string): string {
+    const name = (fileName || '').toLowerCase();
+    if (name.endsWith('.pdf')) return 'application/pdf';
+    if (name.endsWith('.txt')) return 'text/plain';
+    if (name.endsWith('.csv')) return 'text/csv';
+    if (name.endsWith('.json')) return 'application/json';
+    if (name.endsWith('.xml')) return 'application/xml';
+    if (name.endsWith('.md')) return 'text/markdown';
+    if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
+    if (name.endsWith('.png')) return 'image/png';
+    if (name.endsWith('.gif')) return 'image/gif';
+    if (name.endsWith('.webp')) return 'image/webp';
+    return 'application/octet-stream';
+  }
+
+  private isAllowedAttachmentFile(file: File): boolean {
+    return (
+      (file.type || '').toLowerCase() === 'application/pdf' ||
+      this.getFileTypeFromName(file.name) === 'application/pdf'
+    );
+  }
+
+  private revokeObjectUrls(archivos: CursoArchivo[] | undefined): void {
+    if (!archivos?.length) return;
+
+    for (const archivo of archivos) {
+      if (archivo.url?.startsWith('blob:')) {
+        URL.revokeObjectURL(archivo.url);
+      }
     }
   }
 
@@ -904,9 +1453,9 @@ export class CursosGruposComponent implements OnInit {
   }
 
   private toDateValue(value: unknown): number {
-    if (!value) return 0;
-    const date = new Date(value as string | Date);
-    const time = date.getTime();
+    const parsed = coerceDate(value);
+    if (!parsed) return 0;
+    const time = parsed.getTime();
     return Number.isNaN(time) ? 0 : time;
   }
 }

@@ -145,6 +145,14 @@
   gap: 6px;
 }
 
+.files-group {
+  grid-column: 1 / -1;
+}
+
+.file-input {
+  font-size: 12px;
+}
+
 .form-group label {
   font-size: 12px;
   color: var(--text-soft);
@@ -255,6 +263,25 @@ select:focus {
 .instructores-section h4 {
   margin: 0 0 8px;
   color: var(--text);
+}
+
+.curso-files-section {
+  border: 1px solid var(--surface-elevated);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.curso-files-section h4 {
+  margin: 0 0 8px;
+  color: var(--text);
+}
+
+.curso-files-upload {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
 }
 
 .calificaciones-resumen {
@@ -418,11 +445,132 @@ select:focus {
   font-weight: 600;
 }
 
+.file-preview-grid {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.file-preview-card {
+  border: 1px solid var(--surface-elevated);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.file-list {
+  display: grid;
+  gap: 8px;
+}
+
+.file-list-item {
+  border: 1px solid var(--surface-elevated);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.file-meta {
+  min-width: 0;
+}
+
+.file-name,
+.file-type {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-name {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.file-type {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.file-preview-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.file-empty-inline {
+  margin-top: 0;
+}
+
 .empty-state {
   font-size: 13px;
   color: var(--muted);
   padding: 10px;
   text-align: center;
+}
+
+.file-preview-modal {
+  width: min(900px, 100%);
+}
+
+.file-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.file-preview-header h4 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.file-preview-body {
+  border: 1px solid var(--surface-elevated);
+  border-radius: 10px;
+  min-height: 320px;
+  max-height: 70vh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--surface-soft);
+}
+
+.file-preview-body img {
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+}
+
+.pdf-preview iframe {
+  width: 100%;
+  height: min(72vh, 760px);
+  border: 0;
+  background: #ffffff;
+}
+
+.text-preview pre {
+  width: 100%;
+  height: min(72vh, 760px);
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  color: var(--text);
 }
 
 .modal-overlay {
