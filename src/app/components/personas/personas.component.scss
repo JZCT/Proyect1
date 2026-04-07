@@ -52,6 +52,12 @@
   flex-wrap: wrap;
 }
 
+.period-filter-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .btn {
   border: none;
   border-radius: 10px;

@@ -22,7 +22,7 @@
       <div class="executive-summary__header">
         <div>
           <h3>Resumen ejecutivo</h3>
-          <p>Indicadores simples para dirección.</p>
+          <p>Indicadores simples para direcciÃ³n.</p>
         </div>
         <span class="status-badge status-sin-evaluar">Solo lectura</span>
       </div>
@@ -214,6 +214,62 @@
         </div>
 
         <div class="cursos-list">
+          <div class="filters-inline">
+            <div class="form-group">
+              <label>Modo</label>
+              <select [(ngModel)]="cursoFilterMode" name="curso_filter_mode" [disabled]="loadingCursos">
+                <option value="single">Mes especifico</option>
+                <option value="range">Rango</option>
+              </select>
+            </div>
+
+            <div class="form-group" *ngIf="cursoFilterMode === 'single'">
+              <label>Periodo (ano/mes)</label>
+              <input
+                type="month"
+                [(ngModel)]="cursoSinglePeriod"
+                name="curso_single_period"
+                [disabled]="loadingCursos"
+              />
+            </div>
+
+            <div class="form-group" *ngIf="cursoFilterMode === 'range'">
+              <label>Desde (ano/mes)</label>
+              <input
+                type="month"
+                [(ngModel)]="cursoRangeStart"
+                name="curso_range_start"
+                [disabled]="loadingCursos"
+              />
+            </div>
+
+            <div class="form-group" *ngIf="cursoFilterMode === 'range'">
+              <label>Hasta (ano/mes)</label>
+              <input
+                type="month"
+                [(ngModel)]="cursoRangeEnd"
+                name="curso_range_end"
+                [disabled]="loadingCursos"
+              />
+            </div>
+
+            <div class="form-group">
+              <label>Accion</label>
+              <div class="year-filter-actions">
+                <button type="button" class="btn btn-sm btn-primary" (click)="applyCursoRangeFilter()" [disabled]="loadingCursos">
+                  Aplicar filtro
+                </button>
+                <button type="button" class="btn btn-sm btn-secondary" (click)="clearCursoRangeFilter()" [disabled]="loadingCursos || !cursoFilterEnabled">
+                  Todos
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <p class="field-help">
+            Mostrando: {{ getCursoYearFilterLabel() }}{{ loadingCursos ? ' (cargando...)' : '' }}.
+          </p>
+
           <div class="form-group">
             <label>Buscar curso</label>
             <input
@@ -255,6 +311,14 @@
               <div class="curso-info">
                 <h5>{{ curso.nombre }}</h5>
                 <p>{{ curso.descripcion }}</p>
+                <p>
+                  AÃ±o/Mes:
+                  {{
+                    curso.anioCurso
+                      ? (curso.anioCurso + (curso.mesCurso ? ('/' + (curso.mesCurso < 10 ? ('0' + curso.mesCurso) : curso.mesCurso)) : ''))
+                      : ((curso.Fecha_inicio | date:'yyyy/MM') || '-')
+                  }}
+                </p>
                 <p>Empresa: {{ (curso.companyTag || '-') | uppercase }}</p>
                 <p>Inicio: {{ curso.Fecha_inicio | date }} | Fin: {{ curso.Fecha_fin | date }}</p>
                 <p>Representante: {{ curso.nom_representante }} | Telefono: {{ curso.num_represnetantes }}</p>
@@ -426,6 +490,7 @@
               type="text"
               placeholder="Nombre, correo o empresa..."
               [(ngModel)]="personaDisponibleSearchTerm"
+              (ngModelChange)="onPersonaDisponibleSearchTermChange($event)"
               name="persona_disponible_search"
             />
           </div>

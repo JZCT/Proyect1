@@ -22,5 +22,13 @@ export interface Persona {
   clfTeorica?: number;
   archivos?: PersonaArchivo[];
   cursoIds?: string[];
+  assignedCursoId?: string;
+  assignmentStatus?: 'available' | 'assigned';
+  searchTokens?: string[];
+  locationTokens?: string[];
+  locationCity?: string;
+  locationState?: string;
+  anioPersona?: number;
+  mesPersona?: number;
   createdAt?: Date;
 }

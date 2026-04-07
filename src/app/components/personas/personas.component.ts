@@ -32,6 +32,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
   @ViewChild('cameraCanvas') cameraCanvas?: ElementRef<HTMLCanvasElement>;
   private readonly MIN_CALIFICACION_APTO = 80;
   private readonly CURP_REGEX = /^[A-Z0-9]{18}$/;
+  private readonly CURRENT_YEAR = new Date().getFullYear();
   private cameraStream: MediaStream | null = null;
   
   personas: Persona[] = [];
@@ -45,6 +46,12 @@ export class PersonasComponent implements OnInit, OnDestroy {
   isAdmin = false;
   canGenerateReports = false;
   currentUser: User | null = null;
+  loadingPersonas = false;
+  personaFilterEnabled = false;
+  personaFilterMode: 'single' | 'range' = 'single';
+  personaSinglePeriod = `${this.CURRENT_YEAR}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  personaRangeStart = `${this.CURRENT_YEAR}-01`;
+  personaRangeEnd = `${this.CURRENT_YEAR}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   searchTerm: string = '';
   sortBy: 'nombre' | 'empresa' | 'final' = 'nombre';
   sortDirection: 'asc' | 'desc' = 'asc';
@@ -172,16 +179,105 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   loadPersonas() {
-    this.personaService.getPersonas().subscribe({
+    this.loadingPersonas = true;
+    const singlePeriod = this.personaFilterEnabled && this.personaFilterMode === 'single'
+      ? this.parseMonthRangeValue(this.personaSinglePeriod)
+      : null;
+    const rangeFilter = this.personaFilterEnabled && this.personaFilterMode === 'range'
+      ? this.resolvePersonaRangeInputs(false)
+      : null;
+
+    if (this.personaFilterEnabled && this.personaFilterMode === 'single' && !singlePeriod) {
+      this.loadingPersonas = false;
+      return;
+    }
+
+    if (this.personaFilterEnabled && this.personaFilterMode === 'range' && !rangeFilter) {
+      this.loadingPersonas = false;
+      return;
+    }
+
+    this.personaService.getPersonasByPeriod({
+      year: this.personaFilterEnabled && this.personaFilterMode === 'single'
+        ? (singlePeriod?.year ?? null)
+        : null,
+      month: this.personaFilterEnabled && this.personaFilterMode === 'single'
+        ? (singlePeriod?.month ?? null)
+        : null,
+      startYear: this.personaFilterEnabled && this.personaFilterMode === 'range'
+        ? (rangeFilter?.startYear ?? null)
+        : null,
+      startMonth: this.personaFilterEnabled && this.personaFilterMode === 'range'
+        ? (rangeFilter?.startMonth ?? null)
+        : null,
+      endYear: this.personaFilterEnabled && this.personaFilterMode === 'range'
+        ? (rangeFilter?.endYear ?? null)
+        : null,
+      endMonth: this.personaFilterEnabled && this.personaFilterMode === 'range'
+        ? (rangeFilter?.endMonth ?? null)
+        : null
+    }).subscribe({
       next: (personas) => {
         this.allPersonas = personas;
         this.applyPersonaVisibility();
+        this.loadingPersonas = false;
         console.log('Personas cargadas:', personas);
       },
       error: (error) => {
         console.error('Error cargando personas:', error);
+        this.loadingPersonas = false;
+        this.showMessage('No se pudieron cargar las personas');
       }
     });
+  }
+
+  clearPersonaRangeFilter(): void {
+    if (!this.personaFilterEnabled) {
+      return;
+    }
+
+    this.personaFilterEnabled = false;
+    this.loadPersonas();
+  }
+
+  applyPersonaRangeFilter(): void {
+    if (this.personaFilterMode === 'single') {
+      const single = this.parseMonthRangeValue(this.personaSinglePeriod);
+      if (!single) {
+        this.showMessage('Selecciona un periodo valido');
+        return;
+      }
+    } else {
+      const range = this.resolvePersonaRangeInputs(true);
+      if (!range) {
+        return;
+      }
+    }
+
+    this.personaFilterEnabled = true;
+    this.loadPersonas();
+  }
+
+  getPersonaPeriodFilterLabel(): string {
+    if (!this.personaFilterEnabled) {
+      return 'Todos los periodos';
+    }
+
+    if (this.personaFilterMode === 'single') {
+      const single = this.parseMonthRangeValue(this.personaSinglePeriod);
+      if (!single) {
+        return 'Periodo invalido';
+      }
+
+      return `Periodo ${String(single.month).padStart(2, '0')}/${single.year}`;
+    }
+
+    const range = this.resolvePersonaRangeInputs(false);
+    if (!range) {
+      return 'Rango invalido';
+    }
+
+    return `Rango ${String(range.startMonth).padStart(2, '0')}/${range.startYear} - ${String(range.endMonth).padStart(2, '0')}/${range.endYear}`;
   }
 
   private applyPersonaVisibility() {
@@ -1364,6 +1460,8 @@ export class PersonasComponent implements OnInit, OnDestroy {
         persona.empresa || '',
         persona.lugar || '',
         persona.curp || '',
+        persona.anioPersona ? String(persona.anioPersona) : '',
+        persona.mesPersona ? String(persona.mesPersona) : '',
         this.getResultadoTexto(persona)
       ]
         .join(' '));
@@ -1372,6 +1470,28 @@ export class PersonasComponent implements OnInit, OnDestroy {
     });
 
     return filtered.sort((a, b) => this.comparePersonas(a, b));
+  }
+
+  getPersonaPeriodDisplay(persona: Partial<Persona>): string {
+    const year = this.resolvePersonaYearValue(persona);
+    const month = this.resolvePersonaMonthValue(persona);
+
+    if (year && month) {
+      return `Periodo: ${year}/${String(month).padStart(2, '0')}`;
+    }
+
+    if (year) {
+      return `Periodo: ${year}`;
+    }
+
+    const createdAt = normalizeDateInput(persona.createdAt);
+    if (createdAt) {
+      const fallbackYear = createdAt.getFullYear();
+      const fallbackMonth = String(createdAt.getMonth() + 1).padStart(2, '0');
+      return `Periodo: ${fallbackYear}/${fallbackMonth}`;
+    }
+
+    return 'Periodo: sin fecha';
   }
 
   private normalizeSearch(value?: string): string {
@@ -1414,6 +1534,95 @@ export class PersonasComponent implements OnInit, OnDestroy {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/\s+/g, ' ');
+  }
+
+  private normalizeYearInput(value: unknown): number | null {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return null;
+
+    const normalized = Math.floor(numeric);
+    if (normalized < 2000 || normalized > 2100) return null;
+
+    return normalized;
+  }
+
+  private normalizeMonthInput(value: unknown): number | null {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return null;
+
+    const normalized = Math.floor(numeric);
+    if (normalized < 1 || normalized > 12) return null;
+
+    return normalized;
+  }
+
+  private resolvePersonaRangeInputs(showWarnings: boolean): {
+    startYear: number;
+    startMonth: number;
+    endYear: number;
+    endMonth: number;
+  } | null {
+    const startPeriod = this.parseMonthRangeValue(this.personaRangeStart);
+    const endPeriod = this.parseMonthRangeValue(this.personaRangeEnd);
+
+    if (!startPeriod || !endPeriod) {
+      if (showWarnings) {
+        this.showMessage('Completa un rango valido de inicio y fin');
+      }
+      return null;
+    }
+
+    const startYear = startPeriod.year;
+    const startMonth = startPeriod.month;
+    const endYear = endPeriod.year;
+    const endMonth = endPeriod.month;
+
+    const startKey = (startYear * 100) + startMonth;
+    const endKey = (endYear * 100) + endMonth;
+
+    if (startKey <= endKey) {
+      return { startYear, startMonth, endYear, endMonth };
+    }
+
+    return {
+      startYear: endYear,
+      startMonth: endMonth,
+      endYear: startYear,
+      endMonth: startMonth
+    };
+  }
+
+  private parseMonthRangeValue(value: string): { year: number; month: number } | null {
+    const normalized = (value || '').trim();
+    const [yearToken, monthToken] = normalized.split('-');
+    const year = this.normalizeYearInput(yearToken);
+    const month = this.normalizeMonthInput(monthToken);
+
+    if (!year || !month) {
+      return null;
+    }
+
+    return { year, month };
+  }
+
+  private resolvePersonaYearValue(persona: Partial<Persona>): number | null {
+    const explicitYear = this.normalizeYearInput(persona.anioPersona);
+    if (explicitYear) return explicitYear;
+
+    const createdAt = normalizeDateInput(persona.createdAt);
+    if (!createdAt) return null;
+
+    return this.normalizeYearInput(createdAt.getFullYear());
+  }
+
+  private resolvePersonaMonthValue(persona: Partial<Persona>): number | null {
+    const explicitMonth = this.normalizeMonthInput(persona.mesPersona);
+    if (explicitMonth) return explicitMonth;
+
+    const createdAt = normalizeDateInput(persona.createdAt);
+    if (!createdAt) return null;
+
+    return this.normalizeMonthInput(createdAt.getMonth() + 1);
   }
 
   private comparePersonas(a: Persona, b: Persona): number {

@@ -299,6 +299,62 @@
       </button>
     </div>
 
+    <div class="report-filters">
+      <div class="form-group">
+        <label>Modo</label>
+        <select [(ngModel)]="personaFilterMode" name="persona_filter_mode" [disabled]="loadingPersonas">
+          <option value="single">Mes especifico</option>
+          <option value="range">Rango</option>
+        </select>
+      </div>
+
+      <div class="form-group" *ngIf="personaFilterMode === 'single'">
+        <label>Periodo (ano/mes)</label>
+        <input
+          type="month"
+          [(ngModel)]="personaSinglePeriod"
+          name="persona_single_period"
+          [disabled]="loadingPersonas"
+        />
+      </div>
+
+      <div class="form-group" *ngIf="personaFilterMode === 'range'">
+        <label>Desde (ano/mes)</label>
+        <input
+          type="month"
+          [(ngModel)]="personaRangeStart"
+          name="persona_range_start"
+          [disabled]="loadingPersonas"
+        />
+      </div>
+
+      <div class="form-group" *ngIf="personaFilterMode === 'range'">
+        <label>Hasta (ano/mes)</label>
+        <input
+          type="month"
+          [(ngModel)]="personaRangeEnd"
+          name="persona_range_end"
+          [disabled]="loadingPersonas"
+        />
+      </div>
+
+      <div class="form-group">
+        <label>Accion</label>
+        <div class="period-filter-actions">
+          <button type="button" class="btn btn-sm btn-primary" (click)="applyPersonaRangeFilter()" [disabled]="loadingPersonas">
+            Aplicar filtro
+          </button>
+          <button type="button" class="btn btn-sm btn-secondary" (click)="clearPersonaRangeFilter()" [disabled]="loadingPersonas || !personaFilterEnabled">
+            Todos
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <p class="field-help">
+      Mostrando: {{ getPersonaPeriodFilterLabel() }}{{ loadingPersonas ? ' (cargando...)' : '' }}.
+    </p>
+
     <div class="form-group">
       <label>Buscar persona</label>
       <input
@@ -368,6 +424,7 @@
             <td>
               <div class="primary-text">{{ persona.nombre }}</div>
               <div class="secondary-text">{{ (persona.empresa || '-') | uppercase }}</div>
+              <div class="secondary-text">{{ getPersonaPeriodDisplay(persona) }}</div>
             </td>
             <td>{{ persona.curp || '-' }}</td>
             <td>

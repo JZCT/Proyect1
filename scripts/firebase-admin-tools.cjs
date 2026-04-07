@@ -131,6 +131,134 @@ function normalizeCompanyTag(value) {
     .trim();
 }
 
+function normalizeSearchValue(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function tokenizeSearch(value, minLength = 2) {
+  return normalizeSearchValue(value)
+    .split(/[^a-z0-9]+/g)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= minLength);
+}
+
+function parseLocation(value) {
+  const raw = normalizeSearchValue(value);
+  if (!raw) {
+    return { raw: '', city: '', state: '', tokens: [] };
+  }
+
+  const parts = raw
+    .split(/[;,]+/g)
+    .map((part) => part.trim().replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, ''))
+    .filter(Boolean);
+
+  return {
+    raw,
+    city: parts[0] || '',
+    state: parts.length > 1 ? parts[parts.length - 1] : '',
+    tokens: Array.from(new Set(tokenizeSearch(raw, 3)))
+  };
+}
+
+function buildSearchTokens(values) {
+  const tokens = values.flatMap((value) => tokenizeSearch(String(value || ''), 2));
+  return Array.from(new Set(tokens));
+}
+
+function normalizeYear(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return undefined;
+  }
+
+  const normalized = Math.floor(numeric);
+  return normalized >= 2000 && normalized <= 2100 ? normalized : undefined;
+}
+
+function extractYear(value) {
+  if (value === null || value === undefined || value === '') {
+    return undefined;
+  }
+
+  const directYear = normalizeYear(value);
+  if (directYear) {
+    return directYear;
+  }
+
+  if (typeof value === 'object') {
+    if (typeof value.toDate === 'function') {
+      const converted = value.toDate();
+      if (converted instanceof Date && !Number.isNaN(converted.getTime())) {
+        return normalizeYear(converted.getFullYear());
+      }
+    }
+
+    if (value.seconds !== undefined) {
+      const timestampDate = new Date(Number(value.seconds) * 1000);
+      if (!Number.isNaN(timestampDate.getTime())) {
+        return normalizeYear(timestampDate.getFullYear());
+      }
+    }
+  }
+
+  const parsed = new Date(String(value));
+  if (!Number.isNaN(parsed.getTime())) {
+    return normalizeYear(parsed.getFullYear());
+  }
+
+  return undefined;
+}
+
+function normalizeMonth(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return undefined;
+  }
+
+  const normalized = Math.floor(numeric);
+  return normalized >= 1 && normalized <= 12 ? normalized : undefined;
+}
+
+function extractMonth(value) {
+  if (value === null || value === undefined || value === '') {
+    return undefined;
+  }
+
+  const directMonth = normalizeMonth(value);
+  if (directMonth) {
+    return directMonth;
+  }
+
+  if (typeof value === 'object') {
+    if (typeof value.toDate === 'function') {
+      const converted = value.toDate();
+      if (converted instanceof Date && !Number.isNaN(converted.getTime())) {
+        return normalizeMonth(converted.getMonth() + 1);
+      }
+    }
+
+    if (value.seconds !== undefined) {
+      const timestampDate = new Date(Number(value.seconds) * 1000);
+      if (!Number.isNaN(timestampDate.getTime())) {
+        return normalizeMonth(timestampDate.getMonth() + 1);
+      }
+    }
+  }
+
+  const parsed = new Date(String(value));
+  if (!Number.isNaN(parsed.getTime())) {
+    return normalizeMonth(parsed.getMonth() + 1);
+  }
+
+  return undefined;
+}
+
 function initAdminApp(name, serviceAccountPath) {
   const serviceAccount = loadServiceAccount(serviceAccountPath);
 
@@ -150,12 +278,16 @@ Uso:
   node scripts/firebase-admin-tools.cjs migrate-firestore --source-key SOURCE.json --dest-key DEST.json --collections users,cursos,instructores,personas,usuarios
   node scripts/firebase-admin-tools.cjs normalize-users --dest-key DEST.json
   node scripts/firebase-admin-tools.cjs backfill-persona-company-tags --dest-key DEST.json
+  node scripts/firebase-admin-tools.cjs backfill-persona-indexes --dest-key DEST.json
+  node scripts/firebase-admin-tools.cjs backfill-curso-years --dest-key DEST.json
 
 Comandos:
   bootstrap-admin   Crea o actualiza el primer admin en Auth y Firestore/users del proyecto destino.
   migrate-firestore Copia colecciones de Firestore entre dos proyectos, preservando IDs y subcolecciones.
   normalize-users   Reescribe users/{uid} a partir de cualquier doc legacy con campo uid.
   backfill-persona-company-tags   Agrega companyTag normalizado a las personas existentes.
+  backfill-persona-indexes   Completa companyTag, cursoIds, assignedCursoId, assignmentStatus, indices de busqueda/ubicacion y periodo (anioPersona/mesPersona) en personas.
+  backfill-curso-years   Completa anioCurso y mesCurso para cursos existentes usando Fecha_inicio o createdAt.
 
 Variables opcionales:
   FIREBASE_SOURCE_KEY
@@ -393,6 +525,170 @@ async function backfillPersonaCompanyTags(args) {
   }
 }
 
+async function backfillCursoYears(args) {
+  const destinationKey = requireArg(args, 'dest-key', process.env.FIREBASE_DEST_KEY);
+  const app = initAdminApp('destination-admin', destinationKey);
+
+  try {
+    const db = getFirestore(app);
+    const cursosSnapshot = await db.collection('cursos').get();
+    const updatedDocs = [];
+    const skippedDocs = [];
+
+    for (const cursoDoc of cursosSnapshot.docs) {
+      const data = cursoDoc.data();
+      const anioCurso = extractYear(
+        data.anioCurso
+        || data.anio_curso
+        || data.anio
+        || data.year
+        || data.Fecha_inicio
+        || data.fecha_inicio
+        || data.createdAt
+      );
+
+      const mesCurso = extractMonth(
+        data.mesCurso
+        || data.mes_curso
+        || data.mes
+        || data.month
+        || data.Fecha_inicio
+        || data.fecha_inicio
+        || data.createdAt
+      );
+
+      if (!anioCurso && !mesCurso) {
+        skippedDocs.push(cursoDoc.id);
+        continue;
+      }
+
+      await cursoDoc.ref.set({
+        anioCurso,
+        mesCurso
+      }, { merge: true });
+
+      updatedDocs.push(cursoDoc.id);
+    }
+
+    console.log(JSON.stringify({
+      ok: true,
+      command: 'backfill-curso-years',
+      projectId: app.options.projectId,
+      updatedDocs,
+      skippedDocs
+    }, null, 2));
+  } finally {
+    await deleteApp(app);
+  }
+}
+
+async function backfillPersonaIndexes(args) {
+  const destinationKey = requireArg(args, 'dest-key', process.env.FIREBASE_DEST_KEY);
+  const app = initAdminApp('destination-admin', destinationKey);
+
+  try {
+    const db = getFirestore(app);
+    const cursosSnapshot = await db.collection('cursos').get();
+    const personasSnapshot = await db.collection('personas').get();
+    const assignedCursoByPersonaId = new Map();
+
+    for (const cursoDoc of cursosSnapshot.docs) {
+      const cursoData = cursoDoc.data();
+      const personasIds = Array.isArray(cursoData.personasIds)
+        ? cursoData.personasIds.map((id) => String(id || '').trim()).filter(Boolean)
+        : [];
+
+      for (const personaId of personasIds) {
+        if (!assignedCursoByPersonaId.has(personaId)) {
+          assignedCursoByPersonaId.set(personaId, cursoDoc.id);
+        }
+      }
+    }
+
+    const updatedDocs = [];
+    const skippedDocs = [];
+
+    for (const personaDoc of personasSnapshot.docs) {
+      const data = personaDoc.data();
+      const existingCursoIds = Array.isArray(data.cursoIds)
+        ? data.cursoIds.map((id) => String(id || '').trim()).filter(Boolean)
+        : [];
+      const cursoIdFromCursosCollection = assignedCursoByPersonaId.get(personaDoc.id) || '';
+      const cursoIds = Array.from(
+        new Set([...existingCursoIds, cursoIdFromCursosCollection].filter(Boolean))
+      );
+      const assignedCursoId = String(data.assignedCursoId || cursoIdFromCursosCollection || cursoIds[0] || '').trim();
+      const assignmentStatus = assignedCursoId ? 'assigned' : 'available';
+      const companyTag = normalizeCompanyTag(data.companyTag || data.empresa || '');
+      const createdAtSource = data.createdAt || data.created_at;
+      const anioPersona = extractYear(
+        data.anioPersona
+        || data.anio_persona
+        || data.anio
+        || data.year
+        || createdAtSource
+      );
+      const mesPersona = extractMonth(
+        data.mesPersona
+        || data.mes_persona
+        || data.mes
+        || data.month
+        || createdAtSource
+      );
+      const location = parseLocation(data.lugar || data.ubicacion || data['ubicación'] || '');
+      const searchTokens = buildSearchTokens([
+        data.nombre,
+        data.curp,
+        data.email,
+        data.telefono,
+        data.empresa,
+        data.companyTag,
+        data.lugar,
+        data.ubicacion,
+        data['ubicación']
+      ]);
+
+      if (
+        !companyTag &&
+        cursoIds.length === 0 &&
+        !searchTokens.length &&
+        !location.raw &&
+        !assignedCursoId &&
+        !anioPersona &&
+        !mesPersona
+      ) {
+        skippedDocs.push(personaDoc.id);
+        continue;
+      }
+
+      await personaDoc.ref.set({
+        companyTag,
+        cursoIds,
+        assignedCursoId,
+        assignmentStatus,
+        searchTokens,
+        locationTokens: location.tokens,
+        locationCity: location.city,
+        locationState: location.state,
+        anioPersona,
+        mesPersona
+      }, { merge: true });
+
+      updatedDocs.push(personaDoc.id);
+    }
+
+    console.log(JSON.stringify({
+      ok: true,
+      command: 'backfill-persona-indexes',
+      projectId: app.options.projectId,
+      updatedDocs,
+      skippedDocs
+    }, null, 2));
+  } finally {
+    await deleteApp(app);
+  }
+}
+
 async function main() {
   const command = process.argv[2];
   const args = parseArgs(process.argv.slice(3));
@@ -414,6 +710,12 @@ async function main() {
       return;
     case 'backfill-persona-company-tags':
       await backfillPersonaCompanyTags(args);
+      return;
+    case 'backfill-persona-indexes':
+      await backfillPersonaIndexes(args);
+      return;
+    case 'backfill-curso-years':
+      await backfillCursoYears(args);
       return;
     default:
       throw new Error(`Comando no soportado: ${command}`);

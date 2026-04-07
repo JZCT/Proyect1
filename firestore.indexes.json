@@ -1,0 +1,137 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "personas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyTag",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "assignmentStatus",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "searchTokens",
+          "arrayConfig": "CONTAINS"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "personas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyTag",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "searchTokens",
+          "arrayConfig": "CONTAINS"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "personas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyTag",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "assignmentStatus",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "locationCity",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "locationState",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "personas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyTag",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "locationCity",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "locationState",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "personas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyTag",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "assignmentStatus",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "locationTokens",
+          "arrayConfig": "CONTAINS"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "personas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyTag",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "locationTokens",
+          "arrayConfig": "CONTAINS"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "personas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "anioPersona",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "mesPersona",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cursos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "anioCurso",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "mesCurso",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

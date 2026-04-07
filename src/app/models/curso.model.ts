@@ -12,6 +12,8 @@ export interface Curso {
   idcurso?: string;
   nombre: string;
   descripcion: string;
+  anioCurso?: number;
+  mesCurso?: number;
   Fecha_inicio?: Date;
   Fecha_fin?: Date;
   nom_representante: string;

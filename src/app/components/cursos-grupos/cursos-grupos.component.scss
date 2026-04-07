@@ -239,6 +239,12 @@ select:focus {
   gap: 8px;
 }
 
+.year-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .resultado-filters {
   display: flex;
   flex-wrap: wrap;
