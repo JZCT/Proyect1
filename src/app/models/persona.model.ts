@@ -30,5 +30,7 @@ export interface Persona {
   locationState?: string;
   anioPersona?: number;
   mesPersona?: number;
+  lastCursoYear?: number;
+  lastCursoMonth?: number;
   createdAt?: Date;
 }

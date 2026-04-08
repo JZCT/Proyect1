@@ -7,6 +7,8 @@ import { AuthService } from '../../services/auth.service';
 import { NotificationService } from '../../services/notification.service';
 import { Instructor } from '../../models/instructor.model';
 import { Curso } from '../../models/curso.model';
+import { COURSE_ASSIGNMENT_GRACE_MONTHS } from '../../config/global.constants';
+import { isCursoCaducadoParaAsignacion } from '../../utils/course-availability.util';
 import { resolveAppAssetUrl } from '../../utils/asset-url.util';
 import { sanitizePhoneInput } from '../../utils/input-sanitizers.util';
 
@@ -22,6 +24,7 @@ export class InstructorComponent implements OnInit, OnDestroy {
 
   instructores: Instructor[] = [];
   cursos: Curso[] = [];
+  cursosAsignables: Curso[] = [];
 
   editIndex: number | null = null;
   isAdmin = false;
@@ -102,7 +105,7 @@ export class InstructorComponent implements OnInit, OnDestroy {
           }
           return acc;
         }, {});
-        this.refreshVisibleCursosForEdit();
+        this.refreshCursosAsignables();
         this.refreshVisibleInstructores();
       },
       error: (error) => {
@@ -365,8 +368,8 @@ export class InstructorComponent implements OnInit, OnDestroy {
   private refreshVisibleCursosForEdit(): void {
     const term = this.normalizeSearch(this.courseSearchTerm);
     const filtered = term
-      ? this.cursos.filter((curso) => this.getCursoSearchText(curso).includes(term))
-      : [...this.cursos];
+      ? this.cursosAsignables.filter((curso) => this.getCursoSearchText(curso).includes(term))
+      : [...this.cursosAsignables];
 
     this.visibleCursosForEdit = filtered.sort((a, b) => {
       const nombreA = this.normalizeSearch(a.nombre || '');
@@ -427,6 +430,12 @@ export class InstructorComponent implements OnInit, OnDestroy {
     const cursoId = this.getSelectedCursoId(instructor);
     if (!cursoId) {
       this.notificationService.warning('Selecciona un curso');
+      return;
+    }
+
+    const isAssignableCurso = this.cursosAsignables.some((curso) => curso.idcurso === cursoId);
+    if (!isAssignableCurso) {
+      this.notificationService.warning('El curso seleccionado ya caduco para asignacion');
       return;
     }
 
@@ -517,8 +526,38 @@ export class InstructorComponent implements OnInit, OnDestroy {
       curso.nombre,
       curso.companyTag || '',
       curso.descripcion || '',
-      curso.nom_representante || ''
+      curso.nom_representante || '',
+      curso.anioCurso ? String(curso.anioCurso) : '',
+      curso.mesCurso ? String(curso.mesCurso) : ''
     ].join(' '));
+  }
+
+  private refreshCursosAsignables(): void {
+    this.cursosAsignables = this.cursos.filter((curso) => !this.isCursoCaducado(curso));
+    this.ensureSelectedCursosAreAssignable();
+    this.refreshVisibleCursosForEdit();
+  }
+
+  private ensureSelectedCursosAreAssignable(): void {
+    const availableCursoIds = new Set(
+      this.cursosAsignables
+        .map((curso) => (curso.idcurso || '').trim())
+        .filter(Boolean)
+    );
+
+    const sanitized: Record<string, string> = {};
+    for (const [instructorId, cursoId] of Object.entries(this.selectedCursoByInstructor)) {
+      const normalizedCursoId = (cursoId || '').trim();
+      if (normalizedCursoId && availableCursoIds.has(normalizedCursoId)) {
+        sanitized[instructorId] = normalizedCursoId;
+      }
+    }
+
+    this.selectedCursoByInstructor = sanitized;
+  }
+
+  private isCursoCaducado(curso: Curso): boolean {
+    return isCursoCaducadoParaAsignacion(curso, COURSE_ASSIGNMENT_GRACE_MONTHS);
   }
 
   private getInstructorSearchText(instructor: Instructor): string {

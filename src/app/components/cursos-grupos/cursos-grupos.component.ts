@@ -15,7 +15,9 @@ import { Curso } from '../../models/curso.model';
 import { Instructor } from '../../models/instructor.model';
 import { Persona } from '../../models/persona.model';
 import { User } from '../../models/user.model';
+import { COURSE_ASSIGNMENT_GRACE_MONTHS } from '../../config/global.constants';
 import { coerceDate } from '../../utils/date.util';
+import { isCursoCaducadoParaAsignacion } from '../../utils/course-availability.util';
 import { resolveAppAssetUrl } from '../../utils/asset-url.util';
 import { sanitizePhoneInput, sanitizeScoreInput } from '../../utils/input-sanitizers.util';
 
@@ -367,6 +369,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
 
     const selectedCursoId = this.selectedCurso.idcurso;
     const companyTag = this.normalizeCompanyTag(this.selectedCurso.companyTag);
+    const cursoAssignmentPeriod = this.resolveCursoAssignmentPeriod(this.selectedCurso);
 
     try {
       const [assignedFromQuery, personasDisponibles] = await Promise.all([
@@ -377,7 +380,9 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
           ? this.personaService.searchAvailablePersonas({
               companyTag,
               term: this.personaDisponibleSearchTerm,
-              maxResults: this.PERSONAS_QUERY_LIMIT
+              maxResults: this.PERSONAS_QUERY_LIMIT,
+              targetYear: cursoAssignmentPeriod?.year ?? null,
+              targetMonth: cursoAssignmentPeriod?.month ?? null
             })
           : Promise.resolve([])
       ]);
@@ -676,7 +681,8 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
       this.notificationService.success('Persona asignada al curso');
     } catch (error) {
       console.error('Error agregando persona al curso:', error);
-      this.notificationService.error('Error al agregar persona al curso');
+      const errorMessage = error instanceof Error ? error.message.trim() : '';
+      this.notificationService.error(errorMessage || 'Error al agregar persona al curso');
     }
   }
 
@@ -702,6 +708,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
 
     const companyTag = this.normalizeCompanyTag(this.selectedCurso.companyTag);
     const locationTerm = this.getCursoAutoAssignLocation(this.selectedCurso);
+    const cursoAssignmentPeriod = this.resolveCursoAssignmentPeriod(this.selectedCurso);
 
     if (!companyTag || !locationTerm) {
       return;
@@ -710,7 +717,9 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     const candidatos = await this.personaService.findAutoAssignablePersonas({
       companyTag,
       locationTerm,
-      maxResults: this.PERSONAS_QUERY_LIMIT
+      maxResults: this.PERSONAS_QUERY_LIMIT,
+      targetYear: cursoAssignmentPeriod?.year ?? null,
+      targetMonth: cursoAssignmentPeriod?.month ?? null
     });
     const nuevosIds = candidatos
       .map((persona) => (persona.id || '').trim())
@@ -734,7 +743,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
         );
       } else if (result.skipped > 0) {
         this.notificationService.info(
-          `Autoasignacion sin cambios: ${result.skipped} persona(s) ya estaban asignadas en otro curso`
+          `Autoasignacion sin cambios: ${result.skipped} persona(s) estaban bloqueadas por asignacion activa o periodo de espera`
         );
       }
 
@@ -1419,7 +1428,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
       this.cursos = this.allCursos.filter((curso) => {
         const byUserAssignment = !!curso.idcurso && assignedByUser.has(curso.idcurso);
         const byInstructorProfile = (curso.instructorIds || []).some((id) => instructorIds.has(id));
-        return byUserAssignment || byInstructorProfile;
+        return (byUserAssignment || byInstructorProfile) && !this.isCursoCaducadoParaInstructor(curso);
       });
       this.syncSelectedCurso();
       return;
@@ -1452,6 +1461,10 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
 
   private normalizeCompanyTag(tag?: string): string {
     return (tag || '').trim().toLowerCase();
+  }
+
+  private isCursoCaducadoParaInstructor(curso: Curso): boolean {
+    return isCursoCaducadoParaAsignacion(curso, COURSE_ASSIGNMENT_GRACE_MONTHS);
   }
 
   private getInstructorIdsForCurrentUser(): Set<string> {
@@ -1652,6 +1665,25 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   private getCursoAutoAssignLocation(curso: Curso | null | undefined): string {
     if (!curso) return '';
     return this.normalizeSearch(curso.descripcion || '');
+  }
+
+  private resolveCursoAssignmentPeriod(curso: Curso | null | undefined): { year: number; month: number } | null {
+    if (!curso) {
+      return null;
+    }
+
+    const inicio = coerceDate(curso.Fecha_inicio);
+    const createdAt = coerceDate(curso.createdAt);
+    const year = this.normalizeYearInput(curso.anioCurso ?? inicio?.getFullYear() ?? createdAt?.getFullYear());
+    const month = this.normalizeMonthInput(
+      curso.mesCurso ?? ((inicio?.getMonth() ?? createdAt?.getMonth() ?? -1) + 1)
+    );
+
+    if (!year || !month) {
+      return null;
+    }
+
+    return { year, month };
   }
 
 

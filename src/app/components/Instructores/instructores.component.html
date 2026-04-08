@@ -57,7 +57,7 @@
         <span class="badge">{{ nuevoInstructor.cursosIds?.length || 0 }}</span>
       </div>
 
-      <div class="cursos-editor-search" *ngIf="cursos.length > 0">
+      <div class="cursos-editor-search" *ngIf="cursosAsignables.length > 0">
         <input
           type="text"
           placeholder="Buscar curso por nombre, empresa o representante..."
@@ -66,10 +66,10 @@
           name="course_search"
           autocomplete="off"
         >
-        <span class="badge">{{ visibleCursosForEdit.length }}/{{ cursos.length }}</span>
+        <span class="badge">{{ visibleCursosForEdit.length }}/{{ cursosAsignables.length }}</span>
       </div>
 
-      <div class="cursos-editor-list" *ngIf="cursos.length > 0; else noCursosDisponibles">
+      <div class="cursos-editor-list" *ngIf="cursosAsignables.length > 0; else noCursosDisponibles">
         <ng-container *ngIf="visibleCursosForEdit.length > 0; else noCursosFiltrados">
           <label
             class="curso-toggle"
@@ -103,14 +103,14 @@
       </div>
 
       <ng-template #noCursosDisponibles>
-        <p class="sin-cursos">No hay cursos cargados.</p>
+        <p class="sin-cursos">No hay cursos vigentes para asignar.</p>
       </ng-template>
 
       <ng-template #noCursosFiltrados>
         <p class="sin-cursos">No hay cursos que coincidan con la busqueda.</p>
       </ng-template>
 
-      <p class="panel-note">Selecciona aqui los cursos que tendra este instructor. Cada opcion muestra nombre, empresa y descripcion.</p>
+      <p class="panel-note">Solo se muestran cursos vigentes para asignacion. Los cursos caducados se ocultan automaticamente.</p>
     </div>
 
     <div class="acciones-form">
@@ -190,7 +190,7 @@
             <label>Curso:</label>
             <select [(ngModel)]="selectedCursoByInstructor[instructor.id]">
               <option value="">Selecciona un curso</option>
-              <option *ngFor="let curso of cursos; trackBy: trackByCursoId" [value]="curso.idcurso">
+              <option *ngFor="let curso of cursosAsignables; trackBy: trackByCursoId" [value]="curso.idcurso">
                 {{ curso.nombre }}
               </option>
             </select>

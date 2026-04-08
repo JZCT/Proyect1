@@ -10,7 +10,9 @@ import { NotificationService } from '../../services/notification.service';
 import { Curso } from '../../models/curso.model';
 import { Instructor } from '../../models/instructor.model';
 import { User } from '../../models/user.model';
+import { COURSE_ASSIGNMENT_GRACE_MONTHS } from '../../config/global.constants';
 import { coerceDate } from '../../utils/date.util';
+import { isCursoCaducadoParaAsignacion } from '../../utils/course-availability.util';
 import { sanitizePhoneInput } from '../../utils/input-sanitizers.util';
 
 type CursoArchivo = NonNullable<Curso['archivos']>[number] & {
@@ -979,7 +981,7 @@ export class CursosComponent implements OnInit, OnDestroy {
       this.cursos = this.allCursos.filter((curso) => {
         const byUserAssignment = !!curso.idcurso && assignedByUser.has(curso.idcurso);
         const byInstructorProfile = (curso.instructorIds || []).some((id) => instructorIds.has(id));
-        return byUserAssignment || byInstructorProfile;
+        return (byUserAssignment || byInstructorProfile) && !this.isCursoCaducadoParaInstructor(curso);
       });
       return;
     }
@@ -989,6 +991,10 @@ export class CursosComponent implements OnInit, OnDestroy {
 
   private normalizeCompanyTag(tag?: string): string {
     return (tag || '').trim().toLowerCase();
+  }
+
+  private isCursoCaducadoParaInstructor(curso: Curso): boolean {
+    return isCursoCaducadoParaAsignacion(curso, COURSE_ASSIGNMENT_GRACE_MONTHS);
   }
 
   private normalizeInstructorIds(instructorIds?: string[]): string[] {

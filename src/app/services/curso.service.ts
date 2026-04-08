@@ -23,6 +23,7 @@ import {
 import { Observable, combineLatest, map } from 'rxjs';
 import { Curso, CursoArchivo } from '../models/curso.model';
 import { Persona } from '../models/persona.model';
+import { PERSONA_REASSIGNMENT_COOLDOWN_MONTHS } from '../config/global.constants';
 import { coerceDate, normalizeDateInput } from '../utils/date.util';
 
 type CursoArchivoInput = NonNullable<Curso['archivos']>[number] & {
@@ -334,6 +335,8 @@ export class CursoService {
           throw new Error('La persona ya esta asignada a otro curso');
         }
 
+        this.ensurePersonaReassignmentCooldown(personaRaw, curso);
+
         const personasIds = Array.from(new Set([...currentPersonasIds, normalizedPersonaId]));
         const cursoIds = Array.from(new Set([...personaCursoIds, normalizedCursoId]));
 
@@ -384,12 +387,22 @@ export class CursoService {
         const personaRaw = personaSnapshot.data() as Partial<Persona>;
         const cursoIds = this.normalizeIdList(personaRaw.cursoIds).filter((id) => id !== normalizedCursoId);
         const assignedCursoId = cursoIds[0] || '';
+        const releasePeriod = !assignedCursoId
+          ? this.resolveCursoCompletionPeriod(curso)
+          : null;
 
-        transaction.set(personaDoc, {
+        const personaUpdatePayload: Record<string, unknown> = {
           cursoIds,
           assignedCursoId,
           assignmentStatus: assignedCursoId ? 'assigned' : 'available'
-        }, { merge: true });
+        };
+
+        if (releasePeriod) {
+          personaUpdatePayload['lastCursoYear'] = releasePeriod.year;
+          personaUpdatePayload['lastCursoMonth'] = releasePeriod.month;
+        }
+
+        transaction.set(personaDoc, personaUpdatePayload, { merge: true });
       });
     } catch (error) {
       console.error('Error removiendo persona del curso:', error);
@@ -424,7 +437,10 @@ export class CursoService {
         added += 1;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message.toLowerCase() : '';
-        if (errorMessage.includes('ya esta asignada a otro curso')) {
+        if (
+          errorMessage.includes('ya esta asignada a otro curso')
+          || errorMessage.includes('periodo de espera')
+        ) {
           skipped += 1;
         } else {
           errors += 1;
@@ -994,6 +1010,74 @@ export class CursoService {
     if (byInicio) return byInicio;
 
     return this.normalizeMonthValue((createdAt?.getMonth() ?? -1) + 1);
+  }
+
+  private ensurePersonaReassignmentCooldown(persona: Partial<Persona>, targetCurso: Partial<Curso>): void {
+    const lastPeriod = this.resolvePersonaLastCursoPeriod(persona);
+    if (!lastPeriod) {
+      return;
+    }
+
+    const targetPeriod = this.resolveCursoStartPeriod(targetCurso);
+    if (!targetPeriod) {
+      return;
+    }
+
+    const monthDiff = this.diffMonths(lastPeriod, targetPeriod);
+    if (monthDiff >= PERSONA_REASSIGNMENT_COOLDOWN_MONTHS) {
+      return;
+    }
+
+    if (monthDiff < 0) {
+      throw new Error('El periodo del curso seleccionado es anterior al ultimo curso de esta persona');
+    }
+
+    const remaining = PERSONA_REASSIGNMENT_COOLDOWN_MONTHS - monthDiff;
+    throw new Error(
+      `La persona esta en periodo de espera. Deben pasar ${PERSONA_REASSIGNMENT_COOLDOWN_MONTHS} meses entre cursos; faltan ${remaining} mes(es)`
+    );
+  }
+
+  private resolvePersonaLastCursoPeriod(persona: Partial<Persona>): { year: number; month: number } | null {
+    const year = this.normalizeYearValue(persona.lastCursoYear);
+    const month = this.normalizeMonthValue(persona.lastCursoMonth);
+    if (!year || !month) {
+      return null;
+    }
+
+    return { year, month };
+  }
+
+  private resolveCursoStartPeriod(curso: Partial<Curso>): { year: number; month: number } | null {
+    const inicio = coerceDate(curso.Fecha_inicio);
+    const createdAt = coerceDate(curso.createdAt);
+    const year = this.resolveCursoYear(curso.anioCurso, inicio, createdAt);
+    const month = this.resolveCursoMonth(curso.mesCurso, inicio, createdAt);
+    if (!year || !month) {
+      return null;
+    }
+
+    return { year, month };
+  }
+
+  private resolveCursoCompletionPeriod(curso: Partial<Curso>): { year: number; month: number } | null {
+    const fin = coerceDate(curso.Fecha_fin);
+    if (fin) {
+      const year = this.normalizeYearValue(fin.getFullYear());
+      const month = this.normalizeMonthValue(fin.getMonth() + 1);
+      if (year && month) {
+        return { year, month };
+      }
+    }
+
+    return this.resolveCursoStartPeriod(curso);
+  }
+
+  private diffMonths(
+    from: { year: number; month: number },
+    to: { year: number; month: number }
+  ): number {
+    return ((to.year * 12) + to.month) - ((from.year * 12) + from.month);
   }
 
   private normalizeAttachmentUrl(value: unknown): string {

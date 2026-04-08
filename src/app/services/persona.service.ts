@@ -24,6 +24,7 @@ import {
 } from '@angular/fire/storage';
 import { Observable, combineLatest, map } from 'rxjs';
 import { Persona, PersonaArchivo } from '../models/persona.model';
+import { PERSONA_REASSIGNMENT_COOLDOWN_MONTHS } from '../config/global.constants';
 import { normalizeDateInput } from '../utils/date.util';
 
 type RawPersona = Partial<Persona> & {
@@ -37,6 +38,10 @@ type RawPersona = Partial<Persona> & {
   mes_persona?: unknown;
   mes?: unknown;
   month?: unknown;
+  lastCursoYear?: unknown;
+  last_curso_year?: unknown;
+  lastCursoMonth?: unknown;
+  last_curso_month?: unknown;
 };
 
 type PeriodRange = {
@@ -215,6 +220,8 @@ export class PersonaService {
     companyTag: string;
     term?: string;
     maxResults?: number;
+    targetYear?: number | null;
+    targetMonth?: number | null;
   }): Promise<Persona[]> {
     const normalizedCompanyTag = this.normalizeCompanyTag(params.companyTag || '');
     if (!normalizedCompanyTag) {
@@ -224,6 +231,7 @@ export class PersonaService {
     const normalizedTerm = this.normalizeSearchValue(params.term || '');
     const queryToken = this.pickQueryToken(normalizedTerm);
     const requestLimit = this.clampLimit(params.maxResults);
+    const targetPeriod = this.resolvePeriod(params.targetYear, params.targetMonth);
     const q = queryToken
       ? query(
           this.personasCollection,
@@ -262,7 +270,10 @@ export class PersonaService {
         deduped.set(normalized.id, normalized);
       }
 
-      const personas = [...deduped.values()].filter((persona) => this.isAvailablePersona(persona));
+      const personas = [...deduped.values()].filter((persona) =>
+        this.isAvailablePersona(persona)
+        && this.isEligibleForReassignment(persona, targetPeriod)
+      );
       if (!normalizedTerm) {
         return personas.slice(0, requestLimit);
       }
@@ -281,9 +292,12 @@ export class PersonaService {
     companyTag: string;
     locationTerm: string;
     maxResults?: number;
+    targetYear?: number | null;
+    targetMonth?: number | null;
   }): Promise<Persona[]> {
     const normalizedCompanyTag = this.normalizeCompanyTag(params.companyTag || '');
     const normalizedLocation = this.normalizeSearchValue(params.locationTerm || '');
+    const targetPeriod = this.resolvePeriod(params.targetYear, params.targetMonth);
 
     if (!normalizedCompanyTag || !normalizedLocation) {
       return [];
@@ -353,6 +367,7 @@ export class PersonaService {
       const personas = [...deduped.values()];
       return personas.filter((persona) => {
         if (!this.isAvailablePersona(persona)) return false;
+        if (!this.isEligibleForReassignment(persona, targetPeriod)) return false;
         if (this.normalizeCompanyTag(persona.companyTag || persona.empresa || '') !== normalizedCompanyTag) return false;
 
         const personaLocation = this.parseLocation(this.normalizeSearchValue(persona.lugar || ''));
@@ -549,6 +564,9 @@ export class PersonaService {
     const createdAt = normalizeDateInput(persona.createdAt, new Date()) ?? new Date();
     const anioPersona = this.resolvePersonaYear(persona.anioPersona, createdAt);
     const mesPersona = this.resolvePersonaMonth(persona.mesPersona, createdAt);
+    const lastCursoYear = this.normalizeYearValue(persona.lastCursoYear);
+    const lastCursoMonth = this.normalizeMonthValue(persona.lastCursoMonth);
+    const hasLastCursoPeriod = !!lastCursoYear && !!lastCursoMonth;
 
     const location = this.parseLocation(this.normalizeSearchValue(persona.lugar || ''));
     const searchTokens = this.buildSearchTokens([
@@ -582,6 +600,8 @@ export class PersonaService {
       locationState: location.state || '',
       anioPersona,
       mesPersona,
+      lastCursoYear: hasLastCursoPeriod ? lastCursoYear : undefined,
+      lastCursoMonth: hasLastCursoPeriod ? lastCursoMonth : undefined,
       createdAt
     };
   }
@@ -963,6 +983,13 @@ export class PersonaService {
       persona.mesPersona ?? persona.mes_persona ?? persona.mes ?? persona.month,
       createdAt
     );
+    const lastCursoYear = this.normalizeYearValue(
+      persona.lastCursoYear ?? persona.last_curso_year
+    );
+    const lastCursoMonth = this.normalizeMonthValue(
+      persona.lastCursoMonth ?? persona.last_curso_month
+    );
+    const hasLastCursoPeriod = !!lastCursoYear && !!lastCursoMonth;
 
     return {
       id: idOverride || this.normalizeOptionalTextField(persona.id),
@@ -986,6 +1013,8 @@ export class PersonaService {
       locationState: location.state || '',
       anioPersona,
       mesPersona,
+      lastCursoYear: hasLastCursoPeriod ? lastCursoYear : undefined,
+      lastCursoMonth: hasLastCursoPeriod ? lastCursoMonth : undefined,
       createdAt
     };
   }
@@ -1062,6 +1091,47 @@ export class PersonaService {
       state: segments.length > 1 ? segments[segments.length - 1] : '',
       tokens: Array.from(new Set(tokens))
     };
+  }
+
+  private resolvePeriod(yearValue: unknown, monthValue: unknown): { year: number; month: number } | null {
+    const year = this.normalizeYearValue(yearValue);
+    const month = this.normalizeMonthValue(monthValue);
+    if (!year || !month) {
+      return null;
+    }
+
+    return { year, month };
+  }
+
+  private resolveLastCursoPeriod(persona: Partial<Persona>): { year: number; month: number } | null {
+    return this.resolvePeriod(
+      persona.lastCursoYear,
+      persona.lastCursoMonth
+    );
+  }
+
+  private isEligibleForReassignment(
+    persona: Partial<Persona>,
+    targetPeriod: { year: number; month: number } | null
+  ): boolean {
+    if (!targetPeriod) {
+      return true;
+    }
+
+    const lastPeriod = this.resolveLastCursoPeriod(persona);
+    if (!lastPeriod) {
+      return true;
+    }
+
+    const monthDiff = this.diffMonths(lastPeriod, targetPeriod);
+    return monthDiff >= PERSONA_REASSIGNMENT_COOLDOWN_MONTHS;
+  }
+
+  private diffMonths(
+    from: { year: number; month: number },
+    to: { year: number; month: number }
+  ): number {
+    return ((to.year * 12) + to.month) - ((from.year * 12) + from.month);
   }
 
   private isAvailablePersona(persona: Partial<Persona>): boolean {
