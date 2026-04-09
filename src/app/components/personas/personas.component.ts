@@ -23,6 +23,13 @@ type PersonaArchivo = NonNullable<Persona['archivos']>[number] & {
   file?: File;
 };
 type FilePreviewType = 'image' | 'pdf' | 'text' | 'unsupported';
+type FilteredPersonasCache = {
+  source: Persona[];
+  term: string;
+  sortBy: PersonasComponent['sortBy'];
+  sortDirection: PersonasComponent['sortDirection'];
+  result: Persona[];
+};
 
 @Component({
   selector: 'app-personas',
@@ -42,6 +49,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
   private readonly CURRENT_YEAR = new Date().getFullYear();
   private cameraStream: MediaStream | null = null;
   private cursosSubscription: Subscription | null = null;
+  private personasSubscription: Subscription | null = null;
   
   personas: Persona[] = [];
   allPersonas: Persona[] = [];
@@ -70,6 +78,8 @@ export class PersonasComponent implements OnInit, OnDestroy {
   assigningSelected = false;
   bulkAssignCursoId = '';
   deletingPersonaId: string | null = null;
+  showPersonaEntregables = false;
+  personaEntregablesTarget: Persona | null = null;
   showFilePreview = false;
   previewFile: PersonaArchivo | null = null;
   previewType: FilePreviewType = 'unsupported';
@@ -79,6 +89,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
   previewError = '';
   private cursosById: Record<string, Curso> = {};
   private personaAssignmentLabelById: Record<string, string> = {};
+  private filteredPersonasCache: FilteredPersonasCache | null = null;
 
   // Propiedades para carga masiva
   showBulkImport = false;
@@ -180,7 +191,9 @@ export class PersonasComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.persistSearchState();
     this.cursosSubscription?.unsubscribe();
+    this.personasSubscription?.unsubscribe();
     this.detenerCamara();
+    this.closePersonaEntregablesModal();
     this.closeArchivoPreview();
   }
 
@@ -251,6 +264,8 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   loadPersonas() {
+    this.personasSubscription?.unsubscribe();
+    this.personasSubscription = null;
     this.loadingPersonas = true;
     const singlePeriod = this.personaFilterEnabled && this.personaFilterMode === 'single'
       ? this.parseMonthRangeValue(this.personaSinglePeriod)
@@ -269,7 +284,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.personaService.getPersonasByPeriod({
+    this.personasSubscription = this.personaService.getPersonasByPeriod({
       year: this.personaFilterEnabled && this.personaFilterMode === 'single'
         ? (singlePeriod?.year ?? null)
         : null,
@@ -293,7 +308,6 @@ export class PersonasComponent implements OnInit, OnDestroy {
         this.allPersonas = personas;
         this.applyPersonaVisibility();
         this.loadingPersonas = false;
-        console.log('Personas cargadas:', personas);
       },
       error: (error) => {
         console.error('Error cargando personas:', error);
@@ -678,6 +692,9 @@ export class PersonasComponent implements OnInit, OnDestroy {
         this.selectedPersonaIds.delete(id);
         this.allPersonas = this.allPersonas.filter((persona) => persona.id !== id);
         this.applyPersonaVisibility();
+        if (this.personaEntregablesTarget?.id === id) {
+          this.closePersonaEntregablesModal();
+        }
         if (this.editingId === id) {
           this.resetForm();
         }
@@ -830,6 +847,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
   resetForm() {
     this.showPhotoOptions = false;
     this.detenerCamara();
+    this.closePersonaEntregablesModal();
     this.closeArchivoPreview();
     this.savingPersona = false;
     this.revokeObjectUrls(this.newPersona.archivos as PersonaArchivo[] | undefined);
@@ -869,6 +887,39 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
   getCurrentArchivos(): PersonaArchivo[] {
     return (this.editingId ? this.editingPersona.archivos : this.newPersona.archivos) || [];
+  }
+
+  getPersonaArchivos(persona: Partial<Persona> | null | undefined): PersonaArchivo[] {
+    return (persona?.archivos || []).filter((archivo) => !!archivo?.url && !!archivo?.nombre);
+  }
+
+  openPersonaEntregablesModal(persona: Persona): void {
+    this.personaEntregablesTarget = persona;
+    this.showPersonaEntregables = true;
+  }
+
+  closePersonaEntregablesModal(): void {
+    this.showPersonaEntregables = false;
+    this.personaEntregablesTarget = null;
+  }
+
+  formatArchivoSize(size?: number): string {
+    const numericSize = Number(size);
+    if (!Number.isFinite(numericSize) || numericSize <= 0) {
+      return 'Tamano no disponible';
+    }
+
+    if (numericSize < 1024) {
+      return `${numericSize} B`;
+    }
+
+    const kb = numericSize / 1024;
+    if (kb < 1024) {
+      return `${kb.toFixed(1)} KB`;
+    }
+
+    const mb = kb / 1024;
+    return `${mb.toFixed(1)} MB`;
   }
 
   isImageFile(file: PersonaArchivo): boolean {
@@ -1590,6 +1641,16 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
   get filteredPersonas(): Persona[] {
     const term = this.normalizeSearch(this.searchTerm);
+    if (
+      this.filteredPersonasCache &&
+      this.filteredPersonasCache.source === this.personas &&
+      this.filteredPersonasCache.term === term &&
+      this.filteredPersonasCache.sortBy === this.sortBy &&
+      this.filteredPersonasCache.sortDirection === this.sortDirection
+    ) {
+      return this.filteredPersonasCache.result;
+    }
+
     const filtered = this.personas.filter((persona) => {
       const target = this.normalizeText([
         persona.nombre,
@@ -1607,7 +1668,16 @@ export class PersonasComponent implements OnInit, OnDestroy {
       return target.includes(term);
     });
 
-    return filtered.sort((a, b) => this.comparePersonas(a, b));
+    const result = filtered.sort((a, b) => this.comparePersonas(a, b));
+    this.filteredPersonasCache = {
+      source: this.personas,
+      term,
+      sortBy: this.sortBy,
+      sortDirection: this.sortDirection,
+      result
+    };
+
+    return result;
   }
 
   getPersonaPeriodDisplay(persona: Partial<Persona>): string {
@@ -1782,20 +1852,20 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   private resolveCursoPeriod(curso: Partial<Curso>): { year: number; month: number } | null {
-    const explicitYear = this.normalizeYearInput(curso.anioCurso);
-    const explicitMonth = this.normalizeMonthInput(curso.mesCurso);
-    if (explicitYear && explicitMonth) {
-      return { year: explicitYear, month: explicitMonth };
+    const inicio = normalizeDateInput(curso.Fecha_inicio);
+    if (inicio) {
+      const yearFromInicio = this.normalizeYearInput(inicio.getFullYear());
+      const monthFromInicio = this.normalizeMonthInput(inicio.getMonth() + 1);
+      if (yearFromInicio && monthFromInicio) {
+        return { year: yearFromInicio, month: monthFromInicio };
+      }
     }
 
-    const inicio = normalizeDateInput(curso.Fecha_inicio);
-    if (!inicio) return null;
+    const explicitYear = this.normalizeYearInput(curso.anioCurso);
+    const explicitMonth = this.normalizeMonthInput(curso.mesCurso);
+    if (!explicitYear || !explicitMonth) return null;
 
-    const year = this.normalizeYearInput(inicio.getFullYear());
-    const month = this.normalizeMonthInput(inicio.getMonth() + 1);
-    if (!year || !month) return null;
-
-    return { year, month };
+    return { year: explicitYear, month: explicitMonth };
   }
 
   private parseLocationForAssignment(value: string): {

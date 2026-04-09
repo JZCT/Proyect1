@@ -329,11 +329,12 @@
                   <div class="curso-instructores-avatars" *ngIf="cursoInstructores.length > 0">
                     <img
                       *ngFor="let instructor of cursoInstructores; trackBy: trackByInstructorId"
-                      class="curso-instructor-avatar"
+                      class="curso-instructor-avatar clickable-avatar"
                       [src]="instructor.foto || defaultInstructorImg"
                       [alt]="instructor.nombre"
-                      [title]="instructor.nombre"
+                      [title]="'Click para ampliar: ' + instructor.nombre"
                       (error)="onInstructorImgError($event)"
+                      (click)="openImagePreview(instructor.foto || defaultInstructorImg, instructor.nombre); $event.stopPropagation()"
                     />
                   </div>
                 </ng-container>
@@ -468,11 +469,12 @@
           <div *ngIf="instructoresEnCurso.length > 0" class="instructores-grid">
             <div *ngFor="let instructor of instructoresEnCurso; trackBy: trackByInstructorId" class="instructor-card">
               <img
-                class="instructor-avatar"
+                class="instructor-avatar clickable-avatar"
                 [src]="instructor.foto || defaultInstructorImg"
                 [alt]="instructor.nombre"
-                [title]="instructor.nombre"
+                [title]="'Click para ampliar: ' + instructor.nombre"
                 (error)="onInstructorImgError($event)"
+                (click)="openImagePreview(instructor.foto || defaultInstructorImg, instructor.nombre)"
               />
               <div class="instructor-data">
                 <strong>{{ instructor.nombre }}</strong>
@@ -602,7 +604,17 @@
           <div *ngIf="filteredPersonasEnCurso.length > 0" class="scrollable-results">
             <div *ngFor="let persona of filteredPersonasEnCurso; trackBy: trackByPersonaId" class="grupo-item">
               <div class="grupo-info">
-                <h5>{{ persona.nombre }}</h5>
+                <div class="grupo-persona-header">
+                  <img
+                    class="grupo-persona-avatar clickable-avatar"
+                    [src]="persona.foto || defaultInstructorImg"
+                    [alt]="persona.nombre"
+                    [title]="'Click para ampliar: ' + persona.nombre"
+                    (error)="onInstructorImgError($event)"
+                    (click)="openImagePreview(persona.foto || defaultInstructorImg, persona.nombre)"
+                  />
+                  <h5>{{ persona.nombre }}</h5>
+                </div>
                 <p>{{ persona.email }} | {{ persona.telefono }} | CURP: {{ persona.curp || '-' }}</p>
                 <p>
                   Practica: {{ formatCalificacion(persona.clfPractica) }} |
@@ -614,6 +626,45 @@
                     {{ getResultadoTexto(persona) }}
                   </span>
                 </p>
+
+                <div class="persona-entregables">
+                  <p class="persona-entregables-title">
+                    Entregables: {{ getPersonaEntregables(persona).length }}
+                  </p>
+
+                  <div class="file-preview-grid compact" *ngIf="getPersonaEntregables(persona).length > 0; else personaSinEntregables">
+                    <div class="file-preview-card" *ngFor="let file of getPersonaEntregables(persona); trackBy: trackByArchivo">
+                      <div class="file-meta">
+                        <div class="file-name">{{ file.nombre }}</div>
+                        <div class="file-type">{{ file.tipo || 'tipo no disponible' }} | {{ formatArchivoSize(file.size) }}</div>
+                      </div>
+                      <div class="file-preview-actions">
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-info"
+                          (click)="openPersonaEntregable(file)"
+                          [disabled]="!canPreviewArchivo(file)"
+                          [title]="getArchivoPreviewTooltip(file)"
+                        >
+                          {{ getArchivoActionLabel(file) }}
+                        </button>
+                        <a
+                          *ngIf="file.url"
+                          class="btn btn-sm btn-secondary"
+                          [href]="file.url"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Abrir
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  <ng-template #personaSinEntregables>
+                    <p class="field-help">Sin entregables cargados para esta persona.</p>
+                  </ng-template>
+                </div>
 
                 <div *ngIf="canManagePersonas()" class="calificacion-editor">
                   <label>
@@ -650,10 +701,36 @@
               </div>
 
               <div class="grupo-actions" *ngIf="canManagePersonas()">
-                <button type="button" class="btn btn-sm btn-danger" (click)="removePersonaFromCurso(persona.id)">Remover</button>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-danger"
+                  (click)="removePersonaFromCurso(persona.id)"
+                  [disabled]="!persona.id || (persona.id && removingPersonasIds[persona.id])"
+                >
+                  {{ persona.id && removingPersonasIds[persona.id] ? 'Removiendo...' : 'Remover' }}
+                </button>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="showImagePreview" class="modal-overlay image-preview-overlay" (click)="closeImagePreview()">
+      <div class="modal-content image-preview-modal" (click)="$event.stopPropagation()">
+        <div class="file-preview-header">
+          <h4>{{ imagePreviewName || 'Imagen' }}</h4>
+          <div class="file-preview-actions">
+            <button type="button" class="btn btn-sm btn-secondary" (click)="closeImagePreview()">Cerrar</button>
+          </div>
+        </div>
+
+        <div class="image-preview-body">
+          <img
+            [src]="imagePreviewUrl"
+            [alt]="imagePreviewName || 'Imagen ampliada'"
+            (error)="onImagePreviewError($event)"
+          />
         </div>
       </div>
     </div>

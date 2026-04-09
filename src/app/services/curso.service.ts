@@ -20,7 +20,7 @@ import {
   ref,
   uploadBytes
 } from '@angular/fire/storage';
-import { Observable, combineLatest, map } from 'rxjs';
+import { Observable, combineLatest, map, shareReplay } from 'rxjs';
 import { Curso, CursoArchivo } from '../models/curso.model';
 import { Persona } from '../models/persona.model';
 import { PERSONA_REASSIGNMENT_COOLDOWN_MONTHS } from '../config/global.constants';
@@ -76,18 +76,25 @@ export class CursoService {
   private readonly STORAGE_FILES_FOLDER = 'archivos';
 
   private cursosCollection;
+  private cursos$: Observable<Curso[]> | null = null;
+  private cursosByPeriodCache = new Map<string, Observable<Curso[]>>();
 
   constructor(private firestore: Firestore, private storage: Storage) {
     this.cursosCollection = collection(this.firestore, 'cursos');
   }
 
   getCursos(): Observable<Curso[]> {
-    return collectionData(this.cursosCollection, { idField: 'idcurso' }).pipe(
-      map((rows) =>
-        (rows as RawCurso[])
-          .map((row) => this.normalizeCurso(row))
-      )
-    );
+    if (!this.cursos$) {
+      this.cursos$ = collectionData(this.cursosCollection, { idField: 'idcurso' }).pipe(
+        map((rows) =>
+          (rows as RawCurso[])
+            .map((row) => this.normalizeCurso(row))
+        ),
+        shareReplay({ bufferSize: 1, refCount: true })
+      );
+    }
+
+    return this.cursos$;
   }
 
   getCursosByPeriod(filters?: {
@@ -119,6 +126,12 @@ export class CursoService {
     );
     if (!effectiveRange) {
       return this.getCursos();
+    }
+
+    const periodCacheKey = `${effectiveRange.startYear}-${effectiveRange.startMonth}:${effectiveRange.endYear}-${effectiveRange.endMonth}`;
+    const cached = this.cursosByPeriodCache.get(periodCacheKey);
+    if (cached) {
+      return cached;
     }
 
     const cursosByNormalizedFields$ = collectionData(
@@ -157,7 +170,7 @@ export class CursoService {
       { idField: 'idcurso' }
     ) as Observable<RawCurso[]>;
 
-    return combineLatest([
+    const stream$ = combineLatest([
       cursosByNormalizedFields$,
       cursosByFechaInicio$,
       cursosByFechaInicioLegacy$,
@@ -192,8 +205,12 @@ export class CursoService {
         }
 
         return [...deduped.values()];
-      })
+      }),
+      shareReplay({ bufferSize: 1, refCount: true })
     );
+
+    this.cursosByPeriodCache.set(periodCacheKey, stream$);
+    return stream$;
   }
 
   async addCurso(curso: Curso): Promise<void> {
@@ -987,11 +1004,11 @@ export class CursoService {
     inicio?: Date | null,
     createdAt?: Date | null
   ): number | undefined {
-    const byField = this.normalizeYearValue(explicitYear);
-    if (byField) return byField;
-
     const byInicio = this.normalizeYearValue(inicio?.getFullYear());
     if (byInicio) return byInicio;
+
+    const byField = this.normalizeYearValue(explicitYear);
+    if (byField) return byField;
 
     return this.normalizeYearValue(createdAt?.getFullYear());
   }
@@ -1001,11 +1018,11 @@ export class CursoService {
     inicio?: Date | null,
     createdAt?: Date | null
   ): number | undefined {
-    const byField = this.normalizeMonthValue(explicitMonth);
-    if (byField) return byField;
-
     const byInicio = this.normalizeMonthValue((inicio?.getMonth() ?? -1) + 1);
     if (byInicio) return byInicio;
+
+    const byField = this.normalizeMonthValue(explicitMonth);
+    if (byField) return byField;
 
     return this.normalizeMonthValue((createdAt?.getMonth() ?? -1) + 1);
   }

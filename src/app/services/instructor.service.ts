@@ -16,7 +16,7 @@ import {
   updateDoc,
   where
 } from '@angular/fire/firestore';
-import { Observable } from 'rxjs';
+import { Observable, shareReplay } from 'rxjs';
 import { Instructor } from '../models/instructor.model';
 
 @Injectable({
@@ -24,13 +24,20 @@ import { Instructor } from '../models/instructor.model';
 })
 export class InstructorService {
   private instructoresCollection;
+  private instructores$: Observable<Instructor[]> | null = null;
 
   constructor(private firestore: Firestore) {
     this.instructoresCollection = collection(this.firestore, 'instructores');
   }
 
   getInstructores(): Observable<Instructor[]> {
-    return collectionData(this.instructoresCollection, { idField: 'id' }) as Observable<Instructor[]>;
+    if (!this.instructores$) {
+      this.instructores$ = (collectionData(this.instructoresCollection, { idField: 'id' }) as Observable<Instructor[]>).pipe(
+        shareReplay({ bufferSize: 1, refCount: true })
+      );
+    }
+
+    return this.instructores$;
   }
 
   async addInstructor(instructor: Instructor): Promise<string> {

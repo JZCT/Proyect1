@@ -14,7 +14,7 @@
 .executive-summary {
   background: linear-gradient(180deg, rgba(37, 99, 235, 0.08), rgba(37, 99, 235, 0.02));
   border: 1px solid rgba(37, 99, 235, 0.16);
-  border-radius: 14px;
+  border-radius: 20px;
   padding: 14px;
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
   display: grid;
@@ -354,6 +354,16 @@ select:focus {
   background: var(--surface-elevated);
 }
 
+.clickable-avatar {
+  cursor: zoom-in;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.clickable-avatar:hover {
+  transform: scale(1.06);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.22);
+}
+
 .instructor-data {
   display: grid;
 }
@@ -415,6 +425,22 @@ select:focus {
   color: var(--text);
 }
 
+.grupo-persona-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.grupo-persona-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: var(--surface-elevated);
+  flex-shrink: 0;
+}
+
 .curso-info p,
 .grupo-info p {
   margin: 3px 0 0;
@@ -469,6 +495,20 @@ select:focus {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 8px;
+}
+
+.file-preview-grid.compact {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.persona-entregables {
+  margin-top: 8px;
+}
+
+.persona-entregables-title {
+  font-size: 12px;
+  color: var(--text-soft);
+  font-weight: 600;
 }
 
 .file-preview-card {
@@ -542,6 +582,10 @@ select:focus {
   width: min(900px, 100%);
 }
 
+.image-preview-modal {
+  width: min(980px, 100%);
+}
+
 .file-preview-header {
   display: flex;
   justify-content: space-between;
@@ -554,6 +598,23 @@ select:focus {
   margin: 0;
   font-size: 14px;
   color: var(--text);
+}
+
+.image-preview-body {
+  border: 1px solid var(--surface-elevated);
+  border-radius: 10px;
+  min-height: 320px;
+  max-height: 78vh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #0f172a;
+}
+
+.image-preview-body img {
+  width: 100%;
+  max-height: 78vh;
+  object-fit: contain;
 }
 
 .file-preview-body {

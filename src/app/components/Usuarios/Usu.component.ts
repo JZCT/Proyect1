@@ -7,6 +7,13 @@ import { NotificationService } from '../../services/notification.service';
 import { User } from '../../models/user.model';
 import { Instructor } from '../../models/instructor.model';
 
+type FilteredUsersCache = {
+  source: User[];
+  instructoresSource: Instructor[];
+  term: string;
+  result: User[];
+};
+
 @Component({
   selector: 'app-users',
   standalone: true,
@@ -25,6 +32,8 @@ export class UsersComponent implements OnInit {
   editingCompanyTagValue: string = '';
   savingCompanyTagUserId: string | null = null;
   deletingUserId: string | null = null;
+  private instructorNameById: Record<string, string> = {};
+  private filteredUsersCache: FilteredUsersCache | null = null;
 
   newUser: Partial<User> = {
     nombre: '',
@@ -80,6 +89,7 @@ export class UsersComponent implements OnInit {
     this.authService.getAllUsers().subscribe({
       next: (users) => {
         this.users = users;
+        this.filteredUsersCache = null;
         console.log('Usuarios cargados:', users);
       },
       error: (error) => {
@@ -92,6 +102,8 @@ export class UsersComponent implements OnInit {
     this.instructorService.getInstructores().subscribe({
       next: (instructores) => {
         this.instructores = instructores;
+        this.rebuildInstructorNameIndex();
+        this.filteredUsersCache = null;
       },
       error: (error) => {
         console.error('Error cargando instructores:', error);
@@ -275,15 +287,31 @@ export class UsersComponent implements OnInit {
 
   getInstructorNameById(instructorId?: string): string {
     if (!instructorId) return 'Sin vincular';
-    const instructor = this.instructores.find((item) => item.id === instructorId);
-    return instructor?.nombre || 'Sin vincular';
+    return this.instructorNameById[instructorId] || 'Sin vincular';
   }
 
   get filteredUsers(): User[] {
     const term = this.normalizeSearch(this.searchTerm);
-    if (!term) return this.users;
+    if (
+      this.filteredUsersCache &&
+      this.filteredUsersCache.source === this.users &&
+      this.filteredUsersCache.instructoresSource === this.instructores &&
+      this.filteredUsersCache.term === term
+    ) {
+      return this.filteredUsersCache.result;
+    }
 
-    return this.users.filter((user) => {
+    if (!term) {
+      this.filteredUsersCache = {
+        source: this.users,
+        instructoresSource: this.instructores,
+        term,
+        result: this.users
+      };
+      return this.users;
+    }
+
+    const result = this.users.filter((user) => {
       const target = this.normalizeText([
         user.nombre,
         user.email,
@@ -295,6 +323,15 @@ export class UsersComponent implements OnInit {
 
       return target.includes(term);
     });
+
+    this.filteredUsersCache = {
+      source: this.users,
+      instructoresSource: this.instructores,
+      term,
+      result
+    };
+
+    return result;
   }
 
   trackByUserId(index: number, user: User): string {
@@ -315,5 +352,15 @@ export class UsersComponent implements OnInit {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/\s+/g, ' ');
+  }
+
+  private rebuildInstructorNameIndex(): void {
+    const index: Record<string, string> = {};
+    for (const instructor of this.instructores) {
+      const id = (instructor.id || '').trim();
+      if (!id) continue;
+      index[id] = instructor.nombre || '';
+    }
+    this.instructorNameById = index;
   }
 }

@@ -25,6 +25,26 @@ type CursosSearchState = {
   tagSearchTerm: string;
 };
 
+type FilteredCursosCache = {
+  source: Curso[];
+  term: string;
+  tagTerm: string;
+  sortBy: CursosComponent['sortBy'];
+  sortDirection: CursosComponent['sortDirection'];
+  result: Curso[];
+};
+
+type AvailableInstructoresCache = {
+  source: Instructor[];
+  result: Instructor[];
+};
+
+type FilteredInstructoresCache = {
+  source: Instructor[];
+  term: string;
+  result: Instructor[];
+};
+
 @Component({
   selector: 'app-cursos',
   standalone: true,
@@ -67,6 +87,10 @@ export class CursosComponent implements OnInit, OnDestroy {
   previewResourceUrl: SafeResourceUrl | null = null;
   previewOpenUrl: string | null = null;
   previewError = '';
+  private filteredCursosCache: FilteredCursosCache | null = null;
+  private availableInstructoresCache: AvailableInstructoresCache | null = null;
+  private filteredInstructoresCache: FilteredInstructoresCache | null = null;
+  private instructorNameById: Record<string, string> = {};
 
   updateCurrentRepresentativePhone(value: unknown): void {
     const telefono = sanitizePhoneInput(value);
@@ -200,6 +224,8 @@ export class CursosComponent implements OnInit, OnDestroy {
     this.instructorService.getInstructores().subscribe({
       next: (instructores) => {
         this.instructores = instructores;
+        this.rebuildInstructorNameIndex();
+        this.invalidateInstructorCaches();
         this.applyCursoFilter();
       },
       error: (error) => {
@@ -518,20 +544,53 @@ export class CursosComponent implements OnInit, OnDestroy {
   }
 
   getAvailableInstructores(): Instructor[] {
-    return this.instructores
+    if (this.availableInstructoresCache?.source === this.instructores) {
+      return this.availableInstructoresCache.result;
+    }
+
+    const result = this.instructores
       .filter((instructor) => !!instructor.id)
       .sort((a, b) => this.normalizeSearch(a.nombre || '').localeCompare(this.normalizeSearch(b.nombre || '')));
+
+    this.availableInstructoresCache = {
+      source: this.instructores,
+      result
+    };
+
+    return result;
   }
 
   filteredAvailableInstructores(): Instructor[] {
     const term = this.normalizeSearch(this.instructorSearchTerm);
     const available = this.getAvailableInstructores();
+    if (
+      this.filteredInstructoresCache &&
+      this.filteredInstructoresCache.source === available &&
+      this.filteredInstructoresCache.term === term
+    ) {
+      return this.filteredInstructoresCache.result;
+    }
 
-    if (!term) return available;
+    if (!term) {
+      this.filteredInstructoresCache = {
+        source: available,
+        term,
+        result: available
+      };
+      return available;
+    }
 
-    return available.filter((instructor) =>
+    const result = available.filter((instructor) =>
       this.normalizeText([instructor.nombre, instructor.telefono || ''].join(' ')).includes(term)
     );
+
+    this.filteredInstructoresCache = {
+      source: available,
+      term,
+      result
+    };
+
+    return result;
   }
 
   trackByCursoId(index: number, curso: Curso): string {
@@ -557,8 +616,7 @@ export class CursosComponent implements OnInit, OnDestroy {
   }
 
   getInstructorName(instructorId: string): string {
-    const instructor = this.instructores.find((i) => i.id === instructorId);
-    return instructor ? instructor.nombre : 'Instructor no encontrado';
+    return this.instructorNameById[instructorId] || 'Instructor no encontrado';
   }
 
   getCurrentInstructors(): string[] {
@@ -1114,6 +1172,17 @@ export class CursosComponent implements OnInit, OnDestroy {
   get filteredCursos(): Curso[] {
     const term = this.normalizeSearch(this.searchTerm);
     const tagTerm = this.normalizeSearch(this.tagSearchTerm);
+    if (
+      this.filteredCursosCache &&
+      this.filteredCursosCache.source === this.cursos &&
+      this.filteredCursosCache.term === term &&
+      this.filteredCursosCache.tagTerm === tagTerm &&
+      this.filteredCursosCache.sortBy === this.sortBy &&
+      this.filteredCursosCache.sortDirection === this.sortDirection
+    ) {
+      return this.filteredCursosCache.result;
+    }
+
     const filtered = this.cursos.filter((curso) => {
       const target = this.normalizeText([
         curso.nombre,
@@ -1130,7 +1199,17 @@ export class CursosComponent implements OnInit, OnDestroy {
       return matchesGeneral && matchesTag;
     });
 
-    return [...filtered].sort((a, b) => this.compareCursos(a, b));
+    const result = [...filtered].sort((a, b) => this.compareCursos(a, b));
+    this.filteredCursosCache = {
+      source: this.cursos,
+      term,
+      tagTerm,
+      sortBy: this.sortBy,
+      sortDirection: this.sortDirection,
+      result
+    };
+
+    return result;
   }
 
   private normalizeSearch(value?: string): string {
@@ -1216,5 +1295,20 @@ export class CursosComponent implements OnInit, OnDestroy {
       searchTerm: this.searchTerm || '',
       tagSearchTerm: this.tagSearchTerm || ''
     });
+  }
+
+  private rebuildInstructorNameIndex(): void {
+    const index: Record<string, string> = {};
+    for (const instructor of this.instructores) {
+      const id = (instructor.id || '').trim();
+      if (!id) continue;
+      index[id] = instructor.nombre || '';
+    }
+    this.instructorNameById = index;
+  }
+
+  private invalidateInstructorCaches(): void {
+    this.availableInstructoresCache = null;
+    this.filteredInstructoresCache = null;
   }
 }

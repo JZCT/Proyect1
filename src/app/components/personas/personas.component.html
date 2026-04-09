@@ -270,6 +270,51 @@
 
       </div>
 
+      <div class="form-group files-group">
+        <label>Entregables (PDF)</label>
+        <input
+          type="file"
+          accept=".pdf,application/pdf"
+          (change)="onFilesSelected($event)"
+          multiple
+          class="file-input"
+          [disabled]="loadingFile || savingPersona"
+        />
+        <p class="field-help">Puedes subir varios archivos PDF por persona.</p>
+
+        <div class="file-preview-grid" *ngIf="getCurrentArchivos().length > 0; else noCurrentPersonaFiles">
+          <div class="file-preview-card" *ngFor="let file of getCurrentArchivos(); let i = index; trackBy: trackByArchivo">
+            <div class="file-meta">
+              <div class="file-name">{{ file.nombre }}</div>
+              <div class="file-type">{{ file.tipo || 'tipo no disponible' }} | {{ formatArchivoSize(file.size) }}</div>
+            </div>
+            <div class="file-preview-actions">
+              <button
+                type="button"
+                class="btn btn-sm btn-info"
+                (click)="openArchivo(file)"
+                [disabled]="!canPreviewArchivo(file)"
+                [title]="getArchivoPreviewTooltip(file)"
+              >
+                {{ getArchivoActionLabel(file) }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-danger"
+                (click)="removeArchivo(i)"
+                [disabled]="savingPersona"
+              >
+                Quitar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <ng-template #noCurrentPersonaFiles>
+          <div class="empty-state">Sin entregables cargados para esta persona.</div>
+        </ng-template>
+      </div>
+
       <div class="form-actions">
         <button type="submit" class="btn btn-success" [disabled]="loadingFile || savingPersona">
           {{ savingPersona ? (editingId ? 'Actualizando...' : 'Guardando...') : (editingId ? 'Actualizar' : 'Guardar') }}
@@ -436,6 +481,7 @@
             <th>Teorica</th>
             <th>Final</th>
             <th>Resultado</th>
+            <th>Entregables</th>
             <th>Acciones</th>
           </tr>
         </thead>
@@ -471,6 +517,18 @@
               </span>
             </td>
             <td>
+              <div class="file-badges">
+                <span class="file-tag">{{ getPersonaArchivos(persona).length }} archivo(s)</span>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-secondary"
+                  (click)="openPersonaEntregablesModal(persona)"
+                >
+                  Ver
+                </button>
+              </div>
+            </td>
+            <td>
               <div class="actions">
                 <button type="button" class="btn btn-info btn-sm" (click)="startEdit(persona)" *ngIf="canEditPersonas">Editar</button>
                 <button
@@ -487,6 +545,92 @@
           </tr>
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <div *ngIf="showPersonaEntregables" class="modal-overlay" (click)="closePersonaEntregablesModal()">
+    <div class="modal-content file-preview-modal" (click)="$event.stopPropagation()">
+      <div class="file-preview-header">
+        <h4>Entregables de {{ personaEntregablesTarget?.nombre || 'Persona' }}</h4>
+        <div class="file-preview-actions">
+          <button type="button" class="btn btn-sm btn-secondary" (click)="closePersonaEntregablesModal()">Cerrar</button>
+        </div>
+      </div>
+
+      <div class="file-preview-grid" *ngIf="getPersonaArchivos(personaEntregablesTarget).length > 0; else noPersonaEntregables">
+        <div class="file-preview-card" *ngFor="let file of getPersonaArchivos(personaEntregablesTarget); trackBy: trackByArchivo">
+          <div class="file-meta">
+            <div class="file-name">{{ file.nombre }}</div>
+            <div class="file-type">{{ file.tipo || 'tipo no disponible' }} | {{ formatArchivoSize(file.size) }}</div>
+          </div>
+          <div class="file-preview-actions">
+            <button
+              type="button"
+              class="btn btn-sm btn-info"
+              (click)="openArchivo(file)"
+              [disabled]="!canPreviewArchivo(file)"
+              [title]="getArchivoPreviewTooltip(file)"
+            >
+              {{ getArchivoActionLabel(file) }}
+            </button>
+            <a
+              *ngIf="file.url"
+              class="btn btn-sm btn-secondary"
+              [href]="file.url"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Abrir
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <ng-template #noPersonaEntregables>
+        <div class="empty-state">Esta persona no tiene entregables cargados.</div>
+      </ng-template>
+    </div>
+  </div>
+
+  <div *ngIf="showFilePreview" class="modal-overlay" (click)="closeArchivoPreview()">
+    <div class="modal-content file-preview-modal" (click)="$event.stopPropagation()">
+      <div class="file-preview-header">
+        <h4>{{ previewFile?.nombre || 'Vista previa' }}</h4>
+        <div class="file-preview-actions">
+          <a
+            *ngIf="previewOpenUrl"
+            class="btn btn-sm btn-secondary"
+            [href]="previewOpenUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Abrir
+          </a>
+          <button type="button" class="btn btn-sm btn-secondary" (click)="closeArchivoPreview()">Cerrar</button>
+        </div>
+      </div>
+
+      <div class="file-preview-body" *ngIf="previewType === 'image'">
+        <img *ngIf="previewFile?.url; else previewUnavailable" [src]="previewFile?.url" [alt]="previewFile?.nombre || 'archivo'" (error)="onPreviewImageError()" />
+      </div>
+
+      <div class="file-preview-body pdf-preview" *ngIf="previewType === 'pdf'">
+        <iframe *ngIf="previewResourceUrl; else previewUnavailable" [src]="previewResourceUrl"></iframe>
+      </div>
+
+      <div class="file-preview-body text-preview" *ngIf="previewType === 'text'">
+        <pre>{{ previewText || 'Cargando vista previa...' }}</pre>
+      </div>
+
+      <div class="file-preview-body empty-state" *ngIf="previewType === 'unsupported'">
+        {{ previewError || 'No hay vista previa integrada para este tipo de archivo.' }}
+      </div>
+
+      <ng-template #previewUnavailable>
+        <div class="file-preview-body empty-state" style="display:grid;place-items:center;">
+          {{ previewError || 'No se pudo mostrar la vista previa de este archivo.' }}
+        </div>
+      </ng-template>
     </div>
   </div>
 </div>

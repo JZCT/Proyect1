@@ -90,7 +90,11 @@ export class LoginComponent implements OnInit, OnDestroy {
         return;
       }
 
-      const targetRoute = userData.role === 'instructor' ? '/' : '/home';
+      const targetRoute = userData.role === 'instructor'
+        ? '/'
+        : userData.role === 'company'
+          ? '/cursos'
+          : '/home';
 
       this.notificationService.success('Sesion iniciada correctamente');
       await this.authService.waitForCurrentUserData(credential.user.uid);
@@ -118,16 +122,22 @@ export class LoginComponent implements OnInit, OnDestroy {
           this.notificationService.error('Usuario no encontrado');
           break;
         case 'auth/wrong-password':
-          this.notificationService.error('Contrasena incorrecta');
+          this.notificationService.error('Correo o contrasena incorrectos');
           break;
         case 'auth/invalid-credential':
-          this.notificationService.error('Contrasena incorrecta');
+          this.notificationService.error('Correo o contrasena incorrectos');
           break;
         case 'auth/invalid-email':
           this.notificationService.error('Email invalido');
           break;
         case 'auth/user-disabled':
           this.notificationService.error('Usuario deshabilitado');
+          break;
+        case 'auth/too-many-requests':
+          this.notificationService.warning('Demasiados intentos o actividad inusual. Espera un momento e intenta de nuevo.');
+          break;
+        case 'auth/network-request-failed':
+          this.notificationService.error('Error de red. Verifica tu conexion e intenta de nuevo.');
           break;
         default:
           this.notificationService.error('Error al iniciar sesion. Intenta de nuevo.');

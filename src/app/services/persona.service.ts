@@ -22,7 +22,7 @@ import {
   ref,
   uploadBytes
 } from '@angular/fire/storage';
-import { Observable, combineLatest, map } from 'rxjs';
+import { Observable, combineLatest, map, shareReplay } from 'rxjs';
 import { Persona, PersonaArchivo } from '../models/persona.model';
 import { PERSONA_REASSIGNMENT_COOLDOWN_MONTHS } from '../config/global.constants';
 import { normalizeDateInput } from '../utils/date.util';
@@ -65,18 +65,29 @@ export class PersonaService {
   private readonly DEFAULT_SEARCH_LIMIT = 200;
   private readonly MAX_SEARCH_LIMIT = 500;
   private personasCollection;
+  private personas$: Observable<Persona[]> | null = null;
+  private personasByPeriodCache = new Map<string, Observable<Persona[]>>();
+  private personasByCursoInFlight = new Map<string, Promise<Persona[]>>();
+  private personasByIdsInFlight = new Map<string, Promise<Persona[]>>();
+  private availablePersonasInFlight = new Map<string, Promise<Persona[]>>();
+  private autoAssignableInFlight = new Map<string, Promise<Persona[]>>();
 
   constructor(private firestore: Firestore, private storage: Storage) {
     this.personasCollection = collection(this.firestore, 'personas');
   }
 
   getPersonas(): Observable<Persona[]> {
-    return collectionData(this.personasCollection, { idField: 'id' }).pipe(
-      map((rows) =>
-        (rows as RawPersona[])
-          .map((row) => this.normalizePersonaFromRaw(row, row.id))
-      )
-    );
+    if (!this.personas$) {
+      this.personas$ = collectionData(this.personasCollection, { idField: 'id' }).pipe(
+        map((rows) =>
+          (rows as RawPersona[])
+            .map((row) => this.normalizePersonaFromRaw(row, row.id))
+        ),
+        shareReplay({ bufferSize: 1, refCount: true })
+      );
+    }
+
+    return this.personas$;
   }
 
   getPersonasByPeriod(filters?: {
@@ -110,6 +121,12 @@ export class PersonaService {
       return this.getPersonas();
     }
 
+    const periodCacheKey = `${effectiveRange.startYear}-${effectiveRange.startMonth}:${effectiveRange.endYear}-${effectiveRange.endMonth}`;
+    const cached = this.personasByPeriodCache.get(periodCacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const personasByNormalizedFields$ = collectionData(
       query(
         this.personasCollection,
@@ -137,7 +154,7 @@ export class PersonaService {
       { idField: 'id' }
     ) as Observable<RawPersona[]>;
 
-    return combineLatest([
+    const stream$ = combineLatest([
       personasByNormalizedFields$,
       personasByCreatedAt$,
       personasByCreatedAtLegacy$
@@ -163,8 +180,12 @@ export class PersonaService {
         }
 
         return [...deduped.values()];
-      })
+      }),
+      shareReplay({ bufferSize: 1, refCount: true })
     );
+
+    this.personasByPeriodCache.set(periodCacheKey, stream$);
+    return stream$;
   }
 
   async getPersonasByCursoId(cursoId: string, maxResults = this.DEFAULT_SEARCH_LIMIT): Promise<Persona[]> {
@@ -173,19 +194,24 @@ export class PersonaService {
       return [];
     }
 
-    try {
-      const q = query(
-        this.personasCollection,
-        where('assignedCursoId', '==', normalizedCursoId),
-        limit(this.clampLimit(maxResults))
-      );
-      const snapshot = await getDocs(q);
+    const requestLimit = this.clampLimit(maxResults);
+    const requestKey = `${normalizedCursoId}|${requestLimit}`;
 
-      return snapshot.docs.map((row) => this.normalizePersonaFromRaw(row.data() as RawPersona, row.id));
-    } catch (error) {
-      console.error('Error obteniendo personas del curso:', error);
-      return [];
-    }
+    return this.resolveInFlight(this.personasByCursoInFlight, requestKey, async () => {
+      try {
+        const q = query(
+          this.personasCollection,
+          where('assignedCursoId', '==', normalizedCursoId),
+          limit(requestLimit)
+        );
+        const snapshot = await getDocs(q);
+
+        return snapshot.docs.map((row) => this.normalizePersonaFromRaw(row.data() as RawPersona, row.id));
+      } catch (error) {
+        console.error('Error obteniendo personas del curso:', error);
+        return [];
+      }
+    });
   }
 
   async getPersonasByIds(personaIds: string[]): Promise<Persona[]> {
@@ -196,24 +222,38 @@ export class PersonaService {
       return [];
     }
 
-    try {
-      const chunkSize = 30;
-      const all: Persona[] = [];
+    const requestKey = uniqueIds.join('|');
 
-      for (let index = 0; index < uniqueIds.length; index += chunkSize) {
-        const chunk = uniqueIds.slice(index, index + chunkSize);
-        const q = query(this.personasCollection, where(documentId(), 'in', chunk));
-        const snapshot = await getDocs(q);
-        all.push(
-          ...snapshot.docs.map((row) => this.normalizePersonaFromRaw(row.data() as RawPersona, row.id))
+    return this.resolveInFlight(this.personasByIdsInFlight, requestKey, async () => {
+      try {
+        const chunkSize = 30;
+        const chunks: string[][] = [];
+
+        for (let index = 0; index < uniqueIds.length; index += chunkSize) {
+          chunks.push(uniqueIds.slice(index, index + chunkSize));
+        }
+
+        const snapshots = await Promise.all(
+          chunks.map((chunk) => getDocs(query(this.personasCollection, where(documentId(), 'in', chunk))))
         );
-      }
 
-      return all;
-    } catch (error) {
-      console.error('Error obteniendo personas por IDs:', error);
-      return [];
-    }
+        const byId = new Map<string, Persona>();
+        for (const snapshot of snapshots) {
+          for (const row of snapshot.docs) {
+            const normalized = this.normalizePersonaFromRaw(row.data() as RawPersona, row.id);
+            if (!normalized.id) continue;
+            byId.set(normalized.id, normalized);
+          }
+        }
+
+        return uniqueIds
+          .map((id) => byId.get(id))
+          .filter((persona): persona is Persona => !!persona);
+      } catch (error) {
+        console.error('Error obteniendo personas por IDs:', error);
+        return [];
+      }
+    });
   }
 
   async searchAvailablePersonas(params: {
@@ -232,60 +272,78 @@ export class PersonaService {
     const queryToken = this.pickQueryToken(normalizedTerm);
     const requestLimit = this.clampLimit(params.maxResults);
     const targetPeriod = this.resolvePeriod(params.targetYear, params.targetMonth);
-    const q = queryToken
-      ? query(
-          this.personasCollection,
-          where('companyTag', '==', normalizedCompanyTag),
-          where('assignmentStatus', '==', 'available'),
-          where('searchTokens', 'array-contains', queryToken),
-          limit(requestLimit)
-        )
-      : query(
-          this.personasCollection,
-          where('companyTag', '==', normalizedCompanyTag),
-          where('assignmentStatus', '==', 'available'),
-          limit(requestLimit)
+    const requestKey = [
+      normalizedCompanyTag,
+      queryToken || '-',
+      requestLimit,
+      targetPeriod?.year || '-',
+      targetPeriod?.month || '-',
+      normalizedTerm || '-'
+    ].join('|');
+
+    return this.resolveInFlight(this.availablePersonasInFlight, requestKey, async () => {
+      const q = queryToken
+        ? query(
+            this.personasCollection,
+            where('companyTag', '==', normalizedCompanyTag),
+            where('assignmentStatus', '==', 'available'),
+            where('searchTokens', 'array-contains', queryToken),
+            limit(requestLimit)
+          )
+        : query(
+            this.personasCollection,
+            where('companyTag', '==', normalizedCompanyTag),
+            where('assignmentStatus', '==', 'available'),
+            limit(requestLimit)
+          );
+
+      const legacyQ = queryToken
+        ? query(
+            this.personasCollection,
+            where('companyTag', '==', normalizedCompanyTag),
+            where('searchTokens', 'array-contains', queryToken),
+            limit(requestLimit)
+          )
+        : query(
+            this.personasCollection,
+            where('companyTag', '==', normalizedCompanyTag),
+            limit(requestLimit)
+          );
+
+      try {
+        const snapshot = await getDocs(q);
+        const docs = [...snapshot.docs];
+
+        if (snapshot.size < requestLimit) {
+          const legacySnapshot = await getDocs(legacyQ);
+          docs.push(...legacySnapshot.docs);
+        }
+
+        const deduped = new Map<string, Persona>();
+
+        for (const row of docs) {
+          const normalized = this.normalizePersonaFromRaw(row.data() as RawPersona, row.id);
+          if (!normalized.id) continue;
+          deduped.set(normalized.id, normalized);
+        }
+
+        const personas = [...deduped.values()].filter((persona) =>
+          this.isAvailablePersona(persona)
+          && this.isEligibleForReassignment(persona, targetPeriod)
         );
+        if (!normalizedTerm) {
+          return personas.slice(0, requestLimit);
+        }
 
-    const legacyQ = queryToken
-      ? query(
-          this.personasCollection,
-          where('companyTag', '==', normalizedCompanyTag),
-          where('searchTokens', 'array-contains', queryToken),
-          limit(requestLimit)
-        )
-      : query(
-          this.personasCollection,
-          where('companyTag', '==', normalizedCompanyTag),
-          limit(requestLimit)
-        );
-
-    try {
-      const [snapshot, legacySnapshot] = await Promise.all([getDocs(q), getDocs(legacyQ)]);
-      const deduped = new Map<string, Persona>();
-
-      for (const row of [...snapshot.docs, ...legacySnapshot.docs]) {
-        const normalized = this.normalizePersonaFromRaw(row.data() as RawPersona, row.id);
-        if (!normalized.id) continue;
-        deduped.set(normalized.id, normalized);
+        const termTokens = this.tokenizeSearch(normalizedTerm);
+        return personas.filter((persona) =>
+          this.includesEveryToken(persona.searchTokens || [], termTokens)
+        ).slice(0, requestLimit);
+      } catch (error) {
+        console.error('Error buscando personas disponibles:', error);
+        return [];
       }
-
-      const personas = [...deduped.values()].filter((persona) =>
-        this.isAvailablePersona(persona)
-        && this.isEligibleForReassignment(persona, targetPeriod)
-      );
-      if (!normalizedTerm) {
-        return personas.slice(0, requestLimit);
-      }
-
-      const termTokens = this.tokenizeSearch(normalizedTerm);
-      return personas.filter((persona) =>
-        this.includesEveryToken(persona.searchTokens || [], termTokens)
-      ).slice(0, requestLimit);
-    } catch (error) {
-      console.error('Error buscando personas disponibles:', error);
-      return [];
-    }
+    });
   }
 
   async findAutoAssignablePersonas(params: {
@@ -308,80 +366,116 @@ export class PersonaService {
       return [];
     }
 
-    try {
-      const requestLimit = this.clampLimit(params.maxResults);
-      const byExactCityState = location.city && location.state
-        ? await getDocs(query(
-            this.personasCollection,
-            where('companyTag', '==', normalizedCompanyTag),
-            where('assignmentStatus', '==', 'available'),
-            where('locationCity', '==', location.city),
-            where('locationState', '==', location.state),
-            limit(requestLimit)
-          ))
-        : null;
+    const requestLimit = this.clampLimit(params.maxResults);
+    const requestKey = [
+      normalizedCompanyTag,
+      location.raw,
+      requestLimit,
+      targetPeriod?.year || '-',
+      targetPeriod?.month || '-'
+    ].join('|');
 
-      const tokenFallback = location.tokens[0]
-        ? await getDocs(query(
-            this.personasCollection,
-            where('companyTag', '==', normalizedCompanyTag),
-            where('assignmentStatus', '==', 'available'),
-            where('locationTokens', 'array-contains', location.tokens[0]),
-            limit(requestLimit)
-          ))
-        : null;
-
-      const legacyByExactCityState = location.city && location.state
-        ? await getDocs(query(
-            this.personasCollection,
-            where('companyTag', '==', normalizedCompanyTag),
-            where('locationCity', '==', location.city),
-            where('locationState', '==', location.state),
-            limit(requestLimit)
-          ))
-        : null;
-
-      const legacyTokenFallback = location.tokens[0]
-        ? await getDocs(query(
-            this.personasCollection,
-            where('companyTag', '==', normalizedCompanyTag),
-            where('locationTokens', 'array-contains', location.tokens[0]),
-            limit(requestLimit)
-          ))
-        : null;
-
-      const docs = [
-        ...(byExactCityState?.docs || []),
-        ...(tokenFallback?.docs || []),
-        ...(legacyByExactCityState?.docs || []),
-        ...(legacyTokenFallback?.docs || [])
-      ];
-      const deduped = new Map<string, Persona>();
-
-      for (const row of docs) {
-        const normalized = this.normalizePersonaFromRaw(row.data() as RawPersona, row.id);
-        if (!normalized.id) continue;
-        deduped.set(normalized.id, normalized);
-      }
-
-      const personas = [...deduped.values()];
-      return personas.filter((persona) => {
-        if (!this.isAvailablePersona(persona)) return false;
-        if (!this.isEligibleForReassignment(persona, targetPeriod)) return false;
-        if (this.normalizeCompanyTag(persona.companyTag || persona.empresa || '') !== normalizedCompanyTag) return false;
-
-        const personaLocation = this.parseLocation(this.normalizeSearchValue(persona.lugar || ''));
+    return this.resolveInFlight(this.autoAssignableInFlight, requestKey, async () => {
+      try {
+        const primaryQueries: Promise<Awaited<ReturnType<typeof getDocs>>>[] = [];
 
         if (location.city && location.state) {
-          return personaLocation.city === location.city && personaLocation.state === location.state;
+          primaryQueries.push(getDocs(query(
+            this.personasCollection,
+            where('companyTag', '==', normalizedCompanyTag),
+            where('assignmentStatus', '==', 'available'),
+            where('locationCity', '==', location.city),
+            where('locationState', '==', location.state),
+            limit(requestLimit)
+          )));
         }
 
-        return this.includesEveryToken(persona.locationTokens || [], location.tokens);
-      }).slice(0, requestLimit);
-    } catch (error) {
-      console.error('Error buscando personas para autoasignacion:', error);
-      return [];
-    }
+        if (location.tokens[0]) {
+          primaryQueries.push(getDocs(query(
+            this.personasCollection,
+            where('companyTag', '==', normalizedCompanyTag),
+            where('assignmentStatus', '==', 'available'),
+            where('locationTokens', 'array-contains', location.tokens[0]),
+            limit(requestLimit)
+          )));
+        }
+
+        const primarySnapshots = await Promise.all(primaryQueries);
+        const deduped = new Map<string, Persona>();
+        for (const snapshot of primarySnapshots) {
+          for (const row of snapshot.docs) {
+            const normalized = this.normalizePersonaFromRaw(row.data() as RawPersona, row.id);
+            if (!normalized.id) continue;
+            deduped.set(normalized.id, normalized);
+          }
+        }
+
+        let personas = [...deduped.values()].filter((persona) => {
+          if (!this.isAvailablePersona(persona)) return false;
+          if (!this.isEligibleForReassignment(persona, targetPeriod)) return false;
+          if (this.normalizeCompanyTag(persona.companyTag || persona.empresa || '') !== normalizedCompanyTag) return false;
+
+          const personaLocation = this.parseLocation(this.normalizeSearchValue(persona.lugar || ''));
+
+          if (location.city && location.state) {
+            return personaLocation.city === location.city && personaLocation.state === location.state;
+          }
+
+          return this.includesEveryToken(persona.locationTokens || [], location.tokens);
+        });
+
+        if (personas.length < requestLimit) {
+          const legacyQueries: Promise<Awaited<ReturnType<typeof getDocs>>>[] = [];
+
+          if (location.city && location.state) {
+            legacyQueries.push(getDocs(query(
+              this.personasCollection,
+              where('companyTag', '==', normalizedCompanyTag),
+              where('locationCity', '==', location.city),
+              where('locationState', '==', location.state),
+              limit(requestLimit)
+            )));
+          }
+
+          if (location.tokens[0]) {
+            legacyQueries.push(getDocs(query(
+              this.personasCollection,
+              where('companyTag', '==', normalizedCompanyTag),
+              where('locationTokens', 'array-contains', location.tokens[0]),
+              limit(requestLimit)
+            )));
+          }
+
+          const legacySnapshots = await Promise.all(legacyQueries);
+          for (const snapshot of legacySnapshots) {
+            for (const row of snapshot.docs) {
+              const normalized = this.normalizePersonaFromRaw(row.data() as RawPersona, row.id);
+              if (!normalized.id) continue;
+              deduped.set(normalized.id, normalized);
+            }
+          }
+
+          personas = [...deduped.values()].filter((persona) => {
+            if (!this.isAvailablePersona(persona)) return false;
+            if (!this.isEligibleForReassignment(persona, targetPeriod)) return false;
+            if (this.normalizeCompanyTag(persona.companyTag || persona.empresa || '') !== normalizedCompanyTag) return false;
+
+            const personaLocation = this.parseLocation(this.normalizeSearchValue(persona.lugar || ''));
+
+            if (location.city && location.state) {
+              return personaLocation.city === location.city && personaLocation.state === location.state;
+            }
+
+            return this.includesEveryToken(persona.locationTokens || [], location.tokens);
+          });
+        }
+
+        return personas.slice(0, requestLimit);
+      } catch (error) {
+        console.error('Error buscando personas para autoasignacion:', error);
+        return [];
+      }
+    });
   }
 
   async addPersona(persona: Persona): Promise<void> {
@@ -949,6 +1043,24 @@ export class PersonaService {
     } catch {
       return '';
     }
+  }
+
+  private resolveInFlight<T>(
+    cache: Map<string, Promise<T>>,
+    key: string,
+    work: () => Promise<T>
+  ): Promise<T> {
+    const existing = cache.get(key);
+    if (existing) {
+      return existing;
+    }
+
+    const request = work().finally(() => {
+      cache.delete(key);
+    });
+
+    cache.set(key, request);
+    return request;
   }
 
   private normalizePersonaFromRaw(persona: RawPersona, idOverride?: string): Persona {

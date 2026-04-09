@@ -32,6 +32,32 @@ type CursosGruposSearchState = {
   personaDisponibleSearchTerm: string;
 };
 
+type FilteredCursosListCache = {
+  source: Curso[];
+  term: string;
+  sortBy: 'nombre' | 'empresa' | 'inicio' | 'fin';
+  sortDirection: 'asc' | 'desc';
+  result: Curso[];
+};
+
+type FilteredPersonasEnCursoCache = {
+  source: Persona[];
+  term: string;
+  sortBy: 'nombre' | 'empresa' | 'final';
+  sortDirection: 'asc' | 'desc';
+  resultadoFilter: 'all' | 'apto' | 'noApto' | 'sinEvaluar';
+  revision: number;
+  result: Persona[];
+};
+
+type FilteredPersonasDisponiblesCache = {
+  source: Persona[];
+  term: string;
+  sortBy: 'nombre' | 'empresa' | 'final';
+  sortDirection: 'asc' | 'desc';
+  result: Persona[];
+};
+
 @Component({
   selector: 'app-cursos-grupos',
   standalone: true,
@@ -44,6 +70,12 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   private readonly PERSONAS_QUERY_LIMIT = 250;
   private readonly CURRENT_YEAR = new Date().getFullYear();
   private readonly SEARCH_STATE_KEY = 'cursos-grupos';
+  private personasLoadSequence = 0;
+  private selectedCursoReloadKey = '';
+  private personasFilterRevision = 0;
+  private filteredCursosListCache: FilteredCursosListCache | null = null;
+  private filteredPersonasEnCursoCache: FilteredPersonasEnCursoCache | null = null;
+  private filteredPersonasDisponiblesCache: FilteredPersonasDisponiblesCache | null = null;
   private cursosSubscription: Subscription | null = null;
   private personaDisponibleSearchTimer: ReturnType<typeof setTimeout> | null = null;
   currentUser$: Observable<User | null>;
@@ -84,12 +116,16 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   personaSortDirection: 'asc' | 'desc' = 'asc';
   resultadoFilter: 'all' | 'apto' | 'noApto' | 'sinEvaluar' = 'all';
   savingCalificaciones: Record<string, boolean> = {};
+  removingPersonasIds: Record<string, boolean> = {};
   exportingCursoReport = false;
   savingCurso = false;
   deletingCursoId: string | null = null;
   deletingArchivoKey: string | null = null;
   loadingArchivos = false;
   showFilePreview = false;
+  showImagePreview = false;
+  imagePreviewUrl = '';
+  imagePreviewName = '';
   previewFile: CursoArchivo | null = null;
   previewType: FilePreviewType = 'unsupported';
   previewText = '';
@@ -168,6 +204,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     }
 
     this.closeArchivoPreview();
+    this.closeImagePreview();
     this.revokeObjectUrls(this.newCurso.archivos as CursoArchivo[] | undefined);
     this.revokeObjectUrls(this.editingCurso.archivos as CursoArchivo[] | undefined);
   }
@@ -372,6 +409,8 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
       this.personas = [];
       this.personasEnCurso = [];
       this.personasDisponibles = [];
+      this.selectedCursoReloadKey = '';
+      this.personasFilterRevision += 1;
       this.updateResumenCalificaciones();
       this.selectedPersonaToAdd = null;
       return;
@@ -380,49 +419,76 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     const selectedCursoId = this.selectedCurso.idcurso;
     const companyTag = this.normalizeCompanyTag(this.selectedCurso.companyTag);
     const cursoAssignmentPeriod = this.resolveCursoAssignmentPeriod(this.selectedCurso);
+    const loadSequence = ++this.personasLoadSequence;
+    this.selectedCursoReloadKey = this.buildCursoReloadKey(this.selectedCurso);
+
+    const availablePromise = companyTag
+      ? this.personaService.searchAvailablePersonas({
+          companyTag,
+          term: this.personaDisponibleSearchTerm,
+          maxResults: this.PERSONAS_QUERY_LIMIT,
+          targetYear: cursoAssignmentPeriod?.year ?? null,
+          targetMonth: cursoAssignmentPeriod?.month ?? null
+        })
+      : Promise.resolve([]);
 
     try {
-      const [assignedFromQuery, personasDisponibles] = await Promise.all([
+      const fallbackIds = options.reloadEnCurso === false
+        ? []
+        : Array.from(
+            new Set((this.selectedCurso.personasIds || []).map((id) => (id || '').trim()).filter(Boolean))
+          );
+      const shouldPrefetchByIds = fallbackIds.length > 0 && fallbackIds.length <= 60;
+      const [assignedFromQuery, prefetchedFallback] = await Promise.all([
         options.reloadEnCurso === false
           ? Promise.resolve(this.personasEnCurso)
           : this.personaService.getPersonasByCursoId(selectedCursoId, this.PERSONAS_QUERY_LIMIT),
-        companyTag
-          ? this.personaService.searchAvailablePersonas({
-              companyTag,
-              term: this.personaDisponibleSearchTerm,
-              maxResults: this.PERSONAS_QUERY_LIMIT,
-              targetYear: cursoAssignmentPeriod?.year ?? null,
-              targetMonth: cursoAssignmentPeriod?.month ?? null
-            })
-          : Promise.resolve([])
+        shouldPrefetchByIds
+          ? this.personaService.getPersonasByIds(fallbackIds)
+          : Promise.resolve([] as Persona[])
       ]);
-      let personasEnCurso = assignedFromQuery;
+      let personasEnCurso = options.reloadEnCurso === false
+        ? assignedFromQuery
+        : this.mergePersonasContext(assignedFromQuery, prefetchedFallback);
 
-      if (options.reloadEnCurso !== false) {
-        const fallbackIds = Array.from(
-          new Set((this.selectedCurso.personasIds || []).map((id) => (id || '').trim()).filter(Boolean))
-        );
-        if (fallbackIds.length > 0) {
-          const loadedIds = new Set(personasEnCurso.map((persona) => (persona.id || '').trim()).filter(Boolean));
-          const missingIds = fallbackIds.filter((id) => !loadedIds.has(id));
-          if (missingIds.length > 0) {
-            const fallbackPersonas = await this.personaService.getPersonasByIds(missingIds);
-            personasEnCurso = this.mergePersonasContext(personasEnCurso, fallbackPersonas);
-          }
+      if (options.reloadEnCurso !== false && !shouldPrefetchByIds && fallbackIds.length > 0) {
+        const loadedIds = new Set(personasEnCurso.map((persona) => (persona.id || '').trim()).filter(Boolean));
+        const missingIds = fallbackIds.filter((id) => !loadedIds.has(id));
+        if (missingIds.length > 0) {
+          const fallbackPersonas = await this.personaService.getPersonasByIds(missingIds);
+          personasEnCurso = this.mergePersonasContext(personasEnCurso, fallbackPersonas);
         }
       }
 
-      if (!this.selectedCurso || this.selectedCurso.idcurso !== selectedCursoId) {
+      if (
+        loadSequence !== this.personasLoadSequence ||
+        !this.selectedCurso ||
+        this.selectedCurso.idcurso !== selectedCursoId
+      ) {
         return;
       }
 
       this.personasEnCurso = personasEnCurso;
-      this.personasDisponibles = personasDisponibles;
-      this.personas = this.mergePersonasContext(personasEnCurso, personasDisponibles);
+      this.personas = this.mergePersonasContext(personasEnCurso, this.personasDisponibles);
+      this.personasFilterRevision += 1;
       this.updateResumenCalificaciones();
       this.selectNextPersonaPendiente();
 
-      if (options.autoAssign) {
+      const personasDisponibles = await availablePromise;
+      if (
+        loadSequence !== this.personasLoadSequence ||
+        !this.selectedCurso ||
+        this.selectedCurso.idcurso !== selectedCursoId
+      ) {
+        return;
+      }
+
+      this.personasDisponibles = personasDisponibles;
+      this.personas = this.mergePersonasContext(personasEnCurso, personasDisponibles);
+      this.personasFilterRevision += 1;
+      this.selectNextPersonaPendiente();
+
+      if (options.autoAssign && personasEnCurso.length === 0) {
         void this.autoAssignPersonasByEmpresaYUbicacion();
       }
     } catch (error) {
@@ -457,8 +523,10 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
 
   selectCurso(curso: Curso) {
     this.closeArchivoPreview();
+    this.closeImagePreview();
     this.deletingArchivoKey = null;
     this.selectedCurso = curso;
+    this.selectedCursoReloadKey = this.buildCursoReloadKey(curso);
     this.resultadoFilter = 'all';
     this.updateInstructoresEnCurso();
     void this.loadPersonas({ autoAssign: true, reloadEnCurso: true });
@@ -530,10 +598,49 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     return `${archivo.storagePath || ''}|${archivo.nombre || 'archivo'}|${archivo.url || ''}|${archivo.tipo || ''}|${index}`;
   }
 
+  getPersonaEntregables(persona: Persona): CursoArchivo[] {
+    return ((persona.archivos || []) as CursoArchivo[])
+      .filter((archivo) => !!archivo?.url && !!archivo?.nombre);
+  }
+
+  openPersonaEntregable(file: CursoArchivo): void {
+    this.openArchivo(file);
+  }
+
   onInstructorImgError(event: Event) {
     const img = event.target as HTMLImageElement;
     img.onerror = null;
     img.src = this.defaultInstructorImg;
+  }
+
+  openImagePreview(url?: string | null, name?: string | null): void {
+    const resolvedUrl = (url || '').trim();
+    if (!resolvedUrl) {
+      return;
+    }
+
+    this.imagePreviewUrl = resolvedUrl;
+    this.imagePreviewName = (name || 'Imagen').trim() || 'Imagen';
+    this.showImagePreview = true;
+  }
+
+  closeImagePreview(): void {
+    this.showImagePreview = false;
+    this.imagePreviewUrl = '';
+    this.imagePreviewName = '';
+  }
+
+  onImagePreviewError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    if (!img) return;
+
+    if (img.src !== this.defaultInstructorImg) {
+      img.onerror = null;
+      img.src = this.defaultInstructorImg;
+      return;
+    }
+
+    this.closeImagePreview();
   }
 
   toggleCursoForm() {
@@ -626,22 +733,40 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     if (!this.canManageCurso()) return;
     if (!id || this.deletingCursoId === id) return;
 
-    if (id && confirm('Estas seguro de eliminar este curso?')) {
-      try {
-        this.deletingCursoId = id;
-        await this.cursoService.deleteCurso(id);
-        this.selectedCurso = null;
-        this.personasEnCurso = [];
-        this.instructoresEnCurso = [];
-        this.allCursos = this.allCursos.filter((curso) => curso.idcurso !== id);
-        this.applyCursoFilter();
-        this.notificationService.success('Curso eliminado exitosamente');
-      } catch (error) {
-        console.error('Error eliminando curso:', error);
-        this.notificationService.error('Error al eliminar curso');
-      } finally {
-        this.deletingCursoId = null;
-      }
+    const curso = this.allCursos.find((item) => item.idcurso === id) || this.selectedCurso;
+    const cursoNombre = (curso?.nombre || 'Curso sin nombre').trim();
+    const personasCount = Array.from(new Set((curso?.personasIds || []).filter(Boolean))).length;
+    const instructoresCount = Array.from(new Set((curso?.instructorIds || []).filter(Boolean))).length;
+    const archivosCount = (curso?.archivos || []).length;
+
+    const confirmed = confirm(
+      [
+        `Estas seguro de eliminar el curso "${cursoNombre}"?`,
+        '',
+        `Personas asignadas: ${personasCount}`,
+        `Instructores asignados: ${instructoresCount}`,
+        `Archivos del curso: ${archivosCount}`,
+        '',
+        'Esta accion no se puede deshacer.'
+      ].join('\n')
+    );
+    if (!confirmed) return;
+
+    try {
+      this.deletingCursoId = id;
+      await this.cursoService.deleteCurso(id);
+      this.selectedCurso = null;
+      this.selectedCursoReloadKey = '';
+      this.personasEnCurso = [];
+      this.instructoresEnCurso = [];
+      this.allCursos = this.allCursos.filter((cursoItem) => cursoItem.idcurso !== id);
+      this.applyCursoFilter();
+      this.notificationService.success('Curso eliminado exitosamente');
+    } catch (error) {
+      console.error('Error eliminando curso:', error);
+      this.notificationService.error('Error al eliminar curso');
+    } finally {
+      this.deletingCursoId = null;
     }
   }
 
@@ -706,17 +831,69 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   async removePersonaFromCurso(personaId: string | undefined) {
     if (!this.selectedCurso || !personaId) return;
     if (!this.canManagePersonas()) return;
+    if (this.removingPersonasIds[personaId]) return;
+
+    const cursoId = this.selectedCurso.idcurso || '';
+    const selectedCursoIdAtStart = cursoId;
+    const previousPersonasIds = [...(this.selectedCurso.personasIds || [])];
+    const previousPersonasEnCurso = [...this.personasEnCurso];
+    const previousPersonasDisponibles = [...this.personasDisponibles];
+    const previousPersonas = [...this.personas];
+    const previousSelectedPersonaToAdd = this.selectedPersonaToAdd;
+
+    const personaRemovida = this.personasEnCurso.find((persona) => persona.id === personaId);
+    const updatedPersonasIds = previousPersonasIds.filter((id) => id !== personaId);
+
+    this.removingPersonasIds[personaId] = true;
+
+    // Optimistic UI: remove immediately from the selected course list.
+    this.updateSelectedCursoPersonasIds(updatedPersonasIds);
+    this.personasEnCurso = previousPersonasEnCurso.filter((persona) => persona.id !== personaId);
+
+    if (personaRemovida) {
+      const updatedCursoIds = (personaRemovida.cursoIds || [])
+        .map((id) => (id || '').trim())
+        .filter((id) => id && id !== cursoId);
+      const updatedAssignedCursoId = updatedCursoIds[0] || '';
+      const updatedPersona: Persona = {
+        ...personaRemovida,
+        cursoIds: updatedCursoIds,
+        assignedCursoId: updatedAssignedCursoId,
+        assignmentStatus: updatedAssignedCursoId ? 'assigned' : 'available'
+      };
+
+      const alreadyInDisponibles = previousPersonasDisponibles.some((persona) => persona.id === personaId);
+      this.personasDisponibles = alreadyInDisponibles
+        ? previousPersonasDisponibles.map((persona) => (persona.id === personaId ? updatedPersona : persona))
+        : [...previousPersonasDisponibles, updatedPersona];
+    }
+
+    this.personas = this.mergePersonasContext(this.personasEnCurso, this.personasDisponibles);
+    this.personasFilterRevision += 1;
+    this.updateResumenCalificaciones();
+    this.selectNextPersonaPendiente();
 
     try {
-      const cursoId = this.selectedCurso.idcurso || '';
       await this.cursoService.removePersonaFromCurso(cursoId, personaId);
-      const updatedPersonasIds = (this.selectedCurso.personasIds || []).filter((id) => id !== personaId);
-      this.updateSelectedCursoPersonasIds(updatedPersonasIds);
-      await this.loadPersonas({ autoAssign: false, reloadEnCurso: true });
       this.notificationService.info('Persona removida del curso');
+
+      // Lightweight refresh: keep current assigned list and only sync available candidates.
+      void this.loadPersonas({ autoAssign: false, reloadEnCurso: false });
     } catch (error) {
+      if (this.selectedCurso?.idcurso === selectedCursoIdAtStart) {
+        this.updateSelectedCursoPersonasIds(previousPersonasIds);
+        this.personasEnCurso = previousPersonasEnCurso;
+        this.personasDisponibles = previousPersonasDisponibles;
+        this.personas = previousPersonas;
+        this.selectedPersonaToAdd = previousSelectedPersonaToAdd;
+        this.personasFilterRevision += 1;
+        this.updateResumenCalificaciones();
+      }
+
       console.error('Error removiendo persona del curso:', error);
       this.notificationService.error('Error al remover persona del curso');
+    } finally {
+      delete this.removingPersonasIds[personaId];
     }
   }
 
@@ -900,6 +1077,20 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
 
     const target = this.editingCursoId ? this.editingCurso : this.newCurso;
     const archivos = [...(target.archivos || [])];
+    if (index < 0 || index >= archivos.length) return;
+
+    const archivoObjetivo = archivos[index];
+    const archivoNombre = (archivoObjetivo?.nombre || 'archivo').trim();
+    const remainingCount = Math.max(archivos.length - 1, 0);
+    const confirmed = confirm(
+      [
+        `Estas seguro de eliminar el archivo "${archivoNombre}"?`,
+        '',
+        `Archivos restantes despues de eliminar: ${remainingCount}`
+      ].join('\n')
+    );
+    if (!confirmed) return;
+
     const [removed] = archivos.splice(index, 1);
 
     if (removed?.url?.startsWith('blob:')) {
@@ -925,7 +1116,17 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     const deleteKey = this.getArchivoDeleteKey(archivoObjetivo, index);
     if (this.deletingArchivoKey === deleteKey) return;
 
-    if (!confirm(`Estas seguro de eliminar el archivo "${archivoNombre}"?`)) {
+    const remainingCount = Math.max(archivosActuales.length - 1, 0);
+    const cursoNombre = (this.selectedCurso.nombre || 'Curso sin nombre').trim();
+    const confirmed = confirm(
+      [
+        `Estas seguro de eliminar el archivo "${archivoNombre}" del curso "${cursoNombre}"?`,
+        '',
+        `Archivos actuales: ${archivosActuales.length}`,
+        `Archivos despues de eliminar: ${remainingCount}`
+      ].join('\n')
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -1338,6 +1539,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   onCalificacionChange(persona: Persona, field: 'clfPractica' | 'clfTeorica', value: unknown) {
     const normalized = this.normalizeScoreForEdit(value);
     persona[field] = normalized === null ? undefined : normalized;
+    this.personasFilterRevision += 1;
   }
 
   async saveCalificaciones(persona: Persona) {
@@ -1355,6 +1557,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
 
       persona.clfPractica = clfPractica === null ? undefined : clfPractica;
       persona.clfTeorica = clfTeorica === null ? undefined : clfTeorica;
+      this.personasFilterRevision += 1;
       this.updateResumenCalificaciones();
     } catch (error) {
       console.error('Error guardando calificaciones:', error);
@@ -1471,6 +1674,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     this.selectedCurso = updatedSelection;
 
     if (!this.selectedCurso) {
+      this.selectedCursoReloadKey = '';
       this.personasEnCurso = [];
       this.personasDisponibles = [];
       this.personas = [];
@@ -1481,11 +1685,33 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     }
 
     this.updateInstructoresEnCurso();
+    const reloadKey = this.buildCursoReloadKey(this.selectedCurso);
+    if (reloadKey === this.selectedCursoReloadKey) {
+      return;
+    }
+
+    this.selectedCursoReloadKey = reloadKey;
     void this.loadPersonas({ autoAssign: true, reloadEnCurso: true });
   }
 
   private normalizeCompanyTag(tag?: string): string {
     return (tag || '').trim().toLowerCase();
+  }
+
+  private buildCursoReloadKey(curso: Curso | null | undefined): string {
+    if (!curso?.idcurso) {
+      return '';
+    }
+
+    const normalizedPersonasIds = Array.from(
+      new Set((curso.personasIds || []).map((id) => (id || '').trim()).filter(Boolean))
+    ).sort();
+
+    return [
+      curso.idcurso,
+      this.normalizeCompanyTag(curso.companyTag),
+      normalizedPersonasIds.join('|')
+    ].join('#');
   }
 
   private isCursoCaducadoParaInstructor(curso: Curso): boolean {
@@ -1538,6 +1764,16 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
 
   get filteredCursosList(): Curso[] {
     const term = this.normalizeSearch(this.cursoSearchTerm);
+    if (
+      this.filteredCursosListCache &&
+      this.filteredCursosListCache.source === this.cursos &&
+      this.filteredCursosListCache.term === term &&
+      this.filteredCursosListCache.sortBy === this.cursoSortBy &&
+      this.filteredCursosListCache.sortDirection === this.cursoSortDirection
+    ) {
+      return this.filteredCursosListCache.result;
+    }
+
     const filtered = this.cursos.filter((curso) => {
       const parsedLocation = this.parseLocation(curso.descripcion || '');
       const target = this.normalizeText([
@@ -1557,27 +1793,78 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
       return matchesGeneral;
     });
 
-    return [...filtered].sort((a, b) => this.compareCursos(a, b));
+    const result = [...filtered].sort((a, b) => this.compareCursos(a, b));
+    this.filteredCursosListCache = {
+      source: this.cursos,
+      term,
+      sortBy: this.cursoSortBy,
+      sortDirection: this.cursoSortDirection,
+      result
+    };
+
+    return result;
   }
 
   get filteredPersonasEnCurso(): Persona[] {
     const term = this.normalizeSearch(this.personaSearchTerm);
+    if (
+      this.filteredPersonasEnCursoCache &&
+      this.filteredPersonasEnCursoCache.source === this.personasEnCurso &&
+      this.filteredPersonasEnCursoCache.term === term &&
+      this.filteredPersonasEnCursoCache.sortBy === this.personaSortBy &&
+      this.filteredPersonasEnCursoCache.sortDirection === this.personaSortDirection &&
+      this.filteredPersonasEnCursoCache.resultadoFilter === this.resultadoFilter &&
+      this.filteredPersonasEnCursoCache.revision === this.personasFilterRevision
+    ) {
+      return this.filteredPersonasEnCursoCache.result;
+    }
+
     const filtered = this.personasEnCurso.filter((persona) => {
       const matchesSearch = !term || this.getPersonaSearchTarget(persona).includes(term);
       const matchesResultado = this.matchesResultadoFilter(persona);
       return matchesSearch && matchesResultado;
     });
 
-    return [...filtered].sort((a, b) => this.comparePersonas(a, b));
+    const result = [...filtered].sort((a, b) => this.comparePersonas(a, b));
+    this.filteredPersonasEnCursoCache = {
+      source: this.personasEnCurso,
+      term,
+      sortBy: this.personaSortBy,
+      sortDirection: this.personaSortDirection,
+      resultadoFilter: this.resultadoFilter,
+      revision: this.personasFilterRevision,
+      result
+    };
+
+    return result;
   }
 
   get filteredPersonasDisponibles(): Persona[] {
     const term = this.normalizeSearch(this.personaDisponibleSearchTerm);
+    if (
+      this.filteredPersonasDisponiblesCache &&
+      this.filteredPersonasDisponiblesCache.source === this.personasDisponibles &&
+      this.filteredPersonasDisponiblesCache.term === term &&
+      this.filteredPersonasDisponiblesCache.sortBy === this.personaSortBy &&
+      this.filteredPersonasDisponiblesCache.sortDirection === this.personaSortDirection
+    ) {
+      return this.filteredPersonasDisponiblesCache.result;
+    }
+
     const filtered = this.personasDisponibles.filter((persona) =>
       !term || this.getPersonaSearchTarget(persona).includes(term)
     );
 
-    return [...filtered].sort((a, b) => this.comparePersonas(a, b));
+    const result = [...filtered].sort((a, b) => this.comparePersonas(a, b));
+    this.filteredPersonasDisponiblesCache = {
+      source: this.personasDisponibles,
+      term,
+      sortBy: this.personaSortBy,
+      sortDirection: this.personaSortDirection,
+      result
+    };
+
+    return result;
   }
 
   get filteredPersonasAsignacion(): Persona[] {
@@ -1764,9 +2051,11 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
 
     const inicio = coerceDate(curso.Fecha_inicio);
     const createdAt = coerceDate(curso.createdAt);
-    const year = this.normalizeYearInput(curso.anioCurso ?? inicio?.getFullYear() ?? createdAt?.getFullYear());
+    const year = this.normalizeYearInput(
+      inicio?.getFullYear() ?? curso.anioCurso ?? createdAt?.getFullYear()
+    );
     const month = this.normalizeMonthInput(
-      curso.mesCurso ?? ((inicio?.getMonth() ?? createdAt?.getMonth() ?? -1) + 1)
+      ((inicio?.getMonth() ?? -1) + 1) || curso.mesCurso || ((createdAt?.getMonth() ?? -1) + 1)
     );
 
     if (!year || !month) {

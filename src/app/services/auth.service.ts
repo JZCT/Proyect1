@@ -34,6 +34,8 @@ import { environment } from '../../environment/environment';
 })
 export class AuthService {
   private usersCollection;
+  private allUsers$: Observable<User[]> | null = null;
+  private companyTags$: Observable<string[]> | null = null;
   currentUser$: Observable<any>;
   currentUserData$: Observable<User | null>;
 
@@ -53,33 +55,44 @@ export class AuthService {
   }
 
   getAllUsers(): Observable<User[]> {
-    return collectionData(this.usersCollection, { idField: 'id' }) as Observable<User[]>;
+    if (!this.allUsers$) {
+      this.allUsers$ = (collectionData(this.usersCollection, { idField: 'id' }) as Observable<User[]>).pipe(
+        shareReplay({ bufferSize: 1, refCount: true })
+      );
+    }
+
+    return this.allUsers$;
   }
 
   getCompanyTags(): Observable<string[]> {
-    return this.currentUserData$.pipe(
-      switchMap((currentUser) => {
-        if (!currentUser) {
-          return of([]);
-        }
+    if (!this.companyTags$) {
+      this.companyTags$ = this.currentUserData$.pipe(
+        switchMap((currentUser) => {
+          if (!currentUser) {
+            return of([]);
+          }
 
-        if (currentUser.role !== 'admin') {
-          const tag = this.normalizeCompanyTag(currentUser.companyTag || '');
-          return of(tag ? [tag] : []);
-        }
+          if (currentUser.role !== 'admin') {
+            const tag = this.normalizeCompanyTag(currentUser.companyTag || '');
+            return of(tag ? [tag] : []);
+          }
 
-        const companyUsersQuery = query(this.usersCollection, where('role', '==', 'company'));
-        return collectionData(companyUsersQuery, { idField: 'id' }).pipe(
-          map((users) => {
-            const tags = users
-              .map((u) => this.normalizeCompanyTag((u as User).companyTag || ''))
-              .filter((tag) => !!tag);
+          const companyUsersQuery = query(this.usersCollection, where('role', '==', 'company'));
+          return collectionData(companyUsersQuery, { idField: 'id' }).pipe(
+            map((users) => {
+              const tags = users
+                .map((u) => this.normalizeCompanyTag((u as User).companyTag || ''))
+                .filter((tag) => !!tag);
 
-            return Array.from(new Set(tags)).sort((a, b) => a.localeCompare(b));
-          })
-        );
-      })
-    );
+              return Array.from(new Set(tags)).sort((a, b) => a.localeCompare(b));
+            })
+          );
+        }),
+        shareReplay({ bufferSize: 1, refCount: true })
+      );
+    }
+
+    return this.companyTags$;
   }
 
   isAdmin(): Observable<boolean> {
