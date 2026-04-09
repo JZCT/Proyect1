@@ -491,49 +491,49 @@ select:focus {
 }
 
 .file-preview-grid {
-  margin-top: 8px;
+  margin-top: 6px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 6px;
 }
 
 .file-preview-grid.compact {
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
 }
 
 .persona-entregables {
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .persona-entregables-title {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-soft);
   font-weight: 600;
 }
 
 .file-preview-card {
   border: 1px solid var(--surface-elevated);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--surface);
-  padding: 10px;
+  padding: 7px;
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .file-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .file-list-item {
   border: 1px solid var(--surface-elevated);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--surface);
-  padding: 8px;
+  padding: 6px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -552,19 +552,24 @@ select:focus {
 .file-name {
   color: var(--text);
   font-weight: 600;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .file-type {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .file-preview-actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.file-preview-actions .btn {
+  padding: 4px 7px;
+  font-size: 11px;
 }
 
 .file-empty-inline {

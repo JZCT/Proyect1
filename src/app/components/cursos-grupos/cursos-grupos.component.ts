@@ -1524,7 +1524,8 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   private buildCursoReportData(): ReportData {
     const cursoNombre = this.selectedCurso?.nombre || 'Curso sin nombre';
     const instructorName = this.instructoresEnCurso.map((item) => item.nombre).join(', ');
-    const personas = this.personasEnCurso;
+    const personas = this.filteredPersonasEnCurso;
+    const lugar = this.getReportLocationLabel(personas);
 
     return {
       title: `Reporte de Personas - Curso: ${cursoNombre}`,
@@ -1532,8 +1533,26 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
       totalPersonas: personas.length,
       personas,
       empresa: this.selectedCurso?.companyTag || '',
-      instructorName
+      lugar,
+      instructorName,
+      showCursosAsignados: false
     };
+  }
+
+  private getReportLocationLabel(personas: Persona[]): string {
+    const ubicaciones = Array.from(
+      new Set(personas.map((persona) => (persona.lugar || '').trim()).filter(Boolean))
+    );
+
+    if (ubicaciones.length === 1) {
+      return ubicaciones[0];
+    }
+
+    if (ubicaciones.length > 1) {
+      return `Multiples ubicaciones (${ubicaciones.length})`;
+    }
+
+    return '';
   }
 
   onCalificacionChange(persona: Persona, field: 'clfPractica' | 'clfTeorica', value: unknown) {

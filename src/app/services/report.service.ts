@@ -18,6 +18,7 @@ export interface ReportData {
   empresa?: string;
   lugar?: string;
   instructorName?: string;
+  showCursosAsignados?: boolean;
 }
 
 interface ReportMetadataItem {
@@ -81,12 +82,14 @@ export class ReportService {
       personas: filtered,
       empresa: filter.empresa,
       lugar: filter.lugar,
-      instructorName
+      instructorName,
+      showCursosAsignados: true
     };
   }
 
   exportToCSV(reportData: ReportData): void {
     const resumen = this.getResumenResultados(reportData.personas);
+    const includeCursosAsignados = reportData.showCursosAsignados !== false;
     const headers = [
       'Nombre',
       'CURP',
@@ -97,23 +100,28 @@ export class ReportService {
       'Calif Practica',
       'Calif Teorica',
       'Calif Final',
-      'Resultado',
-      'Cursos'
+      'Resultado'
     ];
+    if (includeCursosAsignados) headers.push('Cursos');
 
-    const rows = reportData.personas.map((persona) => [
-      persona.nombre || '',
-      persona.curp || '',
-      persona.email || '',
-      persona.telefono || '',
-      this.formatCompanyTag(persona.empresa),
-      persona.lugar || 'N/A',
-      this.formatCalificacion(persona.clfPractica),
-      this.formatCalificacion(persona.clfTeorica),
-      this.formatCalificacion(this.getCalificacionFinal(persona)),
-      this.getResultadoTexto(persona),
-      persona.cursoIds?.length || 0
-    ]);
+    const rows = reportData.personas.map((persona) => {
+      const row: Array<string | number> = [
+        persona.nombre || '',
+        persona.curp || '',
+        persona.email || '',
+        persona.telefono || '',
+        this.formatCompanyTag(persona.empresa),
+        persona.lugar || 'N/A',
+        this.formatCalificacion(persona.clfPractica),
+        this.formatCalificacion(persona.clfTeorica),
+        this.formatCalificacion(this.getCalificacionFinal(persona)),
+        this.getResultadoTexto(persona)
+      ];
+      if (includeCursosAsignados) {
+        row.push(persona.cursoIds?.length || 0);
+      }
+      return row;
+    });
 
     const csvLines = [
       this.toCsvLine([reportData.title]),
@@ -137,6 +145,7 @@ export class ReportService {
     try {
       const XLSX = await this.loadXLSX();
       const resumen = this.getResumenResultados(reportData.personas);
+      const includeCursosAsignados = reportData.showCursosAsignados !== false;
 
       const data = reportData.personas.map((persona) => ({
         Nombre: persona.nombre,
@@ -149,7 +158,7 @@ export class ReportService {
         'Calif Teorica': this.formatCalificacion(persona.clfTeorica),
         'Calif Final': this.formatCalificacion(this.getCalificacionFinal(persona)),
         Resultado: this.getResultadoTexto(persona),
-        'Cursos Asignados': persona.cursoIds?.length || 0,
+        ...(includeCursosAsignados ? { 'Cursos Asignados': persona.cursoIds?.length || 0 } : {}),
         'Fecha Creacion': this.formatDate(persona.createdAt)
       }));
 
@@ -167,20 +176,34 @@ export class ReportService {
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Personas');
       XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumen');
 
-      worksheet['!cols'] = [
-        { wch: 25 },
-        { wch: 22 },
-        { wch: 30 },
-        { wch: 20 },
-        { wch: 25 },
-        { wch: 20 },
-        { wch: 14 },
-        { wch: 14 },
-        { wch: 12 },
-        { wch: 12 },
-        { wch: 15 },
-        { wch: 18 }
-      ];
+      worksheet['!cols'] = includeCursosAsignados
+        ? [
+            { wch: 25 },
+            { wch: 22 },
+            { wch: 30 },
+            { wch: 20 },
+            { wch: 25 },
+            { wch: 20 },
+            { wch: 14 },
+            { wch: 14 },
+            { wch: 12 },
+            { wch: 12 },
+            { wch: 15 },
+            { wch: 18 }
+          ]
+        : [
+            { wch: 25 },
+            { wch: 22 },
+            { wch: 30 },
+            { wch: 20 },
+            { wch: 25 },
+            { wch: 20 },
+            { wch: 14 },
+            { wch: 14 },
+            { wch: 12 },
+            { wch: 12 },
+            { wch: 18 }
+          ];
       summarySheet['!cols'] = [{ wch: 24 }, { wch: 38 }];
 
       const filename = `reporte_${this.sanitizeFilename(reportData.title)}_${reportData.generatedAt.getTime()}.xlsx`;
@@ -362,6 +385,7 @@ export class ReportService {
 
   private generateHTMLReport(reportData: ReportData): string {
     const resumen = this.getResumenResultados(reportData.personas);
+    const includeCursosAsignados = reportData.showCursosAsignados !== false;
     const personasTable = reportData.personas
       .map((persona) => `
         <tr>
@@ -375,7 +399,7 @@ export class ReportService {
           <td>${this.formatCalificacion(persona.clfTeorica)}</td>
           <td>${this.formatCalificacion(this.getCalificacionFinal(persona))}</td>
           <td>${this.getResultadoTexto(persona)}</td>
-          <td>${persona.cursoIds?.length || 0}</td>
+          ${includeCursosAsignados ? `<td>${persona.cursoIds?.length || 0}</td>` : ''}
         </tr>
       `)
       .join('');
@@ -408,7 +432,7 @@ export class ReportService {
         'Teorica',
         'Final',
         'Resultado',
-        'Cursos'
+        ...(includeCursosAsignados ? ['Cursos'] : [])
       ],
       tableRowsHtml: personasTable,
       emptyMessage: 'No hay personas para mostrar con los filtros seleccionados.'
@@ -450,6 +474,8 @@ export class ReportService {
           <td colspan="${options.tableHeaders.length}">${this.escapeHtml(options.emptyMessage)}</td>
         </tr>
       `;
+    const isWideTable = options.tableHeaders.length > 8;
+    const tableColgroup = this.buildTableColgroup(options.tableHeaders);
 
     return `
       <!DOCTYPE html>
@@ -458,10 +484,10 @@ export class ReportService {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${this.escapeHtml(options.title)}</title>
-        <style>${this.getPdfStyles()}</style>
+        <style>${this.getPdfStyles(isWideTable)}</style>
       </head>
       <body>
-        <main class="sheet">
+        <main class="sheet ${isWideTable ? 'sheet--wide' : ''}">
           <header class="letterhead">
             <div class="letterhead__topline">
               <div class="letterhead__identity">
@@ -502,6 +528,7 @@ export class ReportService {
 
             <div class="table-wrap">
               <table>
+                ${tableColgroup}
                 <thead>
                   <tr>${headers}</tr>
                 </thead>
@@ -526,7 +553,35 @@ export class ReportService {
     `;
   }
 
-  private getPdfStyles(): string {
+  private buildTableColgroup(headers: string[]): string {
+    if (!headers.length) return '';
+
+    const weights = headers.map((header) => this.getHeaderWeight(header));
+    const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || headers.length;
+    const cols = weights
+      .map((weight) => `<col style="width: ${((weight / totalWeight) * 100).toFixed(2)}%">`)
+      .join('');
+
+    return `<colgroup>${cols}</colgroup>`;
+  }
+
+  private getHeaderWeight(header: string): number {
+    const normalized = (header || '').trim().toLowerCase();
+    if (!normalized) return 1;
+    if (normalized.includes('descripcion')) return 1.5;
+    if (normalized.includes('email')) return 1.35;
+    if (normalized.includes('nombre')) return 1.25;
+    if (normalized.includes('empresa') || normalized.includes('ubicacion')) return 1.1;
+    if (normalized.includes('representante')) return 1.1;
+    if (normalized.includes('curp')) return 0.95;
+    if (normalized.includes('telefono')) return 0.9;
+    if (normalized.includes('resultado')) return 0.9;
+    if (normalized.includes('practica') || normalized.includes('teorica') || normalized.includes('final')) return 0.8;
+    if (normalized.includes('inicio') || normalized.includes('fin') || normalized.includes('cursos')) return 0.75;
+    return 1;
+  }
+
+  private getPdfStyles(isWideLayout = false): string {
     return `
       :root {
         --ink: #17324d;
@@ -547,7 +602,8 @@ export class ReportService {
       }
 
       @page {
-        margin: 14mm;
+        size: letter ${isWideLayout ? 'landscape' : 'portrait'};
+        margin: 10mm;
       }
 
       body {
@@ -787,6 +843,15 @@ export class ReportService {
       table {
         width: 100%;
         border-collapse: collapse;
+        table-layout: fixed;
+      }
+
+      thead {
+        display: table-header-group;
+      }
+
+      tbody {
+        display: table-row-group;
       }
 
       thead th {
@@ -804,6 +869,8 @@ export class ReportService {
         border-top: 1px solid #e7edf2;
         font-size: 12px;
         vertical-align: top;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       tbody tr:nth-child(even) {
@@ -839,13 +906,163 @@ export class ReportService {
       }
 
       @media print {
+        * {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+
+        html,
         body {
+          width: 100%;
           background: #ffffff;
         }
 
         .sheet {
+          width: 100%;
+          max-width: none;
+          margin: 0;
           border: none;
           box-shadow: none;
+        }
+
+        .letterhead {
+          padding: 14px 16px 12px;
+        }
+
+        .letterhead::after {
+          display: none;
+        }
+
+        .letterhead__topline {
+          gap: 12px;
+        }
+
+        .logo-slot {
+          width: 120px;
+          min-width: 120px;
+          height: 78px;
+          border-radius: 10px;
+          padding: 8px;
+        }
+
+        .brand-kicker,
+        .section-tag,
+        .meta-card__label,
+        .summary-card__label,
+        .doc-pill span {
+          font-size: 8px;
+          letter-spacing: 0.12em;
+        }
+
+        .brand-name {
+          font-size: 18px;
+        }
+
+        .doc-pill {
+          min-width: 115px;
+          padding: 7px 10px;
+          border-radius: 9px;
+        }
+
+        .doc-pill strong {
+          margin-top: 2px;
+          font-size: 13px;
+        }
+
+        .letterhead__body {
+          grid-template-columns: minmax(0, 1.3fr) minmax(220px, 1fr);
+          gap: 12px;
+          margin-top: 12px;
+        }
+
+        .title-block h1 {
+          margin: 6px 0 8px;
+          font-size: 20px;
+          line-height: 1.1;
+        }
+
+        .subtitle {
+          max-width: none;
+          font-size: 10px;
+          line-height: 1.35;
+        }
+
+        .meta-grid {
+          gap: 6px;
+        }
+
+        .meta-card {
+          padding: 7px 8px;
+          border-radius: 8px;
+        }
+
+        .meta-card__value {
+          font-size: 10px;
+          line-height: 1.25;
+        }
+
+        .content {
+          padding: 10px 12px 12px;
+        }
+
+        .summary-grid {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 6px;
+          margin-bottom: 10px;
+        }
+
+        .summary-card {
+          padding: 8px 10px;
+          border-radius: 8px;
+        }
+
+        .summary-card__value {
+          font-size: 16px;
+        }
+
+        .table-wrap {
+          overflow: visible;
+          border-radius: 0;
+        }
+
+        thead th {
+          padding: 6px 5px;
+          font-size: 8px;
+          line-height: 1.2;
+          letter-spacing: 0.05em;
+        }
+
+        tbody td {
+          padding: 5px;
+          font-size: 8.5px;
+          line-height: 1.28;
+        }
+
+        tr,
+        th,
+        td {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        .sheet--wide thead th {
+          padding: 5px 4px;
+          font-size: 7.4px;
+        }
+
+        .sheet--wide tbody td {
+          padding: 4px;
+          font-size: 7.8px;
+        }
+
+        .empty-row td {
+          padding: 14px 8px;
+        }
+
+        .footer {
+          margin-top: 10px;
+          padding-top: 8px;
+          font-size: 9px;
         }
       }
 

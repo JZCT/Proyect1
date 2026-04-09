@@ -24,13 +24,13 @@ export const routes: Routes = [
     path: '',
     component: CursosGruposComponent,
     canActivate: [roleGuard],
-    data: { roles: ['admin', 'instructor', 'director'] }
+    data: { roles: ['admin', 'instructor', 'director', 'company'] }
   },
   {
     path: 'personas',
     component: PersonasComponent,
     canActivate: [roleGuard],
-    data: { roles: ['admin', 'instructor', 'company'] }
+    data: { roles: ['admin', 'instructor'] }
   },
   {
     path: 'instructores',
@@ -42,7 +42,7 @@ export const routes: Routes = [
     path: 'cursos',
     component: CursosComponent,
     canActivate: [roleGuard],
-    data: { roles: ['admin', 'company'] }
+    data: { roles: ['admin'] }
   },
   {
     path: 'usuario',

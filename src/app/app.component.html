@@ -26,11 +26,11 @@
         [class.is-open]="mobileNavOpen"
       >
         <a *ngIf="user.role === 'admin' || user.role === 'director'" routerLink="/home" routerLinkActive="active" (click)="closeMobileNav()">Home</a>
-        <a *ngIf="user.role !== 'company'" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeMobileNav()">
+        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeMobileNav()">
           {{ user.role === 'director' ? 'Resumen' : 'Cursos y Personas' }}
         </a>
-        <a *ngIf="user.role !== 'instructor'" routerLink="/cursos" routerLinkActive="active" (click)="closeMobileNav()">Cursos</a>
-        <a *ngIf="user.role === 'admin' || user.role === 'instructor' || user.role === 'company'" routerLink="/personas" routerLinkActive="active" (click)="closeMobileNav()">Personas</a>
+        <a *ngIf="user.role === 'admin'" routerLink="/cursos" routerLinkActive="active" (click)="closeMobileNav()">Cursos</a>
+        <a *ngIf="user.role === 'admin' || user.role === 'instructor'" routerLink="/personas" routerLinkActive="active" (click)="closeMobileNav()">Personas</a>
         <a *ngIf="user.role === 'admin'" routerLink="/instructores" routerLinkActive="active" (click)="closeMobileNav()">Instructores</a>
         <a *ngIf="user.role === 'admin'" routerLink="/usuario" routerLinkActive="active" (click)="closeMobileNav()">Usuarios</a>
 

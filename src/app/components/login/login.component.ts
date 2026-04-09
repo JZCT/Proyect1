@@ -93,7 +93,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       const targetRoute = userData.role === 'instructor'
         ? '/'
         : userData.role === 'company'
-          ? '/cursos'
+          ? '/'
           : '/home';
 
       this.notificationService.success('Sesion iniciada correctamente');

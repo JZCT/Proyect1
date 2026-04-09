@@ -20,7 +20,7 @@ export const roleGuard: CanActivateFn = (route) => {
       }
 
       if (user.role === 'company') {
-        return router.createUrlTree(['/cursos']);
+        return router.createUrlTree(['/']);
       }
 
       if (user.role === 'instructor') {
