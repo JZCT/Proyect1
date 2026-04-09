@@ -275,7 +275,8 @@
             <input
               type="text"
               placeholder="Nombre, empresa, etiqueta, ciudad, representante..."
-              [(ngModel)]="cursoSearchTerm"
+              [ngModel]="cursoSearchTerm"
+              (ngModelChange)="onCursoSearchTermChange($event)"
             />
           </div>
 
@@ -489,7 +490,7 @@
             <input
               type="text"
               placeholder="Nombre, correo o empresa..."
-              [(ngModel)]="personaDisponibleSearchTerm"
+              [ngModel]="personaDisponibleSearchTerm"
               (ngModelChange)="onPersonaDisponibleSearchTermChange($event)"
               name="persona_disponible_search"
             />
@@ -532,7 +533,8 @@
             <input
               type="text"
               placeholder="Nombre, correo, empresa o resultado..."
-              [(ngModel)]="personaSearchTerm"
+              [ngModel]="personaSearchTerm"
+              (ngModelChange)="onPersonaSearchTermChange($event)"
               name="persona_curso_search"
             />
           </div>

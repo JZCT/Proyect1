@@ -376,33 +376,31 @@ export class CursoService {
           return;
         }
 
+        const personaSnapshot = await transaction.get(personaDoc);
         const personasIds = currentPersonasIds.filter((id) => id !== normalizedPersonaId);
         transaction.update(cursoDoc, { personasIds });
 
-        const personaSnapshot = await transaction.get(personaDoc);
-        if (!personaSnapshot.exists()) {
-          return;
+        if (personaSnapshot.exists()) {
+          const personaRaw = personaSnapshot.data() as Partial<Persona>;
+          const cursoIds = this.normalizeIdList(personaRaw.cursoIds).filter((id) => id !== normalizedCursoId);
+          const assignedCursoId = cursoIds[0] || '';
+          const releasePeriod = !assignedCursoId
+            ? this.resolveCursoCompletionPeriod(curso)
+            : null;
+
+          const personaUpdatePayload: Record<string, unknown> = {
+            cursoIds,
+            assignedCursoId,
+            assignmentStatus: assignedCursoId ? 'assigned' : 'available'
+          };
+
+          if (releasePeriod) {
+            personaUpdatePayload['lastCursoYear'] = releasePeriod.year;
+            personaUpdatePayload['lastCursoMonth'] = releasePeriod.month;
+          }
+
+          transaction.set(personaDoc, personaUpdatePayload, { merge: true });
         }
-
-        const personaRaw = personaSnapshot.data() as Partial<Persona>;
-        const cursoIds = this.normalizeIdList(personaRaw.cursoIds).filter((id) => id !== normalizedCursoId);
-        const assignedCursoId = cursoIds[0] || '';
-        const releasePeriod = !assignedCursoId
-          ? this.resolveCursoCompletionPeriod(curso)
-          : null;
-
-        const personaUpdatePayload: Record<string, unknown> = {
-          cursoIds,
-          assignedCursoId,
-          assignmentStatus: assignedCursoId ? 'assigned' : 'available'
-        };
-
-        if (releasePeriod) {
-          personaUpdatePayload['lastCursoYear'] = releasePeriod.year;
-          personaUpdatePayload['lastCursoMonth'] = releasePeriod.month;
-        }
-
-        transaction.set(personaDoc, personaUpdatePayload, { merge: true });
       });
     } catch (error) {
       console.error('Error removiendo persona del curso:', error);

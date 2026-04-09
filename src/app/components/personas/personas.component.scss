@@ -50,6 +50,15 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.table-tools-course-select {
+  flex: 0 1 320px;
+  width: 320px;
+  min-width: 240px;
+  max-width: 360px;
 }
 
 .period-filter-actions {
@@ -97,6 +106,18 @@
 .actions .btn,
 .modal-actions .btn {
   min-width: 112px;
+}
+
+.table-tools .btn {
+  min-width: auto;
+}
+
+@media (max-width: 1100px) {
+  .table-tools-course-select {
+    width: 280px;
+    min-width: 220px;
+    max-width: 320px;
+  }
 }
 
 .actions .btn-danger {
@@ -280,6 +301,13 @@ select:focus {
 }
 
 @media (max-width: 640px) {
+  .table-tools-course-select {
+    flex: 1 1 100%;
+    max-width: none;
+    min-width: 0;
+    width: 100%;
+  }
+
   .camera-shutter {
     width: 62px;
     height: 62px;

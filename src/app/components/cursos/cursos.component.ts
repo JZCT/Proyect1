@@ -7,6 +7,7 @@ import { InstructorService } from '../../services/instructor.service';
 import { AuthService } from '../../services/auth.service';
 import { ReportService } from '../../services/report.service';
 import { NotificationService } from '../../services/notification.service';
+import { ViewStateService } from '../../services/view-state.service';
 import { Curso } from '../../models/curso.model';
 import { Instructor } from '../../models/instructor.model';
 import { User } from '../../models/user.model';
@@ -19,6 +20,10 @@ type CursoArchivo = NonNullable<Curso['archivos']>[number] & {
   file?: File;
 };
 type FilePreviewType = 'image' | 'pdf' | 'text' | 'unsupported';
+type CursosSearchState = {
+  searchTerm: string;
+  tagSearchTerm: string;
+};
 
 @Component({
   selector: 'app-cursos',
@@ -30,6 +35,7 @@ type FilePreviewType = 'image' | 'pdf' | 'text' | 'unsupported';
 export class CursosComponent implements OnInit, OnDestroy {
   private readonly MIN_INSTRUCTORES = 1;
   private readonly MAX_INSTRUCTORES = 3;
+  private readonly SEARCH_STATE_KEY = 'cursos';
 
   cursos: Curso[] = [];
   allCursos: Curso[] = [];
@@ -103,10 +109,12 @@ export class CursosComponent implements OnInit, OnDestroy {
     private authService: AuthService,
     private reportService: ReportService,
     private notificationService: NotificationService,
-    private sanitizer: DomSanitizer
+    private sanitizer: DomSanitizer,
+    private viewStateService: ViewStateService
   ) {}
 
   ngOnInit(): void {
+    this.restoreSearchState();
     this.checkAdminStatus();
     this.loadCurrentUser();
     this.loadCompanyTags();
@@ -115,6 +123,7 @@ export class CursosComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.persistSearchState();
     this.closeArchivoPreview();
     this.revokeObjectUrls(this.newCurso.archivos as CursoArchivo[] | undefined);
     this.revokeObjectUrls(this.editingCurso.archivos as CursoArchivo[] | undefined);
@@ -535,6 +544,16 @@ export class CursosComponent implements OnInit, OnDestroy {
 
   trackByString(index: number, value: string): string {
     return value || `${index}`;
+  }
+
+  onSearchTermChange(value: string): void {
+    this.searchTerm = value;
+    this.persistSearchState();
+  }
+
+  onTagSearchTermChange(value: string): void {
+    this.tagSearchTerm = value;
+    this.persistSearchState();
   }
 
   getInstructorName(instructorId: string): string {
@@ -1180,5 +1199,22 @@ export class CursosComponent implements OnInit, OnDestroy {
   private closeFloatingMenus() {
     this.activeActionMenuId = null;
     this.showInstructorDropdown = false;
+  }
+
+  private restoreSearchState(): void {
+    const state = this.viewStateService.getState<CursosSearchState>(this.SEARCH_STATE_KEY, {
+      searchTerm: '',
+      tagSearchTerm: ''
+    });
+
+    this.searchTerm = state.searchTerm || '';
+    this.tagSearchTerm = state.tagSearchTerm || '';
+  }
+
+  private persistSearchState(): void {
+    this.viewStateService.setState<CursosSearchState>(this.SEARCH_STATE_KEY, {
+      searchTerm: this.searchTerm || '',
+      tagSearchTerm: this.tagSearchTerm || ''
+    });
   }
 }

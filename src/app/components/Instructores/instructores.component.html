@@ -85,6 +85,7 @@
               <strong>{{ curso.nombre }}</strong>
               <small>{{ (curso.companyTag || 'Sin empresa') | uppercase }}</small>
               <small class="curso-description">{{ curso.descripcion || 'Sin descripcion' }}</small>
+              <small class="curso-description">Ubicacion: {{ getCursoUbicacion(curso.idcurso || '') }} | {{ getCursoPeriodo(curso.idcurso || '') }}</small>
             </span>
           </label>
         </ng-container>
@@ -178,6 +179,7 @@
               >
                 <strong>{{ getCursoNombre(cursoId) }}</strong>
                 <small>{{ getCursoDescripcion(cursoId) }}</small>
+                <small>{{ getCursoUbicacion(cursoId) }} | {{ getCursoPeriodo(cursoId) }}</small>
               </li>
             </ul>
 
@@ -191,7 +193,7 @@
             <select [(ngModel)]="selectedCursoByInstructor[instructor.id]">
               <option value="">Selecciona un curso</option>
               <option *ngFor="let curso of cursosAsignables; trackBy: trackByCursoId" [value]="curso.idcurso">
-                {{ curso.nombre }}
+                {{ getCursoSelectorLabel(curso) }}
               </option>
             </select>
 

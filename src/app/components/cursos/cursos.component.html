@@ -207,7 +207,8 @@
         id="buscar_curso"
         type="text"
         placeholder="Nombre, descripcion, empresa o representante..."
-        [(ngModel)]="searchTerm"
+        [ngModel]="searchTerm"
+        (ngModelChange)="onSearchTermChange($event)"
       />
     </div>
 
@@ -217,7 +218,8 @@
         id="buscar_etiqueta_curso"
         type="text"
         placeholder="Ej. empresa-sur"
-        [(ngModel)]="tagSearchTerm"
+        [ngModel]="tagSearchTerm"
+        (ngModelChange)="onTagSearchTermChange($event)"
       />
     </div>
 

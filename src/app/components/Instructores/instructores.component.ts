@@ -5,6 +5,7 @@ import { InstructorService } from '../../services/instructor.service';
 import { CursoService } from '../../services/curso.service';
 import { AuthService } from '../../services/auth.service';
 import { NotificationService } from '../../services/notification.service';
+import { ViewStateService } from '../../services/view-state.service';
 import { Instructor } from '../../models/instructor.model';
 import { Curso } from '../../models/curso.model';
 import { COURSE_ASSIGNMENT_GRACE_MONTHS } from '../../config/global.constants';
@@ -20,6 +21,7 @@ import { sanitizePhoneInput } from '../../utils/input-sanitizers.util';
   styleUrls: ['./instructores.component.scss']
 })
 export class InstructorComponent implements OnInit, OnDestroy {
+  private readonly SEARCH_STATE_KEY = 'instructores';
   defaultImg = resolveAppAssetUrl('assets/default-avatar.png');
 
   instructores: Instructor[] = [];
@@ -64,16 +66,19 @@ export class InstructorComponent implements OnInit, OnDestroy {
     private instructorService: InstructorService,
     private cursoService: CursoService,
     private authService: AuthService,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    private viewStateService: ViewStateService
   ) {}
 
   ngOnInit(): void {
+    this.restoreSearchState();
     this.checkAdminStatus();
     this.loadInstructores();
     this.loadCursos();
   }
 
   ngOnDestroy(): void {
+    this.persistSearchState();
     this.detenerCamara();
   }
 
@@ -347,6 +352,7 @@ export class InstructorComponent implements OnInit, OnDestroy {
 
   onSearchTermChange(value: string): void {
     this.searchTerm = value;
+    this.persistSearchState();
     this.refreshVisibleInstructores();
   }
 
@@ -389,6 +395,25 @@ export class InstructorComponent implements OnInit, OnDestroy {
     return curso ? curso.nombre : 'Curso desconocido';
   }
 
+  getCursoSelectorLabel(curso: Curso): string {
+    const empresa = (curso.companyTag || 'sin-empresa').toUpperCase();
+    const ubicacion = this.getCursoLocationDisplay(curso);
+    const periodo = this.getCursoPeriodDisplay(curso);
+    return `${curso.nombre} (${empresa}) - ${ubicacion} - ${periodo}`;
+  }
+
+  getCursoPeriodo(cursoId: string): string {
+    const curso = this.cursosById[cursoId];
+    if (!curso) return 'Periodo s/f';
+    return this.getCursoPeriodDisplay(curso);
+  }
+
+  getCursoUbicacion(cursoId: string): string {
+    const curso = this.cursosById[cursoId];
+    if (!curso) return 'Sin ubicacion';
+    return this.getCursoLocationDisplay(curso);
+  }
+
   getCursoDescripcion(cursoId: string): string {
     const curso = this.cursosById[cursoId];
     return curso ? curso.descripcion || 'Sin descripcion' : 'Descripcion no disponible';
@@ -397,10 +422,12 @@ export class InstructorComponent implements OnInit, OnDestroy {
   getCursoTooltip(curso: Curso): string {
     const descripcion = curso.descripcion?.trim() || 'Sin descripcion';
     const empresa = curso.companyTag?.trim();
+    const ubicacion = this.getCursoLocationDisplay(curso);
+    const periodo = this.getCursoPeriodDisplay(curso);
 
     return empresa
-      ? `${curso.nombre} - ${descripcion} - ${empresa.toUpperCase()}`
-      : `${curso.nombre} - ${descripcion}`;
+      ? `${curso.nombre} - ${descripcion} - ${empresa.toUpperCase()} - ${ubicacion} - ${periodo}`
+      : `${curso.nombre} - ${descripcion} - ${ubicacion} - ${periodo}`;
   }
 
   getSelectedCursoId(instructor: Instructor): string {
@@ -527,9 +554,36 @@ export class InstructorComponent implements OnInit, OnDestroy {
       curso.companyTag || '',
       curso.descripcion || '',
       curso.nom_representante || '',
+      this.getCursoLocationDisplay(curso),
+      this.getCursoPeriodDisplay(curso),
       curso.anioCurso ? String(curso.anioCurso) : '',
       curso.mesCurso ? String(curso.mesCurso) : ''
     ].join(' '));
+  }
+
+  private getCursoLocationDisplay(curso: Partial<Curso>): string {
+    const description = (curso.descripcion || '').trim();
+    if (!description) return 'Sin ubicacion';
+
+    const segments = description
+      .split(/[;,]+/g)
+      .map((segment) => segment.trim())
+      .filter(Boolean);
+
+    if (segments.length === 0) return 'Sin ubicacion';
+    if (segments.length === 1) return segments[0];
+    return `${segments[0]} / ${segments[segments.length - 1]}`;
+  }
+
+  private getCursoPeriodDisplay(curso: Partial<Curso>): string {
+    const year = Number(curso.anioCurso);
+    const month = Number(curso.mesCurso);
+
+    if (Number.isFinite(year) && Number.isFinite(month) && month >= 1 && month <= 12) {
+      return `Periodo ${String(month).padStart(2, '0')}/${Math.floor(year)}`;
+    }
+
+    return 'Periodo s/f';
   }
 
   private refreshCursosAsignables(): void {
@@ -592,5 +646,19 @@ export class InstructorComponent implements OnInit, OnDestroy {
     const nombreA = this.normalizeSearch(a.nombre || '');
     const nombreB = this.normalizeSearch(b.nombre || '');
     return nombreA.localeCompare(nombreB) * direction;
+  }
+
+  private restoreSearchState(): void {
+    const state = this.viewStateService.getState<{ searchTerm: string }>(this.SEARCH_STATE_KEY, {
+      searchTerm: ''
+    });
+
+    this.searchTerm = state.searchTerm || '';
+  }
+
+  private persistSearchState(): void {
+    this.viewStateService.setState<{ searchTerm: string }>(this.SEARCH_STATE_KEY, {
+      searchTerm: this.searchTerm || ''
+    });
   }
 }

@@ -10,6 +10,7 @@ import { PersonaService } from '../../services/persona.service';
 import { AuthService } from '../../services/auth.service';
 import { ReportData, ReportService } from '../../services/report.service';
 import { NotificationService } from '../../services/notification.service';
+import { ViewStateService } from '../../services/view-state.service';
 
 import { Curso } from '../../models/curso.model';
 import { Instructor } from '../../models/instructor.model';
@@ -25,6 +26,11 @@ type CursoArchivo = NonNullable<Curso['archivos']>[number] & {
   file?: File;
 };
 type FilePreviewType = 'pdf' | 'image' | 'text' | 'unsupported';
+type CursosGruposSearchState = {
+  cursoSearchTerm: string;
+  personaSearchTerm: string;
+  personaDisponibleSearchTerm: string;
+};
 
 @Component({
   selector: 'app-cursos-grupos',
@@ -37,6 +43,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   private readonly MIN_CALIFICACION_APTO = 80;
   private readonly PERSONAS_QUERY_LIMIT = 250;
   private readonly CURRENT_YEAR = new Date().getFullYear();
+  private readonly SEARCH_STATE_KEY = 'cursos-grupos';
   private cursosSubscription: Subscription | null = null;
   private personaDisponibleSearchTimer: ReturnType<typeof setTimeout> | null = null;
   currentUser$: Observable<User | null>;
@@ -123,7 +130,8 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     private authService: AuthService,
     private reportService: ReportService,
     private notificationService: NotificationService,
-    private sanitizer: DomSanitizer
+    private sanitizer: DomSanitizer,
+    private viewStateService: ViewStateService
   ) {
     this.currentUser$ = this.authService.currentUserData$;
   }
@@ -140,6 +148,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.restoreSearchState();
     this.loadCurrentUser();
     this.loadCompanyTags();
     this.loadCursos();
@@ -147,6 +156,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.persistSearchState();
     if (this.cursosSubscription) {
       this.cursosSubscription.unsubscribe();
       this.cursosSubscription = null;
@@ -388,10 +398,17 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
       ]);
       let personasEnCurso = assignedFromQuery;
 
-      if (personasEnCurso.length === 0) {
-        const fallbackIds = (this.selectedCurso.personasIds || []).filter(Boolean);
+      if (options.reloadEnCurso !== false) {
+        const fallbackIds = Array.from(
+          new Set((this.selectedCurso.personasIds || []).map((id) => (id || '').trim()).filter(Boolean))
+        );
         if (fallbackIds.length > 0) {
-          personasEnCurso = await this.personaService.getPersonasByIds(fallbackIds);
+          const loadedIds = new Set(personasEnCurso.map((persona) => (persona.id || '').trim()).filter(Boolean));
+          const missingIds = fallbackIds.filter((id) => !loadedIds.has(id));
+          if (missingIds.length > 0) {
+            const fallbackPersonas = await this.personaService.getPersonasByIds(missingIds);
+            personasEnCurso = this.mergePersonasContext(personasEnCurso, fallbackPersonas);
+          }
         }
       }
 
@@ -711,6 +728,14 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     const cursoAssignmentPeriod = this.resolveCursoAssignmentPeriod(this.selectedCurso);
 
     if (!companyTag || !locationTerm) {
+      return;
+    }
+
+    const matchingCursos = this.getAutoAssignMatchingCursos(this.selectedCurso, cursoAssignmentPeriod);
+    if (matchingCursos.length > 1) {
+      this.notificationService.info(
+        `Autoasignacion detenida: se detectaron ${matchingCursos.length} cursos para la misma empresa/ubicacion y periodo. Usa asignacion multiple desde Personas.`
+      );
       return;
     }
 
@@ -1559,8 +1584,19 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     return this.filteredPersonasDisponibles;
   }
 
+  onCursoSearchTermChange(value: string): void {
+    this.cursoSearchTerm = value;
+    this.persistSearchState();
+  }
+
+  onPersonaSearchTermChange(value: string): void {
+    this.personaSearchTerm = value;
+    this.persistSearchState();
+  }
+
   onPersonaDisponibleSearchTermChange(value: string): void {
     this.personaDisponibleSearchTerm = value;
+    this.persistSearchState();
 
     if (this.personaDisponibleSearchTimer) {
       clearTimeout(this.personaDisponibleSearchTimer);
@@ -1665,6 +1701,60 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   private getCursoAutoAssignLocation(curso: Curso | null | undefined): string {
     if (!curso) return '';
     return this.normalizeSearch(curso.descripcion || '');
+  }
+
+  private getAutoAssignMatchingCursos(
+    referenceCurso: Curso | null | undefined,
+    referencePeriod?: { year: number; month: number } | null
+  ): Curso[] {
+    if (!referenceCurso) {
+      return [];
+    }
+
+    const referenceCompanyTag = this.normalizeCompanyTag(referenceCurso.companyTag);
+    const referenceLocation = this.parseLocation(this.getCursoAutoAssignLocation(referenceCurso));
+    const effectivePeriod = referencePeriod || this.resolveCursoAssignmentPeriod(referenceCurso);
+
+    if (!referenceCompanyTag || !referenceLocation.raw) {
+      return [];
+    }
+
+    return this.allCursos.filter((curso) => {
+      if (!curso.idcurso) return false;
+      if (this.normalizeCompanyTag(curso.companyTag) !== referenceCompanyTag) return false;
+
+      const currentLocation = this.parseLocation(this.getCursoAutoAssignLocation(curso));
+      if (!this.isSameAutoAssignLocation(referenceLocation, currentLocation)) {
+        return false;
+      }
+
+      if (!effectivePeriod) {
+        return true;
+      }
+
+      const currentPeriod = this.resolveCursoAssignmentPeriod(curso);
+      if (!currentPeriod) {
+        return false;
+      }
+
+      return currentPeriod.year === effectivePeriod.year && currentPeriod.month === effectivePeriod.month;
+    });
+  }
+
+  private isSameAutoAssignLocation(
+    left: { raw: string; parts: string[]; city: string; state: string; hasCityState: boolean },
+    right: { raw: string; parts: string[]; city: string; state: string; hasCityState: boolean }
+  ): boolean {
+    if (!left.raw || !right.raw) {
+      return false;
+    }
+
+    if (left.hasCityState && right.hasCityState) {
+      return left.city === right.city && left.state === right.state;
+    }
+
+    const rightParts = new Set(right.parts);
+    return left.parts.some((part) => rightParts.has(part));
   }
 
   private resolveCursoAssignmentPeriod(curso: Curso | null | undefined): { year: number; month: number } | null {
@@ -1828,6 +1918,26 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     if (!parsed) return 0;
     const time = parsed.getTime();
     return Number.isNaN(time) ? 0 : time;
+  }
+
+  private restoreSearchState(): void {
+    const state = this.viewStateService.getState<CursosGruposSearchState>(this.SEARCH_STATE_KEY, {
+      cursoSearchTerm: '',
+      personaSearchTerm: '',
+      personaDisponibleSearchTerm: ''
+    });
+
+    this.cursoSearchTerm = state.cursoSearchTerm || '';
+    this.personaSearchTerm = state.personaSearchTerm || '';
+    this.personaDisponibleSearchTerm = state.personaDisponibleSearchTerm || '';
+  }
+
+  private persistSearchState(): void {
+    this.viewStateService.setState<CursosGruposSearchState>(this.SEARCH_STATE_KEY, {
+      cursoSearchTerm: this.cursoSearchTerm || '',
+      personaSearchTerm: this.personaSearchTerm || '',
+      personaDisponibleSearchTerm: this.personaDisponibleSearchTerm || ''
+    });
   }
 }
 

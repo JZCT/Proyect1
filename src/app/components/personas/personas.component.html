@@ -291,10 +291,38 @@
 
   <div class="table-section">
     <h3>Registros ({{ filteredPersonas.length }})</h3>
-    <div class="table-tools" *ngIf="isAdmin && filteredPersonas.length > 0">
+    <div class="table-tools" *ngIf="canEditPersonas && filteredPersonas.length > 0">
       <button type="button" class="btn btn-light btn-sm" (click)="selectVisible()">Seleccionar visibles</button>
       <button type="button" class="btn btn-light btn-sm" (click)="clearSelection()" [disabled]="selectedCount === 0">Limpiar seleccion</button>
-      <button type="button" class="btn btn-danger btn-sm" (click)="deleteSelectedPersonas()" [disabled]="selectedCount === 0 || deletingSelected">
+
+      <select
+        class="table-tools-course-select"
+        [(ngModel)]="bulkAssignCursoId"
+        name="bulk_assign_curso_id"
+        [disabled]="assigningSelected || cursosAsignables.length === 0"
+      >
+        <option value="">Curso destino...</option>
+        <option *ngFor="let curso of cursosAsignables; trackBy: trackByCursoId" [value]="curso.idcurso">
+          {{ getCursoOptionLabel(curso) }}
+        </option>
+      </select>
+
+      <button
+        type="button"
+        class="btn btn-primary btn-sm"
+        (click)="assignSelectedToCurso()"
+        [disabled]="selectedCount === 0 || !bulkAssignCursoId || assigningSelected"
+      >
+        {{ assigningSelected ? 'Asignando...' : 'Asignar seleccionadas (' + selectedCount + ')' }}
+      </button>
+
+      <button
+        type="button"
+        class="btn btn-danger btn-sm"
+        (click)="deleteSelectedPersonas()"
+        *ngIf="isAdmin"
+        [disabled]="selectedCount === 0 || deletingSelected"
+      >
         {{ deletingSelected ? 'Eliminando...' : 'Eliminar seleccionadas (' + selectedCount + ')' }}
       </button>
     </div>
@@ -360,7 +388,8 @@
       <input
         type="text"
         placeholder="Nombre, correo, empresa, ubicacion o resultado..."
-        [(ngModel)]="searchTerm"
+        [ngModel]="searchTerm"
+        (ngModelChange)="onSearchTermChange($event)"
       />
     </div>
 
@@ -389,7 +418,7 @@
       <table class="table">
         <thead>
           <tr>
-            <th class="select-col" *ngIf="isAdmin">
+            <th class="select-col" *ngIf="canEditPersonas">
               <input
                 type="checkbox"
                 [checked]="isAllFilteredSelected()"
@@ -412,7 +441,7 @@
         </thead>
         <tbody>
           <tr *ngFor="let persona of filteredPersonas; trackBy: trackByPersonaId">
-            <td class="select-col" *ngIf="isAdmin">
+            <td class="select-col" *ngIf="canEditPersonas">
               <input
                 type="checkbox"
                 [checked]="isSelected(persona.id)"
@@ -425,6 +454,7 @@
               <div class="primary-text">{{ persona.nombre }}</div>
               <div class="secondary-text">{{ (persona.empresa || '-') | uppercase }}</div>
               <div class="secondary-text">{{ getPersonaPeriodDisplay(persona) }}</div>
+              <div class="secondary-text">{{ getPersonaAssignmentLabel(persona) }}</div>
             </td>
             <td>{{ persona.curp || '-' }}</td>
             <td>

@@ -2,14 +2,20 @@ import { Component, OnDestroy, OnInit, ViewChild, ElementRef } from '@angular/co
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { Subscription } from 'rxjs';
 import { PersonaService } from '../../services/persona.service';
+import { CursoService } from '../../services/curso.service';
 import { AuthService } from '../../services/auth.service';
 import { BulkImportOptions, ImportService } from '../../services/import.service';
 import { ReportService } from '../../services/report.service';
 import { NotificationService } from '../../services/notification.service';
+import { ViewStateService } from '../../services/view-state.service';
 import { Persona } from '../../models/persona.model';
+import { Curso } from '../../models/curso.model';
 import { User } from '../../models/user.model';
+import { COURSE_ASSIGNMENT_GRACE_MONTHS } from '../../config/global.constants';
 import { resolveAppAssetUrl } from '../../utils/asset-url.util';
+import { isCursoCaducadoParaAsignacion } from '../../utils/course-availability.util';
 import { normalizeDateInput } from '../../utils/date.util';
 import { sanitizePhoneInput, sanitizeScoreInput } from '../../utils/input-sanitizers.util';
 
@@ -30,13 +36,17 @@ export class PersonasComponent implements OnInit, OnDestroy {
   @ViewChild('excelInput') excelInput!: ElementRef<HTMLInputElement>;
   @ViewChild('cameraVideo') cameraVideo?: ElementRef<HTMLVideoElement>;
   @ViewChild('cameraCanvas') cameraCanvas?: ElementRef<HTMLCanvasElement>;
+  private readonly SEARCH_STATE_KEY = 'personas';
   private readonly MIN_CALIFICACION_APTO = 80;
   private readonly CURP_REGEX = /^[A-Z0-9]{18}$/;
   private readonly CURRENT_YEAR = new Date().getFullYear();
   private cameraStream: MediaStream | null = null;
+  private cursosSubscription: Subscription | null = null;
   
   personas: Persona[] = [];
   allPersonas: Persona[] = [];
+  cursos: Curso[] = [];
+  cursosAsignables: Curso[] = [];
   showForm = false;
   editingId: string | null = null;
   loadingFile = false;
@@ -57,6 +67,8 @@ export class PersonasComponent implements OnInit, OnDestroy {
   sortDirection: 'asc' | 'desc' = 'asc';
   selectedPersonaIds = new Set<string>();
   deletingSelected = false;
+  assigningSelected = false;
+  bulkAssignCursoId = '';
   deletingPersonaId: string | null = null;
   showFilePreview = false;
   previewFile: PersonaArchivo | null = null;
@@ -65,6 +77,8 @@ export class PersonasComponent implements OnInit, OnDestroy {
   previewResourceUrl: SafeResourceUrl | null = null;
   previewOpenUrl: string | null = null;
   previewError = '';
+  private cursosById: Record<string, Curso> = {};
+  private personaAssignmentLabelById: Record<string, string> = {};
 
   // Propiedades para carga masiva
   showBulkImport = false;
@@ -120,11 +134,13 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
   constructor(
     private personaService: PersonaService,
+    private cursoService: CursoService,
     private authService: AuthService,
     private importService: ImportService,
     private reportService: ReportService,
     private notificationService: NotificationService,
-    private sanitizer: DomSanitizer
+    private sanitizer: DomSanitizer,
+    private viewStateService: ViewStateService
   ) {}
 
   get canEditPersonas(): boolean {
@@ -154,12 +170,16 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.restoreSearchState();
     this.checkAdminStatus();
     this.loadCurrentUser();
+    this.loadCursosForAssignment();
     this.loadPersonas();
   }
 
   ngOnDestroy(): void {
+    this.persistSearchState();
+    this.cursosSubscription?.unsubscribe();
     this.detenerCamara();
     this.closeArchivoPreview();
   }
@@ -174,8 +194,60 @@ export class PersonasComponent implements OnInit, OnDestroy {
     this.authService.currentUserData$.subscribe((userData) => {
       this.currentUser = userData;
       this.canGenerateReports = userData?.role === 'admin' || userData?.role === 'company';
+      this.applyCursoAssignmentVisibility();
       this.applyPersonaVisibility();
     });
+  }
+
+  private loadCursosForAssignment(): void {
+    this.cursosSubscription?.unsubscribe();
+    this.cursosSubscription = this.cursoService.getCursos().subscribe({
+      next: (cursos) => {
+        this.cursos = cursos;
+        this.applyCursoAssignmentVisibility();
+        this.cursosById = this.cursos.reduce<Record<string, Curso>>((acc, curso) => {
+          if (curso.idcurso) {
+            acc[curso.idcurso] = curso;
+          }
+          return acc;
+        }, {});
+        this.updatePersonaAssignmentLabels();
+      },
+      error: (error) => {
+        console.error('Error cargando cursos para asignacion:', error);
+      }
+    });
+  }
+
+  private applyCursoAssignmentVisibility(): void {
+    const activeCursos = this.cursos.filter(
+      (curso) => !isCursoCaducadoParaAsignacion(curso, COURSE_ASSIGNMENT_GRACE_MONTHS)
+    );
+
+    if (!this.currentUser || this.currentUser.role === 'admin') {
+      this.cursosAsignables = activeCursos;
+      this.ensureBulkAssignCursoIsValid();
+      this.updatePersonaAssignmentLabels();
+      return;
+    }
+
+    if (this.currentUser.role === 'instructor') {
+      const assignedByUser = new Set((this.currentUser.assignedCourseIds || []).filter(Boolean));
+      const explicitInstructorId = (this.currentUser.instructorId || '').trim();
+
+      this.cursosAsignables = activeCursos.filter((curso) => {
+        const byUserAssignment = !!curso.idcurso && assignedByUser.has(curso.idcurso);
+        const byInstructorProfile = !!explicitInstructorId && (curso.instructorIds || []).includes(explicitInstructorId);
+        return byUserAssignment || byInstructorProfile;
+      });
+      this.ensureBulkAssignCursoIsValid();
+      this.updatePersonaAssignmentLabels();
+      return;
+    }
+
+    this.cursosAsignables = [];
+    this.ensureBulkAssignCursoIsValid();
+    this.updatePersonaAssignmentLabels();
   }
 
   loadPersonas() {
@@ -298,6 +370,8 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
     this.syncSelectionWithCurrentData();
     this.updateFilterOptions();
+    this.ensureBulkAssignCursoIsValid();
+    this.updatePersonaAssignmentLabels();
   }
 
   private getCompanyEmpresaName(): string {
@@ -667,6 +741,65 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
   clearSelection(): void {
     this.selectedPersonaIds.clear();
+  }
+
+  getCursoOptionLabel(curso: Curso): string {
+    const empresa = (curso.companyTag || 'sin-empresa').toUpperCase();
+    const ubicacion = this.getCursoLocationDisplay(curso);
+    const periodo = this.getCursoPeriodLabel(curso);
+    return `${curso.nombre} (${empresa}) - ${ubicacion} - ${periodo}`;
+  }
+
+  async assignSelectedToCurso(): Promise<void> {
+    if (!this.canEditPersonas || this.assigningSelected) return;
+
+    const cursoId = (this.bulkAssignCursoId || '').trim();
+    if (!cursoId) {
+      this.showMessage('Selecciona un curso destino');
+      return;
+    }
+
+    const ids = [...this.selectedPersonaIds].filter(Boolean);
+    if (ids.length === 0) {
+      this.showMessage('Selecciona al menos una persona');
+      return;
+    }
+
+    const confirmed = confirm(
+      `Se intentara asignar ${ids.length} persona(s) al curso seleccionado. ¿Continuar?`
+    );
+    if (!confirmed) return;
+
+    try {
+      this.assigningSelected = true;
+      const result = await this.cursoService.addPersonasToCurso(cursoId, ids);
+      this.loadPersonas();
+
+      const summary = [
+        `Asignadas: ${result.added}`,
+        `Omitidas: ${result.skipped}`,
+        `Errores: ${result.errors}`
+      ].join(' | ');
+
+      this.showMessage(`Asignacion multiple completada. ${summary}`);
+      this.clearSelection();
+      this.bulkAssignCursoId = '';
+    } catch (error) {
+      console.error('Error en asignacion multiple de personas:', error);
+      const message = error instanceof Error ? error.message : 'No se pudo completar la asignacion multiple';
+      this.showMessage(message);
+    } finally {
+      this.assigningSelected = false;
+    }
+  }
+
+  getPersonaAssignmentLabel(persona: Persona): string {
+    const personaId = (persona.id || '').trim();
+    if (personaId && this.personaAssignmentLabelById[personaId]) {
+      return this.personaAssignmentLabelById[personaId];
+    }
+
+    return this.buildPersonaAssignmentLabel(persona);
   }
 
   async deleteSelectedPersonas(): Promise<void> {
@@ -1450,6 +1583,11 @@ export class PersonasComponent implements OnInit, OnDestroy {
     }
   }
 
+  onSearchTermChange(value: string): void {
+    this.searchTerm = value;
+    this.persistSearchState();
+  }
+
   get filteredPersonas(): Persona[] {
     const term = this.normalizeSearch(this.searchTerm);
     const filtered = this.personas.filter((persona) => {
@@ -1504,6 +1642,10 @@ export class PersonasComponent implements OnInit, OnDestroy {
       .filter((id): id is string => !!id);
   }
 
+  trackByCursoId(index: number, curso: Curso): string {
+    return curso.idcurso || curso.nombre || `${index}`;
+  }
+
   trackByPersonaId(index: number, persona: Persona): string {
     return persona.id || persona.curp || persona.email || persona.nombre || `${index}`;
   }
@@ -1526,6 +1668,178 @@ export class PersonasComponent implements OnInit, OnDestroy {
     this.selectedPersonaIds = new Set(
       [...this.selectedPersonaIds].filter(id => validIds.has(id))
     );
+  }
+
+  private ensureBulkAssignCursoIsValid(): void {
+    const cursoId = (this.bulkAssignCursoId || '').trim();
+    if (!cursoId) return;
+
+    const isValid = this.cursosAsignables.some((curso) => curso.idcurso === cursoId);
+    if (!isValid) {
+      this.bulkAssignCursoId = '';
+    }
+  }
+
+  private updatePersonaAssignmentLabels(): void {
+    const labels: Record<string, string> = {};
+
+    for (const persona of this.personas) {
+      const personaId = (persona.id || '').trim();
+      if (!personaId) continue;
+      labels[personaId] = this.buildPersonaAssignmentLabel(persona);
+    }
+
+    this.personaAssignmentLabelById = labels;
+  }
+
+  private buildPersonaAssignmentLabel(persona: Partial<Persona>): string {
+    const assignedCursoId = (persona.assignedCursoId || '').trim();
+    if (assignedCursoId) {
+      return `Asignado a: ${this.getCursoNombreById(assignedCursoId)}`;
+    }
+
+    const candidateCursos = this.getCandidateCursosForPersona(persona);
+    if (candidateCursos.length > 1) {
+      return `Pendiente de asignacion (${candidateCursos.length} cursos)`;
+    }
+
+    if (candidateCursos.length === 1) {
+      return `Disponible para: ${candidateCursos[0].nombre}`;
+    }
+
+    return 'Disponible';
+  }
+
+  private getCursoNombreById(cursoId: string): string {
+    const normalizedId = (cursoId || '').trim();
+    if (!normalizedId) return 'Curso sin definir';
+
+    const curso = this.cursosById[normalizedId];
+    if (!curso) return normalizedId;
+
+    return this.getCursoCompactLabel(curso);
+  }
+
+  private getCursoCompactLabel(curso: Partial<Curso>): string {
+    const nombre = (curso.nombre || 'Curso').trim();
+    const ubicacion = this.getCursoLocationDisplay(curso);
+    const periodo = this.getCursoPeriodLabel(curso);
+    return `${nombre} (${ubicacion}, ${periodo})`;
+  }
+
+  private getCursoLocationDisplay(curso: Partial<Curso>): string {
+    const rawDescription = this.normalizeTextField(curso.descripcion);
+    if (!rawDescription) return 'Sin ubicacion';
+
+    const segments = rawDescription
+      .split(/[;,]+/g)
+      .map((segment) => segment.trim())
+      .filter(Boolean);
+
+    if (segments.length === 0) return 'Sin ubicacion';
+    if (segments.length === 1) return segments[0];
+
+    return `${segments[0]} / ${segments[segments.length - 1]}`;
+  }
+
+  private getCursoPeriodLabel(curso: Partial<Curso>): string {
+    const period = this.resolveCursoPeriod(curso);
+    if (!period) {
+      return 'Periodo s/f';
+    }
+
+    return `Periodo ${String(period.month).padStart(2, '0')}/${period.year}`;
+  }
+
+  private getCandidateCursosForPersona(persona: Partial<Persona>): Curso[] {
+    const companyTag = this.normalizeCompanyTag((persona.companyTag || persona.empresa || '').trim());
+    if (!companyTag) return [];
+
+    const personaLocation = this.parseLocationForAssignment(persona.lugar || '');
+    if (!personaLocation.raw) return [];
+
+    const personaYear = this.resolvePersonaYearValue(persona);
+    const personaMonth = this.resolvePersonaMonthValue(persona);
+
+    return this.cursosAsignables.filter((curso) => {
+      if (this.normalizeCompanyTag((curso.companyTag || '').trim()) !== companyTag) {
+        return false;
+      }
+
+      const cursoLocation = this.parseLocationForAssignment(curso.descripcion || '');
+      if (!this.isSameLocationForAssignment(personaLocation, cursoLocation)) {
+        return false;
+      }
+
+      if (personaYear && personaMonth) {
+        const cursoPeriod = this.resolveCursoPeriod(curso);
+        if (!cursoPeriod) return false;
+        return cursoPeriod.year === personaYear && cursoPeriod.month === personaMonth;
+      }
+
+      return true;
+    });
+  }
+
+  private resolveCursoPeriod(curso: Partial<Curso>): { year: number; month: number } | null {
+    const explicitYear = this.normalizeYearInput(curso.anioCurso);
+    const explicitMonth = this.normalizeMonthInput(curso.mesCurso);
+    if (explicitYear && explicitMonth) {
+      return { year: explicitYear, month: explicitMonth };
+    }
+
+    const inicio = normalizeDateInput(curso.Fecha_inicio);
+    if (!inicio) return null;
+
+    const year = this.normalizeYearInput(inicio.getFullYear());
+    const month = this.normalizeMonthInput(inicio.getMonth() + 1);
+    if (!year || !month) return null;
+
+    return { year, month };
+  }
+
+  private parseLocationForAssignment(value: string): {
+    raw: string;
+    parts: string[];
+    city: string;
+    state: string;
+    hasCityState: boolean;
+  } {
+    const normalized = this.normalizeSearch(value);
+    if (!normalized) {
+      return { raw: '', parts: [], city: '', state: '', hasCityState: false };
+    }
+
+    const parts = normalized
+      .split(/[;,]+/g)
+      .map((part) => part.trim().replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, ''))
+      .filter(Boolean);
+
+    const hasCityState = parts.length >= 2;
+    const city = hasCityState ? parts[0] : '';
+    const state = hasCityState ? parts[parts.length - 1] : '';
+
+    return {
+      raw: normalized,
+      parts: parts.length > 0 ? parts : [normalized],
+      city,
+      state,
+      hasCityState
+    };
+  }
+
+  private isSameLocationForAssignment(
+    left: { raw: string; parts: string[]; city: string; state: string; hasCityState: boolean },
+    right: { raw: string; parts: string[]; city: string; state: string; hasCityState: boolean }
+  ): boolean {
+    if (!left.raw || !right.raw) return false;
+
+    if (left.hasCityState && right.hasCityState) {
+      return left.city === right.city && left.state === right.state;
+    }
+
+    const rightParts = new Set(right.parts);
+    return left.parts.some((part) => rightParts.has(part));
   }
 
   private normalizeText(value: string): string {
@@ -1677,6 +1991,20 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
   private isValidCurp(value?: string): boolean {
     return this.CURP_REGEX.test(this.normalizeCurp(value));
+  }
+
+  private restoreSearchState(): void {
+    const state = this.viewStateService.getState<{ searchTerm: string }>(this.SEARCH_STATE_KEY, {
+      searchTerm: ''
+    });
+
+    this.searchTerm = state.searchTerm || '';
+  }
+
+  private persistSearchState(): void {
+    this.viewStateService.setState<{ searchTerm: string }>(this.SEARCH_STATE_KEY, {
+      searchTerm: this.searchTerm || ''
+    });
   }
 }
 
