@@ -33,6 +33,7 @@ html {
 body.cecapta-standalone {
   margin: 0;
   min-height: 100vh;
+  overflow-y: scroll;
 }
 
 app-root,
@@ -46,7 +47,7 @@ app-root {
   display: block;
   width: 100%;
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow-x: auto;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(180deg, var(--brand-4) 0%, var(--bg) 48%, #f6fbff 100%);
   color: var(--text);
@@ -182,7 +183,7 @@ app-root .table-scroll {
   max-height: min(72vh, 760px);
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: stable;
   -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -218,12 +219,58 @@ app-root .table-scroll .table tbody tr:hover td {
   background: rgba(0, 131, 251, 0.05);
 }
 
+/* Personas table: keep layout stable even with very long values */
+app-root app-personas .table-scroll .table {
+  table-layout: fixed;
+  min-width: 1100px;
+}
+
+app-root app-personas .table-scroll .table th,
+app-root app-personas .table-scroll .table td {
+  font-size: clamp(11px, 0.68vw, 13px);
+}
+
+app-root app-personas .info-col {
+  width: clamp(220px, 24vw, 320px);
+}
+
+app-root app-personas th.curp-col,
+app-root app-personas td.curp-col {
+  width: clamp(120px, 10vw, 150px);
+  max-width: clamp(120px, 10vw, 150px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+app-root app-personas td.curp-col {
+  font-family: "Consolas", "Courier New", monospace;
+}
+
+app-root app-personas .contact-col .primary-text,
+app-root app-personas .contact-col .secondary-text {
+  display: block;
+  max-width: clamp(150px, 18vw, 240px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+app-root app-personas .location-col .badge {
+  max-width: clamp(110px, 12vw, 160px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
+}
+
 app-root .scrollable-results {
   width: 100%;
   max-height: min(68vh, 760px);
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: stable;
   min-height: 0;
   padding-right: 4px;
 }

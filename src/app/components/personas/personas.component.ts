@@ -78,6 +78,8 @@ export class PersonasComponent implements OnInit, OnDestroy {
   assigningSelected = false;
   bulkAssignCursoId = '';
   deletingPersonaId: string | null = null;
+  showPersonaDetalle = false;
+  personaDetalleTarget: Persona | null = null;
   showPersonaEntregables = false;
   personaEntregablesTarget: Persona | null = null;
   showFilePreview = false;
@@ -193,6 +195,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
     this.cursosSubscription?.unsubscribe();
     this.personasSubscription?.unsubscribe();
     this.detenerCamara();
+    this.closePersonaDetalleModal();
     this.closePersonaEntregablesModal();
     this.closeArchivoPreview();
   }
@@ -383,6 +386,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
     }
 
     this.syncSelectionWithCurrentData();
+    this.syncPersonaDetalleTarget();
     this.updateFilterOptions();
     this.ensureBulkAssignCursoIsValid();
     this.updatePersonaAssignmentLabels();
@@ -695,6 +699,9 @@ export class PersonasComponent implements OnInit, OnDestroy {
         if (this.personaEntregablesTarget?.id === id) {
           this.closePersonaEntregablesModal();
         }
+        if (this.personaDetalleTarget?.id === id) {
+          this.closePersonaDetalleModal();
+        }
         if (this.editingId === id) {
           this.resetForm();
         }
@@ -761,10 +768,11 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   getCursoOptionLabel(curso: Curso): string {
-    const empresa = (curso.companyTag || 'sin-empresa').toUpperCase();
-    const ubicacion = this.getCursoLocationDisplay(curso);
-    const periodo = this.getCursoPeriodLabel(curso);
-    return `${curso.nombre} (${empresa}) - ${ubicacion} - ${periodo}`;
+    const nombre = this.truncateLabel((curso.nombre || 'Curso').trim(), 26);
+    const empresa = this.truncateLabel((curso.companyTag || 'sin-empresa').toUpperCase(), 12);
+    const ubicacion = this.truncateLabel(this.getCursoLocationDisplay(curso), 18);
+    const diaCorto = this.getCursoDayShortLabel(curso);
+    return `${nombre} | Dia ${diaCorto} | ${ubicacion}, ${empresa}`;
   }
 
   async assignSelectedToCurso(): Promise<void> {
@@ -798,7 +806,14 @@ export class PersonasComponent implements OnInit, OnDestroy {
         `Errores: ${result.errors}`
       ].join(' | ');
 
-      this.showMessage(`Asignacion multiple completada. ${summary}`);
+      if (ids.length === 1 && result.skippedDetails.length > 0) {
+        this.showMessage(result.skippedDetails[0]);
+      } else if (result.skippedDetails.length > 0) {
+        const detailPreview = result.skippedDetails.slice(0, 2).join(' | ');
+        this.showMessage(`Asignacion multiple completada. ${summary} | Motivo(s): ${detailPreview}`);
+      } else {
+        this.showMessage(`Asignacion multiple completada. ${summary}`);
+      }
       this.clearSelection();
       this.bulkAssignCursoId = '';
     } catch (error) {
@@ -896,6 +911,24 @@ export class PersonasComponent implements OnInit, OnDestroy {
   openPersonaEntregablesModal(persona: Persona): void {
     this.personaEntregablesTarget = persona;
     this.showPersonaEntregables = true;
+  }
+
+  openPersonaDetalleModal(persona: Persona): void {
+    this.personaDetalleTarget = persona;
+    this.showPersonaDetalle = true;
+  }
+
+  closePersonaDetalleModal(): void {
+    this.showPersonaDetalle = false;
+    this.personaDetalleTarget = null;
+  }
+
+  openPersonaDetalleEdit(): void {
+    if (!this.canEditPersonas || !this.personaDetalleTarget) return;
+
+    const persona = this.personaDetalleTarget;
+    this.closePersonaDetalleModal();
+    this.startEdit(persona);
   }
 
   closePersonaEntregablesModal(): void {
@@ -1740,6 +1773,24 @@ export class PersonasComponent implements OnInit, OnDestroy {
     );
   }
 
+  private syncPersonaDetalleTarget(): void {
+    if (!this.personaDetalleTarget) return;
+
+    const currentTargetId = (this.personaDetalleTarget.id || '').trim();
+    if (!currentTargetId) {
+      this.closePersonaDetalleModal();
+      return;
+    }
+
+    const updatedTarget = this.personas.find((persona) => (persona.id || '').trim() === currentTargetId);
+    if (!updatedTarget) {
+      this.closePersonaDetalleModal();
+      return;
+    }
+
+    this.personaDetalleTarget = updatedTarget;
+  }
+
   private ensureBulkAssignCursoIsValid(): void {
     const cursoId = (this.bulkAssignCursoId || '').trim();
     if (!cursoId) return;
@@ -1774,7 +1825,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
     }
 
     if (candidateCursos.length === 1) {
-      return `Disponible para: ${candidateCursos[0].nombre}`;
+      return `Disponible: ${this.getCursoCompactLabel(candidateCursos[0])}`;
     }
 
     return 'Disponible';
@@ -1791,10 +1842,10 @@ export class PersonasComponent implements OnInit, OnDestroy {
   }
 
   private getCursoCompactLabel(curso: Partial<Curso>): string {
-    const nombre = (curso.nombre || 'Curso').trim();
-    const ubicacion = this.getCursoLocationDisplay(curso);
-    const periodo = this.getCursoPeriodLabel(curso);
-    return `${nombre} (${ubicacion}, ${periodo})`;
+    const nombre = this.truncateLabel((curso.nombre || 'Curso').trim(), 24);
+    const ubicacion = this.truncateLabel(this.getCursoLocationDisplay(curso), 16);
+    const diaCorto = this.getCursoDayShortLabel(curso);
+    return `${nombre} (Dia ${diaCorto}, ${ubicacion})`;
   }
 
   private getCursoLocationDisplay(curso: Partial<Curso>): string {
@@ -1812,13 +1863,33 @@ export class PersonasComponent implements OnInit, OnDestroy {
     return `${segments[0]} / ${segments[segments.length - 1]}`;
   }
 
-  private getCursoPeriodLabel(curso: Partial<Curso>): string {
-    const period = this.resolveCursoPeriod(curso);
-    if (!period) {
-      return 'Periodo s/f';
+  private getCursoDayShortLabel(curso: Partial<Curso>): string {
+    const dia = normalizeDateInput(curso.dia ?? curso.Fecha_inicio ?? curso.Fecha_fin);
+    if (dia) {
+      return this.formatDateForDisplayShort(dia);
     }
 
-    return `Periodo ${String(period.month).padStart(2, '0')}/${period.year}`;
+    const period = this.resolveCursoPeriod(curso);
+    if (!period) {
+      return '--/--/--';
+    }
+
+    const yearShort = String(period.year).slice(-2);
+    return `01/${String(period.month).padStart(2, '0')}/${yearShort}`;
+  }
+
+  private formatDateForDisplayShort(date: Date): string {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear()).slice(-2);
+    return `${day}/${month}/${year}`;
+  }
+
+  private truncateLabel(value: string, maxLength: number): string {
+    const normalized = (value || '').trim();
+    if (!normalized) return '';
+    if (normalized.length <= maxLength) return normalized;
+    return `${normalized.slice(0, Math.max(1, maxLength - 3)).trimEnd()}...`;
   }
 
   private getCandidateCursosForPersona(persona: Partial<Persona>): Curso[] {
@@ -1831,31 +1902,39 @@ export class PersonasComponent implements OnInit, OnDestroy {
     const personaYear = this.resolvePersonaYearValue(persona);
     const personaMonth = this.resolvePersonaMonthValue(persona);
 
-    return this.cursosAsignables.filter((curso) => {
+    const matchingCursos = new Map<string, Curso>();
+
+    for (const curso of this.cursosAsignables) {
+      const cursoId = (curso.idcurso || '').trim();
+      if (!cursoId) continue;
+
       if (this.normalizeCompanyTag((curso.companyTag || '').trim()) !== companyTag) {
-        return false;
+        continue;
       }
 
       const cursoLocation = this.parseLocationForAssignment(curso.descripcion || '');
       if (!this.isSameLocationForAssignment(personaLocation, cursoLocation)) {
-        return false;
+        continue;
       }
 
       if (personaYear && personaMonth) {
         const cursoPeriod = this.resolveCursoPeriod(curso);
-        if (!cursoPeriod) return false;
-        return cursoPeriod.year === personaYear && cursoPeriod.month === personaMonth;
+        if (!cursoPeriod || cursoPeriod.year !== personaYear || cursoPeriod.month !== personaMonth) {
+          continue;
+        }
       }
 
-      return true;
-    });
+      matchingCursos.set(cursoId, curso);
+    }
+
+    return [...matchingCursos.values()];
   }
 
   private resolveCursoPeriod(curso: Partial<Curso>): { year: number; month: number } | null {
-    const inicio = normalizeDateInput(curso.Fecha_inicio);
-    if (inicio) {
-      const yearFromInicio = this.normalizeYearInput(inicio.getFullYear());
-      const monthFromInicio = this.normalizeMonthInput(inicio.getMonth() + 1);
+    const dia = normalizeDateInput(curso.dia ?? curso.Fecha_inicio ?? curso.Fecha_fin);
+    if (dia) {
+      const yearFromInicio = this.normalizeYearInput(dia.getFullYear());
+      const monthFromInicio = this.normalizeMonthInput(dia.getMonth() + 1);
       if (yearFromInicio && monthFromInicio) {
         return { year: yearFromInicio, month: monthFromInicio };
       }
@@ -1905,7 +1984,14 @@ export class PersonasComponent implements OnInit, OnDestroy {
     if (!left.raw || !right.raw) return false;
 
     if (left.hasCityState && right.hasCityState) {
-      return left.city === right.city && left.state === right.state;
+      const sameCity = left.city === right.city;
+      const sameState = left.state === right.state;
+      const stateOverlap =
+        !left.state || !right.state ||
+        right.parts.includes(left.state) ||
+        left.parts.includes(right.state);
+
+      return sameCity && (sameState || stateOverlap);
     }
 
     const rightParts = new Set(right.parts);
@@ -2077,10 +2163,3 @@ export class PersonasComponent implements OnInit, OnDestroy {
     });
   }
 }
-
-
-
-
-
-
-

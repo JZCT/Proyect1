@@ -23,7 +23,6 @@ import {
 import { Observable, combineLatest, map, shareReplay } from 'rxjs';
 import { Curso, CursoArchivo } from '../models/curso.model';
 import { Persona } from '../models/persona.model';
-import { PERSONA_REASSIGNMENT_COOLDOWN_MONTHS } from '../config/global.constants';
 import { coerceDate, normalizeDateInput } from '../utils/date.util';
 
 type CursoArchivoInput = NonNullable<Curso['archivos']>[number] & {
@@ -43,6 +42,8 @@ type PeriodRange = {
 
 type RawCurso = Partial<Curso> & {
   idcurso?: string;
+  dia?: unknown;
+  fecha_dia?: unknown;
   fecha_inicio?: unknown;
   fecha_fin?: unknown;
   anioCurso?: unknown;
@@ -143,6 +144,15 @@ export class CursoService {
       { idField: 'idcurso' }
     ) as Observable<RawCurso[]>;
 
+    const cursosByDia$ = collectionData(
+      query(
+        this.cursosCollection,
+        where('dia', '>=', effectiveRange.rangeStart),
+        where('dia', '<=', effectiveRange.rangeEnd)
+      ),
+      { idField: 'idcurso' }
+    ) as Observable<RawCurso[]>;
+
     const cursosByFechaInicio$ = collectionData(
       query(
         this.cursosCollection,
@@ -172,24 +182,25 @@ export class CursoService {
 
     const stream$ = combineLatest([
       cursosByNormalizedFields$,
+      cursosByDia$,
       cursosByFechaInicio$,
       cursosByFechaInicioLegacy$,
       cursosByCreatedAt$
     ]).pipe(
-      map(([rowsByFields, rowsByInicio, rowsByInicioLegacy, rowsByCreatedAt]) => {
+      map(([rowsByFields, rowsByDia, rowsByInicio, rowsByInicioLegacy, rowsByCreatedAt]) => {
         const deduped = new Map<string, Curso>();
         let fallbackIndex = 0;
 
-        for (const row of [...rowsByFields, ...rowsByInicio, ...rowsByInicioLegacy, ...rowsByCreatedAt]) {
+        for (const row of [...rowsByFields, ...rowsByDia, ...rowsByInicio, ...rowsByInicioLegacy, ...rowsByCreatedAt]) {
           const normalized = this.normalizeCurso(row);
           const resolvedYear = this.resolveCursoYear(
             normalized.anioCurso,
-            normalized.Fecha_inicio,
+            normalized.dia,
             normalized.createdAt
           );
           const resolvedMonth = this.resolveCursoMonth(
             normalized.mesCurso,
-            normalized.Fecha_inicio,
+            normalized.dia,
             normalized.createdAt
           );
           const periodKey = this.toPeriodKey(resolvedYear, resolvedMonth);
@@ -344,18 +355,47 @@ export class CursoService {
         const personaRaw = personaSnapshot.data() as Partial<Persona>;
         const personaCursoIds = this.normalizeIdList(personaRaw.cursoIds);
         const assignedCursoId = this.normalizeString(personaRaw.assignedCursoId || '');
+        const conflictCandidates = Array.from(
+          new Set([assignedCursoId, ...personaCursoIds].filter((id) => id && id !== normalizedCursoId))
+        );
+        const staleCursoIds = new Set<string>();
+        let conflictingCursoId = '';
+        let conflictingCursoNombre = '';
 
-        const assignedElsewhere = (!!assignedCursoId && assignedCursoId !== normalizedCursoId)
-          || personaCursoIds.some((id) => id && id !== normalizedCursoId);
+        for (const candidateCursoId of conflictCandidates) {
+          const candidateCursoDoc = doc(this.firestore, `cursos/${candidateCursoId}`);
+          const candidateCursoSnapshot = await transaction.get(candidateCursoDoc);
 
-        if (assignedElsewhere) {
-          throw new Error('La persona ya esta asignada a otro curso');
+          if (!candidateCursoSnapshot.exists()) {
+            staleCursoIds.add(candidateCursoId);
+            continue;
+          }
+
+          const candidateCurso = this.normalizeCurso(
+            candidateCursoSnapshot.data() as RawCurso,
+            candidateCursoSnapshot.id
+          );
+          const candidatePersonasIds = this.normalizeIdList(candidateCurso.personasIds);
+          if (candidatePersonasIds.includes(normalizedPersonaId)) {
+            conflictingCursoId = candidateCursoId;
+            conflictingCursoNombre = this.normalizeString(candidateCurso.nombre);
+            break;
+          }
+
+          staleCursoIds.add(candidateCursoId);
         }
 
-        this.ensurePersonaReassignmentCooldown(personaRaw, curso);
+        if (conflictingCursoId) {
+          const conflictingCursoLabel = conflictingCursoNombre
+            ? `${conflictingCursoId}: ${conflictingCursoNombre}`
+            : conflictingCursoId;
+          throw new Error(`La persona ya esta asignada a otro curso (${conflictingCursoLabel})`);
+        }
+
+        const cleanedPersonaCursoIds = personaCursoIds.filter((id) => !staleCursoIds.has(id));
 
         const personasIds = Array.from(new Set([...currentPersonasIds, normalizedPersonaId]));
-        const cursoIds = Array.from(new Set([...personaCursoIds, normalizedCursoId]));
+        const cursoIds = Array.from(new Set([...cleanedPersonaCursoIds, normalizedCursoId]));
 
         transaction.update(cursoDoc, { personasIds });
         transaction.set(personaDoc, {
@@ -365,7 +405,14 @@ export class CursoService {
         }, { merge: true });
       });
     } catch (error) {
-      console.error('Error agregando persona al curso:', error);
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      const isExpectedBusinessRule = message.includes('ya esta asignada a otro curso');
+
+      if (isExpectedBusinessRule) {
+        console.warn('Validacion al agregar persona al curso:', error);
+      } else {
+        console.error('Error agregando persona al curso:', error);
+      }
       throw error;
     }
   }
@@ -401,20 +448,12 @@ export class CursoService {
           const personaRaw = personaSnapshot.data() as Partial<Persona>;
           const cursoIds = this.normalizeIdList(personaRaw.cursoIds).filter((id) => id !== normalizedCursoId);
           const assignedCursoId = cursoIds[0] || '';
-          const releasePeriod = !assignedCursoId
-            ? this.resolveCursoCompletionPeriod(curso)
-            : null;
 
           const personaUpdatePayload: Record<string, unknown> = {
             cursoIds,
             assignedCursoId,
             assignmentStatus: assignedCursoId ? 'assigned' : 'available'
           };
-
-          if (releasePeriod) {
-            personaUpdatePayload['lastCursoYear'] = releasePeriod.year;
-            personaUpdatePayload['lastCursoMonth'] = releasePeriod.month;
-          }
 
           transaction.set(personaDoc, personaUpdatePayload, { merge: true });
         }
@@ -428,7 +467,7 @@ export class CursoService {
   async addPersonasToCurso(
     cursoId: string,
     personaIds: string[]
-  ): Promise<{ added: number; skipped: number; errors: number }> {
+  ): Promise<{ added: number; skipped: number; errors: number; skippedDetails: string[] }> {
     const normalizedCursoId = this.normalizeString(cursoId);
     const uniquePersonaIds = Array.from(
       new Set(
@@ -439,12 +478,13 @@ export class CursoService {
     );
 
     if (!normalizedCursoId || uniquePersonaIds.length === 0) {
-      return { added: 0, skipped: 0, errors: 0 };
+      return { added: 0, skipped: 0, errors: 0, skippedDetails: [] };
     }
 
     let added = 0;
     let skipped = 0;
     let errors = 0;
+    const skippedDetails: string[] = [];
 
     for (const personaId of uniquePersonaIds) {
       try {
@@ -452,18 +492,19 @@ export class CursoService {
         added += 1;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message.toLowerCase() : '';
-        if (
-          errorMessage.includes('ya esta asignada a otro curso')
-          || errorMessage.includes('periodo de espera')
-        ) {
+        if (errorMessage.includes('ya esta asignada a otro curso')) {
           skipped += 1;
+          const detail = error instanceof Error ? error.message : '';
+          if (detail) {
+            skippedDetails.push(`${personaId}: ${detail}`);
+          }
         } else {
           errors += 1;
         }
       }
     }
 
-    return { added, skipped, errors };
+    return { added, skipped, errors, skippedDetails };
   }
 
   async assignInstructoresToCurso(cursoId: string, instructorIds: string[]): Promise<void> {
@@ -545,17 +586,25 @@ export class CursoService {
   }
 
   private normalizeCurso(curso: RawCurso, idcursoOverride?: string): Curso {
+    const dia = coerceDate(
+      curso.dia ??
+      curso.fecha_dia ??
+      curso.Fecha_inicio ??
+      curso.fecha_inicio ??
+      curso.Fecha_fin ??
+      curso.fecha_fin
+    );
     const inicio = coerceDate(curso.Fecha_inicio ?? curso.fecha_inicio);
     const fin = coerceDate(curso.Fecha_fin ?? curso.fecha_fin);
     const createdAt = coerceDate(curso.createdAt);
     const anioCurso = this.resolveCursoYear(
       curso.anioCurso ?? curso.anio_curso ?? curso.anio ?? curso.year,
-      inicio,
+      dia,
       createdAt
     );
     const mesCurso = this.resolveCursoMonth(
       curso.mesCurso ?? curso.mes_curso ?? curso.mes ?? curso.month,
-      inicio,
+      dia,
       createdAt
     );
 
@@ -565,6 +614,7 @@ export class CursoService {
       descripcion: this.normalizeString(curso.descripcion),
       anioCurso,
       mesCurso,
+      dia,
       Fecha_inicio: inicio,
       Fecha_fin: fin,
       nom_representante: this.normalizeString(
@@ -629,19 +679,17 @@ export class CursoService {
     const normalizedArchivos = await this.normalizeArchivos(cursoId, curso.archivos, uploadedStoragePaths);
     const normalizedInstructorIds = this.normalizeInstructorIds(curso.instructorIds);
     const normalizedPersonasIds = this.normalizeIdList(curso.personasIds);
-    const inicio = coerceDate(curso.Fecha_inicio);
-    const fin = coerceDate(curso.Fecha_fin);
+    const dia = coerceDate(curso.dia ?? curso.Fecha_inicio ?? curso.Fecha_fin);
     const createdAt = normalizeDateInput(curso.createdAt, new Date()) ?? new Date();
-    const anioCurso = this.resolveCursoYear(curso.anioCurso, inicio, createdAt);
-    const mesCurso = this.resolveCursoMonth(curso.mesCurso, inicio, createdAt);
+    const anioCurso = this.resolveCursoYear(curso.anioCurso, dia, createdAt);
+    const mesCurso = this.resolveCursoMonth(curso.mesCurso, dia, createdAt);
 
     return {
       nombre: this.normalizeString(curso.nombre),
       descripcion: this.normalizeString(curso.descripcion),
       anioCurso,
       mesCurso,
-      Fecha_inicio: inicio,
-      Fecha_fin: fin,
+      dia,
       nom_representante: this.normalizeString(curso.nom_representante),
       num_represnetantes: this.normalizeString(curso.num_represnetantes),
       companyTag: this.normalizeCompanyTag(curso.companyTag),
@@ -1001,11 +1049,11 @@ export class CursoService {
 
   private resolveCursoYear(
     explicitYear: unknown,
-    inicio?: Date | null,
+    dia?: Date | null,
     createdAt?: Date | null
   ): number | undefined {
-    const byInicio = this.normalizeYearValue(inicio?.getFullYear());
-    if (byInicio) return byInicio;
+    const byDia = this.normalizeYearValue(dia?.getFullYear());
+    if (byDia) return byDia;
 
     const byField = this.normalizeYearValue(explicitYear);
     if (byField) return byField;
@@ -1015,84 +1063,16 @@ export class CursoService {
 
   private resolveCursoMonth(
     explicitMonth: unknown,
-    inicio?: Date | null,
+    dia?: Date | null,
     createdAt?: Date | null
   ): number | undefined {
-    const byInicio = this.normalizeMonthValue((inicio?.getMonth() ?? -1) + 1);
-    if (byInicio) return byInicio;
+    const byDia = this.normalizeMonthValue((dia?.getMonth() ?? -1) + 1);
+    if (byDia) return byDia;
 
     const byField = this.normalizeMonthValue(explicitMonth);
     if (byField) return byField;
 
     return this.normalizeMonthValue((createdAt?.getMonth() ?? -1) + 1);
-  }
-
-  private ensurePersonaReassignmentCooldown(persona: Partial<Persona>, targetCurso: Partial<Curso>): void {
-    const lastPeriod = this.resolvePersonaLastCursoPeriod(persona);
-    if (!lastPeriod) {
-      return;
-    }
-
-    const targetPeriod = this.resolveCursoStartPeriod(targetCurso);
-    if (!targetPeriod) {
-      return;
-    }
-
-    const monthDiff = this.diffMonths(lastPeriod, targetPeriod);
-    if (monthDiff >= PERSONA_REASSIGNMENT_COOLDOWN_MONTHS) {
-      return;
-    }
-
-    if (monthDiff < 0) {
-      throw new Error('El periodo del curso seleccionado es anterior al ultimo curso de esta persona');
-    }
-
-    const remaining = PERSONA_REASSIGNMENT_COOLDOWN_MONTHS - monthDiff;
-    throw new Error(
-      `La persona esta en periodo de espera. Deben pasar ${PERSONA_REASSIGNMENT_COOLDOWN_MONTHS} meses entre cursos; faltan ${remaining} mes(es)`
-    );
-  }
-
-  private resolvePersonaLastCursoPeriod(persona: Partial<Persona>): { year: number; month: number } | null {
-    const year = this.normalizeYearValue(persona.lastCursoYear);
-    const month = this.normalizeMonthValue(persona.lastCursoMonth);
-    if (!year || !month) {
-      return null;
-    }
-
-    return { year, month };
-  }
-
-  private resolveCursoStartPeriod(curso: Partial<Curso>): { year: number; month: number } | null {
-    const inicio = coerceDate(curso.Fecha_inicio);
-    const createdAt = coerceDate(curso.createdAt);
-    const year = this.resolveCursoYear(curso.anioCurso, inicio, createdAt);
-    const month = this.resolveCursoMonth(curso.mesCurso, inicio, createdAt);
-    if (!year || !month) {
-      return null;
-    }
-
-    return { year, month };
-  }
-
-  private resolveCursoCompletionPeriod(curso: Partial<Curso>): { year: number; month: number } | null {
-    const fin = coerceDate(curso.Fecha_fin);
-    if (fin) {
-      const year = this.normalizeYearValue(fin.getFullYear());
-      const month = this.normalizeMonthValue(fin.getMonth() + 1);
-      if (year && month) {
-        return { year, month };
-      }
-    }
-
-    return this.resolveCursoStartPeriod(curso);
-  }
-
-  private diffMonths(
-    from: { year: number; month: number },
-    to: { year: number; month: number }
-  ): number {
-    return ((to.year * 12) + to.month) - ((from.year * 12) + from.month);
   }
 
   private normalizeAttachmentUrl(value: unknown): string {

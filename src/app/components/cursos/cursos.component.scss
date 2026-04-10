@@ -16,6 +16,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .header h2,
@@ -26,6 +27,12 @@
 
 .header {
   gap: 10px;
+}
+
+.header .btn {
+  flex: 0 0 auto;
+  min-width: 132px;
+  white-space: nowrap;
 }
 
 .form {
@@ -205,8 +212,20 @@
   background: var(--surface-soft);
 }
 
+.table th:last-child,
+.table td:last-child {
+  min-width: 150px;
+  white-space: normal;
+}
+
 .actions {
-  width: 132px;
+  width: auto;
+  min-width: 136px;
+}
+
+.actions .btn {
+  min-width: 96px;
+  white-space: nowrap;
 }
 
 .empty-state {
@@ -654,12 +673,23 @@
     gap: 10px;
   }
 
+  .header .btn {
+    width: 100%;
+    min-width: 0;
+  }
+
   .modal-header {
     flex-direction: column;
   }
 
   .actions {
-    width: 108px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .actions .btn {
+    width: 100%;
+    min-width: 0;
   }
 
   .table {

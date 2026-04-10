@@ -28,6 +28,7 @@ type CursoArchivo = NonNullable<Curso['archivos']>[number] & {
 type FilePreviewType = 'pdf' | 'image' | 'text' | 'unsupported';
 type CursosGruposSearchState = {
   cursoSearchTerm: string;
+  cursoCityFilter: string;
   personaSearchTerm: string;
   personaDisponibleSearchTerm: string;
 };
@@ -35,7 +36,8 @@ type CursosGruposSearchState = {
 type FilteredCursosListCache = {
   source: Curso[];
   term: string;
-  sortBy: 'nombre' | 'empresa' | 'inicio' | 'fin';
+  cityFilter: string;
+  sortBy: 'nombre' | 'empresa' | 'dia';
   sortDirection: 'asc' | 'desc';
   result: Curso[];
 };
@@ -108,7 +110,8 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   cursoRangeStart = `${this.CURRENT_YEAR}-01`;
   cursoRangeEnd = `${this.CURRENT_YEAR}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   cursoSearchTerm: string = '';
-  cursoSortBy: 'nombre' | 'empresa' | 'inicio' | 'fin' = 'nombre';
+  cursoCityFilter: string = '';
+  cursoSortBy: 'nombre' | 'empresa' | 'dia' = 'nombre';
   cursoSortDirection: 'asc' | 'desc' = 'asc';
   personaSearchTerm: string = '';
   personaDisponibleSearchTerm: string = '';
@@ -138,8 +141,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   newCurso: Partial<Curso> = {
     nombre: '',
     descripcion: '',
-    Fecha_inicio: undefined,
-    Fecha_fin: undefined,
+    dia: undefined,
     nom_representante: '',
     num_represnetantes: '',
     companyTag: '',
@@ -151,8 +153,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   editingCurso: Partial<Curso> = {
     nombre: '',
     descripcion: '',
-    Fecha_inicio: undefined,
-    Fecha_fin: undefined,
+    dia: undefined,
     nom_representante: '',
     num_represnetantes: '',
     companyTag: '',
@@ -660,8 +661,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     if (
       this.newCurso.nombre &&
       this.newCurso.descripcion &&
-      this.newCurso.Fecha_inicio &&
-      this.newCurso.Fecha_fin &&
+      this.newCurso.dia &&
       this.newCurso.nom_representante &&
       this.newCurso.num_represnetantes &&
       this.newCurso.companyTag &&
@@ -694,6 +694,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     this.editingCursoId = curso.idcurso || null;
     this.editingCurso = {
       ...curso,
+      dia: curso.dia ?? curso.Fecha_inicio ?? curso.Fecha_fin,
       num_represnetantes: sanitizePhoneInput(curso.num_represnetantes),
       archivos: (curso.archivos || []).map((archivo) => ({ ...archivo }))
     };
@@ -708,6 +709,11 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     if (this.editingCursoId) {
       if (!this.editingCurso.companyTag || !this.editingCurso.companyTag.trim()) {
         this.notificationService.warning('La etiqueta de empresa es requerida');
+        return;
+      }
+
+      if (!this.editingCurso.dia) {
+        this.notificationService.warning('El dia del curso es requerido');
         return;
       }
 
@@ -778,8 +784,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     this.newCurso = {
       nombre: '',
       descripcion: '',
-      Fecha_inicio: undefined,
-      Fecha_fin: undefined,
+      dia: undefined,
       nom_representante: '',
       num_represnetantes: '',
       companyTag: '',
@@ -789,8 +794,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     this.editingCurso = {
       nombre: '',
       descripcion: '',
-      Fecha_inicio: undefined,
-      Fecha_fin: undefined,
+      dia: undefined,
       nom_representante: '',
       num_represnetantes: '',
       companyTag: '',
@@ -945,7 +949,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
         );
       } else if (result.skipped > 0) {
         this.notificationService.info(
-          `Autoasignacion sin cambios: ${result.skipped} persona(s) estaban bloqueadas por asignacion activa o periodo de espera`
+          `Autoasignacion sin cambios: ${result.skipped} persona(s) estaban bloqueadas por asignacion activa`
         );
       }
 
@@ -1722,12 +1726,14 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
       return '';
     }
 
+    const cursoDia = this.formatDate(curso.dia ?? curso.Fecha_inicio ?? curso.Fecha_fin) || '';
     const normalizedPersonasIds = Array.from(
       new Set((curso.personasIds || []).map((id) => (id || '').trim()).filter(Boolean))
     ).sort();
 
     return [
       curso.idcurso,
+      cursoDia,
       this.normalizeCompanyTag(curso.companyTag),
       normalizedPersonasIds.join('|')
     ].join('#');
@@ -1781,12 +1787,24 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     return Array.from(new Set([...this.companyTags, normalizedCurrent]));
   }
 
+  get cursoCityOptions(): string[] {
+    return Array.from(
+      new Set(
+        this.cursos
+          .map((curso) => this.parseLocation(curso.descripcion || '').city)
+          .filter((city) => !!city)
+      )
+    ).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  }
+
   get filteredCursosList(): Curso[] {
     const term = this.normalizeSearch(this.cursoSearchTerm);
+    const cityFilter = this.normalizeSearch(this.cursoCityFilter);
     if (
       this.filteredCursosListCache &&
       this.filteredCursosListCache.source === this.cursos &&
       this.filteredCursosListCache.term === term &&
+      this.filteredCursosListCache.cityFilter === cityFilter &&
       this.filteredCursosListCache.sortBy === this.cursoSortBy &&
       this.filteredCursosListCache.sortDirection === this.cursoSortDirection
     ) {
@@ -1809,13 +1827,15 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
         .join(' '));
 
       const matchesGeneral = !term || target.includes(term);
-      return matchesGeneral;
+      const matchesCity = !cityFilter || this.normalizeSearch(parsedLocation.city) === cityFilter;
+      return matchesGeneral && matchesCity;
     });
 
     const result = [...filtered].sort((a, b) => this.compareCursos(a, b));
     this.filteredCursosListCache = {
       source: this.cursos,
       term,
+      cityFilter,
       sortBy: this.cursoSortBy,
       sortDirection: this.cursoSortDirection,
       result
@@ -1892,6 +1912,20 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
 
   onCursoSearchTermChange(value: string): void {
     this.cursoSearchTerm = value;
+    this.persistSearchState();
+  }
+
+  clearCursoCityFilter(): void {
+    if (!this.cursoCityFilter) {
+      return;
+    }
+
+    this.cursoCityFilter = '';
+    this.persistSearchState();
+  }
+
+  onCursoCityFilterChange(value: string): void {
+    this.cursoCityFilter = value;
     this.persistSearchState();
   }
 
@@ -2068,13 +2102,13 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
       return null;
     }
 
-    const inicio = coerceDate(curso.Fecha_inicio);
+    const dia = coerceDate(curso.dia ?? curso.Fecha_inicio ?? curso.Fecha_fin);
     const createdAt = coerceDate(curso.createdAt);
     const year = this.normalizeYearInput(
-      inicio?.getFullYear() ?? curso.anioCurso ?? createdAt?.getFullYear()
+      dia?.getFullYear() ?? curso.anioCurso ?? createdAt?.getFullYear()
     );
     const month = this.normalizeMonthInput(
-      ((inicio?.getMonth() ?? -1) + 1) || curso.mesCurso || ((createdAt?.getMonth() ?? -1) + 1)
+      ((dia?.getMonth() ?? -1) + 1) || curso.mesCurso || ((createdAt?.getMonth() ?? -1) + 1)
     );
 
     if (!year || !month) {
@@ -2176,16 +2210,10 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   private compareCursos(a: Curso, b: Curso): number {
     const direction = this.cursoSortDirection === 'asc' ? 1 : -1;
 
-    if (this.cursoSortBy === 'inicio') {
-      const inicioA = this.toDateValue(a.Fecha_inicio);
-      const inicioB = this.toDateValue(b.Fecha_inicio);
-      if (inicioA !== inicioB) return (inicioA - inicioB) * direction;
-    }
-
-    if (this.cursoSortBy === 'fin') {
-      const finA = this.toDateValue(a.Fecha_fin);
-      const finB = this.toDateValue(b.Fecha_fin);
-      if (finA !== finB) return (finA - finB) * direction;
+    if (this.cursoSortBy === 'dia') {
+      const diaA = this.toDateValue(a.dia ?? a.Fecha_inicio ?? a.Fecha_fin);
+      const diaB = this.toDateValue(b.dia ?? b.Fecha_inicio ?? b.Fecha_fin);
+      if (diaA !== diaB) return (diaA - diaB) * direction;
     }
 
     if (this.cursoSortBy === 'empresa') {
@@ -2231,11 +2259,13 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   private restoreSearchState(): void {
     const state = this.viewStateService.getState<CursosGruposSearchState>(this.SEARCH_STATE_KEY, {
       cursoSearchTerm: '',
+      cursoCityFilter: '',
       personaSearchTerm: '',
       personaDisponibleSearchTerm: ''
     });
 
     this.cursoSearchTerm = state.cursoSearchTerm || '';
+    this.cursoCityFilter = state.cursoCityFilter || '';
     this.personaSearchTerm = state.personaSearchTerm || '';
     this.personaDisponibleSearchTerm = state.personaDisponibleSearchTerm || '';
   }
@@ -2243,6 +2273,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   private persistSearchState(): void {
     this.viewStateService.setState<CursosGruposSearchState>(this.SEARCH_STATE_KEY, {
       cursoSearchTerm: this.cursoSearchTerm || '',
+      cursoCityFilter: this.cursoCityFilter || '',
       personaSearchTerm: this.personaSearchTerm || '',
       personaDisponibleSearchTerm: this.personaDisponibleSearchTerm || ''
     });

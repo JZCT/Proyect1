@@ -263,8 +263,7 @@ export class ReportService {
         Nombre: curso.nombre || '',
         Descripcion: curso.descripcion || '',
         'Etiqueta Empresa': this.formatCompanyTag(curso.companyTag),
-        Inicio: this.formatDate(curso.Fecha_inicio),
-        Fin: this.formatDate(curso.Fecha_fin),
+        Dia: this.formatDate(curso.dia || curso.Fecha_inicio || curso.Fecha_fin),
         Representante: curso.nom_representante || '',
         'Telefono Representante': curso.num_represnetantes || '',
         Instructores: curso.instructorIds?.length || 0
@@ -275,7 +274,6 @@ export class ReportService {
         { wch: 28 },
         { wch: 45 },
         { wch: 22 },
-        { wch: 14 },
         { wch: 14 },
         { wch: 24 },
         { wch: 22 },
@@ -308,8 +306,7 @@ export class ReportService {
           <td>${this.escapeHtml(curso.nombre || '')}</td>
           <td>${this.escapeHtml(curso.descripcion || '')}</td>
           <td>${this.escapeHtml(this.formatCompanyTag(curso.companyTag) || '-')}</td>
-          <td>${this.escapeHtml(this.formatDate(curso.Fecha_inicio))}</td>
-          <td>${this.escapeHtml(this.formatDate(curso.Fecha_fin))}</td>
+          <td>${this.escapeHtml(this.formatDate(curso.dia || curso.Fecha_inicio || curso.Fecha_fin))}</td>
           <td>${this.escapeHtml(curso.nom_representante || '-')}</td>
           <td>${this.escapeHtml(curso.num_represnetantes || '-')}</td>
         </tr>
@@ -334,8 +331,7 @@ export class ReportService {
           'Nombre',
           'Descripcion',
           'Etiqueta Empresa',
-          'Inicio',
-          'Fin',
+          'Dia',
           'Representante',
           'Telefono'
         ],

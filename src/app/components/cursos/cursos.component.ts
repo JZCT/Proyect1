@@ -76,7 +76,7 @@ export class CursosComponent implements OnInit, OnDestroy {
   searchTerm: string = '';
   tagSearchTerm: string = '';
   instructorSearchTerm: string = '';
-  sortBy: 'nombre' | 'empresa' | 'inicio' | 'fin' = 'nombre';
+  sortBy: 'nombre' | 'empresa' | 'dia' = 'nombre';
   sortDirection: 'asc' | 'desc' = 'asc';
   exportingReport = false;
   loadingArchivos = false;
@@ -106,8 +106,7 @@ export class CursosComponent implements OnInit, OnDestroy {
   newCurso: Partial<Curso> = {
     nombre: '',
     descripcion: '',
-    Fecha_inicio: undefined,
-    Fecha_fin: undefined,
+    dia: undefined,
     nom_representante: '',
     num_represnetantes: '',
     companyTag: '',
@@ -118,8 +117,7 @@ export class CursosComponent implements OnInit, OnDestroy {
   editingCurso: Partial<Curso> = {
     nombre: '',
     descripcion: '',
-    Fecha_inicio: undefined,
-    Fecha_fin: undefined,
+    dia: undefined,
     nom_representante: '',
     num_represnetantes: '',
     companyTag: '',
@@ -262,8 +260,7 @@ export class CursosComponent implements OnInit, OnDestroy {
     this.editingCurso = {
       nombre: '',
       descripcion: '',
-      Fecha_inicio: undefined,
-      Fecha_fin: undefined,
+      dia: undefined,
       nom_representante: '',
       num_represnetantes: '',
       companyTag: '',
@@ -286,6 +283,11 @@ export class CursosComponent implements OnInit, OnDestroy {
 
     if (!this.newCurso.companyTag || !this.newCurso.companyTag.trim()) {
       this.notificationService.warning('La etiqueta de empresa es requerida');
+      return;
+    }
+
+    if (!this.newCurso.dia) {
+      this.notificationService.warning('El dia del curso es requerido');
       return;
     }
 
@@ -324,6 +326,7 @@ export class CursosComponent implements OnInit, OnDestroy {
     this.editingId = curso.idcurso || null;
     this.editingCurso = {
       ...curso,
+      dia: curso.dia ?? curso.Fecha_inicio ?? curso.Fecha_fin,
       num_represnetantes: sanitizePhoneInput(curso.num_represnetantes),
       archivos: (curso.archivos || []).map((archivo) => ({ ...archivo }))
     };
@@ -339,6 +342,11 @@ export class CursosComponent implements OnInit, OnDestroy {
 
     if (!this.editingCurso.companyTag || !this.editingCurso.companyTag.trim()) {
       this.notificationService.warning('La etiqueta de empresa es requerida');
+      return;
+    }
+
+    if (!this.editingCurso.dia) {
+      this.notificationService.warning('El dia del curso es requerido');
       return;
     }
 
@@ -404,8 +412,7 @@ export class CursosComponent implements OnInit, OnDestroy {
     this.newCurso = {
       nombre: '',
       descripcion: '',
-      Fecha_inicio: undefined,
-      Fecha_fin: undefined,
+      dia: undefined,
       nom_representante: '',
       num_represnetantes: '',
       companyTag: '',
@@ -416,8 +423,7 @@ export class CursosComponent implements OnInit, OnDestroy {
     this.editingCurso = {
       nombre: '',
       descripcion: '',
-      Fecha_inicio: undefined,
-      Fecha_fin: undefined,
+      dia: undefined,
       nom_representante: '',
       num_represnetantes: '',
       companyTag: '',
@@ -1227,16 +1233,10 @@ export class CursosComponent implements OnInit, OnDestroy {
   private compareCursos(a: Curso, b: Curso): number {
     const direction = this.sortDirection === 'asc' ? 1 : -1;
 
-    if (this.sortBy === 'inicio') {
-      const inicioA = this.toDateValue(a.Fecha_inicio);
-      const inicioB = this.toDateValue(b.Fecha_inicio);
-      if (inicioA !== inicioB) return (inicioA - inicioB) * direction;
-    }
-
-    if (this.sortBy === 'fin') {
-      const finA = this.toDateValue(a.Fecha_fin);
-      const finB = this.toDateValue(b.Fecha_fin);
-      if (finA !== finB) return (finA - finB) * direction;
+    if (this.sortBy === 'dia') {
+      const diaA = this.toDateValue(a.dia ?? a.Fecha_inicio ?? a.Fecha_fin);
+      const diaB = this.toDateValue(b.dia ?? b.Fecha_inicio ?? b.Fecha_fin);
+      if (diaA !== diaB) return (diaA - diaB) * direction;
     }
 
     if (this.sortBy === 'empresa') {

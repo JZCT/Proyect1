@@ -62,26 +62,14 @@
         </div>
 
         <div class="form-group">
-          <label for="Fecha_inicio">Fecha de inicio</label>
+          <label for="curso_dia">Dia del curso</label>
           <input
             type="date"
-            id="Fecha_inicio"
-            name="Fecha_inicio"
+            id="curso_dia"
+            name="curso_dia"
             required
-            [ngModel]="editingId ? formatDate(editingCurso.Fecha_inicio) : formatDate(newCurso.Fecha_inicio)"
-            (ngModelChange)="editingId ? (editingCurso.Fecha_inicio = $event) : (newCurso.Fecha_inicio = $event)"
-          />
-        </div>
-
-        <div class="form-group">
-          <label for="fecha_fin">Fecha de fin</label>
-          <input
-            type="date"
-            id="fecha_fin"
-            name="fecha_fin"
-            required
-            [ngModel]="editingId ? formatDate(editingCurso.Fecha_fin) : formatDate(newCurso.Fecha_fin)"
-            (ngModelChange)="editingId ? (editingCurso.Fecha_fin = $event) : (newCurso.Fecha_fin = $event)"
+            [ngModel]="editingId ? formatDate(editingCurso.dia) : formatDate(newCurso.dia)"
+            (ngModelChange)="editingId ? (editingCurso.dia = $event) : (newCurso.dia = $event)"
           />
         </div>
 
@@ -229,8 +217,7 @@
         <select id="orden_curso_por" [(ngModel)]="sortBy" name="curso_sort_by">
           <option value="nombre">Alfabetico (Nombre)</option>
           <option value="empresa">Alfabetico (Etiqueta)</option>
-          <option value="inicio">Fecha inicio</option>
-          <option value="fin">Fecha fin</option>
+          <option value="dia">Dia</option>
         </select>
       </div>
 
@@ -257,8 +244,7 @@
             <th>Descripcion</th>
             <th>Empresa</th>
             <th>Instructores</th>
-            <th>Inicio</th>
-            <th>Fin</th>
+            <th>Dia</th>
             <th>Representante</th>
             <th>Telefono</th>
             <th>Acciones</th>
@@ -276,8 +262,7 @@
                 <small>{{ getInstructorSummary(curso.instructorIds) }}</small>
               </div>
             </td>
-            <td>{{ curso.Fecha_inicio | date }}</td>
-            <td>{{ curso.Fecha_fin | date }}</td>
+            <td>{{ (curso.dia || curso.Fecha_inicio || curso.Fecha_fin) | date }}</td>
             <td>{{ curso.nom_representante }}</td>
             <td>{{ curso.num_represnetantes }}</td>
             <td class="actions">
@@ -347,9 +332,8 @@
         </section>
 
         <section class="detail-card">
-          <h4>Fechas</h4>
-          <p>Inicio: {{ selectedCourseDetail.Fecha_inicio | date }}</p>
-          <p>Fin: {{ selectedCourseDetail.Fecha_fin | date }}</p>
+          <h4>Dia</h4>
+          <p>{{ (selectedCourseDetail.dia || selectedCourseDetail.Fecha_inicio || selectedCourseDetail.Fecha_fin) | date }}</p>
         </section>
 
         <section class="detail-card">

@@ -24,7 +24,6 @@ import {
 } from '@angular/fire/storage';
 import { Observable, combineLatest, map, shareReplay } from 'rxjs';
 import { Persona, PersonaArchivo } from '../models/persona.model';
-import { PERSONA_REASSIGNMENT_COOLDOWN_MONTHS } from '../config/global.constants';
 import { normalizeDateInput } from '../utils/date.util';
 
 type RawPersona = Partial<Persona> & {
@@ -329,7 +328,6 @@ export class PersonaService {
 
         const personas = [...deduped.values()].filter((persona) =>
           this.isAvailablePersona(persona)
-          && this.isEligibleForReassignment(persona, targetPeriod)
         );
         if (!normalizedTerm) {
           return personas.slice(0, requestLimit);
@@ -377,6 +375,23 @@ export class PersonaService {
 
     return this.resolveInFlight(this.autoAssignableInFlight, requestKey, async () => {
       try {
+        const shouldMatchByCityState = Boolean(location.city && location.state);
+        const isLocationMatch = (personaLocation: { city: string; state: string; tokens?: string[] }) => {
+          if (!shouldMatchByCityState) {
+            return this.includesEveryToken(personaLocation.tokens || [], location.tokens);
+          }
+
+          if (personaLocation.city !== location.city) {
+            return false;
+          }
+
+          if (!personaLocation.state) {
+            return true;
+          }
+
+          return personaLocation.state === location.state;
+        };
+
         const primaryQueries: Promise<Awaited<ReturnType<typeof getDocs>>>[] = [];
 
         if (location.city && location.state) {
@@ -412,16 +427,10 @@ export class PersonaService {
 
         let personas = [...deduped.values()].filter((persona) => {
           if (!this.isAvailablePersona(persona)) return false;
-          if (!this.isEligibleForReassignment(persona, targetPeriod)) return false;
           if (this.normalizeCompanyTag(persona.companyTag || persona.empresa || '') !== normalizedCompanyTag) return false;
 
           const personaLocation = this.parseLocation(this.normalizeSearchValue(persona.lugar || ''));
-
-          if (location.city && location.state) {
-            return personaLocation.city === location.city && personaLocation.state === location.state;
-          }
-
-          return this.includesEveryToken(persona.locationTokens || [], location.tokens);
+          return isLocationMatch(personaLocation);
         });
 
         if (personas.length < requestLimit) {
@@ -457,16 +466,10 @@ export class PersonaService {
 
           personas = [...deduped.values()].filter((persona) => {
             if (!this.isAvailablePersona(persona)) return false;
-            if (!this.isEligibleForReassignment(persona, targetPeriod)) return false;
             if (this.normalizeCompanyTag(persona.companyTag || persona.empresa || '') !== normalizedCompanyTag) return false;
 
             const personaLocation = this.parseLocation(this.normalizeSearchValue(persona.lugar || ''));
-
-            if (location.city && location.state) {
-              return personaLocation.city === location.city && personaLocation.state === location.state;
-            }
-
-            return this.includesEveryToken(persona.locationTokens || [], location.tokens);
+            return isLocationMatch(personaLocation);
           });
         }
 
@@ -1213,37 +1216,6 @@ export class PersonaService {
     }
 
     return { year, month };
-  }
-
-  private resolveLastCursoPeriod(persona: Partial<Persona>): { year: number; month: number } | null {
-    return this.resolvePeriod(
-      persona.lastCursoYear,
-      persona.lastCursoMonth
-    );
-  }
-
-  private isEligibleForReassignment(
-    persona: Partial<Persona>,
-    targetPeriod: { year: number; month: number } | null
-  ): boolean {
-    if (!targetPeriod) {
-      return true;
-    }
-
-    const lastPeriod = this.resolveLastCursoPeriod(persona);
-    if (!lastPeriod) {
-      return true;
-    }
-
-    const monthDiff = this.diffMonths(lastPeriod, targetPeriod);
-    return monthDiff >= PERSONA_REASSIGNMENT_COOLDOWN_MONTHS;
-  }
-
-  private diffMonths(
-    from: { year: number; month: number },
-    to: { year: number; month: number }
-  ): number {
-    return ((to.year * 12) + to.month) - ((from.year * 12) + from.month);
   }
 
   private isAvailablePersona(persona: Partial<Persona>): boolean {

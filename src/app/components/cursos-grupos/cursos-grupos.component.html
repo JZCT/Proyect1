@@ -108,24 +108,13 @@
             </div>
 
             <div class="form-group">
-              <label>Fecha de inicio</label>
+              <label>Dia del curso</label>
               <input
                 type="date"
-                name="curso_fecha_inicio"
+                name="curso_dia"
                 required
-                [ngModel]="editingCursoId ? formatDate(editingCurso.Fecha_inicio) : formatDate(newCurso.Fecha_inicio)"
-                (ngModelChange)="editingCursoId ? (editingCurso.Fecha_inicio = $event) : (newCurso.Fecha_inicio = $event)"
-              />
-            </div>
-
-            <div class="form-group">
-              <label>Fecha de fin</label>
-              <input
-                type="date"
-                name="curso_fecha_fin"
-                required
-                [ngModel]="editingCursoId ? formatDate(editingCurso.Fecha_fin) : formatDate(newCurso.Fecha_fin)"
-                (ngModelChange)="editingCursoId ? (editingCurso.Fecha_fin = $event) : (newCurso.Fecha_fin = $event)"
+                [ngModel]="editingCursoId ? formatDate(editingCurso.dia) : formatDate(newCurso.dia)"
+                (ngModelChange)="editingCursoId ? (editingCurso.dia = $event) : (newCurso.dia = $event)"
               />
             </div>
 
@@ -280,14 +269,38 @@
             />
           </div>
 
+          <div class="form-group">
+            <label>Ciudad</label>
+            <div class="city-filter-controls">
+              <select
+                [(ngModel)]="cursoCityFilter"
+                name="curso_city_filter"
+                (ngModelChange)="onCursoCityFilterChange($event)"
+              >
+                <option value="">Filtrar por ciudad</option>
+                <option *ngFor="let ciudad of cursoCityOptions" [value]="ciudad">
+                  {{ ciudad | titlecase }}
+                </option>
+              </select>
+
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                (click)="clearCursoCityFilter()"
+                [disabled]="!cursoCityFilter"
+              >
+                Todas las ciudades
+              </button>
+            </div>
+          </div>
+
           <div class="filters-inline">
             <div class="form-group">
               <label>Ordenar cursos por</label>
               <select [(ngModel)]="cursoSortBy" name="curso_list_sort_by">
                 <option value="nombre">Alfabetico (Nombre)</option>
                 <option value="empresa">Alfabetico (Etiqueta)</option>
-                <option value="inicio">Fecha inicio</option>
-                <option value="fin">Fecha fin</option>
+                <option value="dia">Dia</option>
               </select>
             </div>
 
@@ -317,11 +330,11 @@
                   {{
                     curso.anioCurso
                       ? (curso.anioCurso + (curso.mesCurso ? ('/' + (curso.mesCurso < 10 ? ('0' + curso.mesCurso) : curso.mesCurso)) : ''))
-                      : ((curso.Fecha_inicio | date:'yyyy/MM') || '-')
+                      : ((curso.dia | date:'yyyy/MM') || (curso.Fecha_inicio | date:'yyyy/MM') || '-')
                   }}
                 </p>
                 <p>Empresa: {{ (curso.companyTag || '-') | uppercase }}</p>
-                <p>Inicio: {{ curso.Fecha_inicio | date }} | Fin: {{ curso.Fecha_fin | date }}</p>
+                <p>Dia: {{ (curso.dia || curso.Fecha_inicio || curso.Fecha_fin) | date }}</p>
                 <p>Representante: {{ curso.nom_representante }} | Telefono: {{ curso.num_represnetantes }}</p>
                 <p>Archivos: {{ curso.archivos?.length || 0 }}</p>
 

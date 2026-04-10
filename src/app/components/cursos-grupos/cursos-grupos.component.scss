@@ -98,8 +98,14 @@
   margin-bottom: 10px;
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+}
+
+.panel-header .btn {
+  flex: 0 0 auto;
+  min-width: 120px;
+  white-space: nowrap;
 }
 
 .report-actions {
@@ -237,6 +243,17 @@ select:focus {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 8px;
+}
+
+.city-filter-controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.city-filter-controls select {
+  min-width: 0;
 }
 
 .year-filter-actions {
@@ -688,6 +705,10 @@ select:focus {
   .form-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .panel-header .btn {
+    min-width: 0;
   }
 }
 

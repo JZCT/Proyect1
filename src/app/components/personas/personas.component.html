@@ -346,7 +346,7 @@
         name="bulk_assign_curso_id"
         [disabled]="assigningSelected || cursosAsignables.length === 0"
       >
-        <option value="">Curso destino...</option>
+        <option value="">Curso destino (con fecha)...</option>
         <option *ngFor="let curso of cursosAsignables; trackBy: trackByCursoId" [value]="curso.idcurso">
           {{ getCursoOptionLabel(curso) }}
         </option>
@@ -473,68 +473,79 @@
               />
             </th>
             <th>Perfil</th>
-            <th>Informacion</th>
-            <th>CURP</th>
-            <th>Contacto</th>
-            <th>Ubicacion</th>
-            <th>Practica</th>
-            <th>Teorica</th>
-            <th>Final</th>
-            <th>Resultado</th>
-            <th>Entregables</th>
-            <th>Acciones</th>
+            <th class="info-col">Informacion</th>
+            <th class="curp-col">CURP</th>
+            <th class="contact-col">Contacto</th>
+            <th class="location-col">Ubicacion</th>
+            <th class="score-col">Practica</th>
+            <th class="score-col">Teorica</th>
+            <th class="score-col">Final</th>
+            <th class="result-col">Resultado</th>
+            <th class="files-col">Entregables</th>
+            <th class="actions-col">Acciones</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let persona of filteredPersonas; trackBy: trackByPersonaId">
-            <td class="select-col" *ngIf="canEditPersonas">
+          <tr
+            *ngFor="let persona of filteredPersonas; trackBy: trackByPersonaId"
+            class="clickable-row"
+            tabindex="0"
+            role="button"
+            (click)="openPersonaDetalleModal(persona)"
+            (keydown.enter)="openPersonaDetalleModal(persona)"
+            (keydown.space)="openPersonaDetalleModal(persona); $event.preventDefault()"
+          >
+            <td class="select-col" *ngIf="canEditPersonas" (click)="$event.stopPropagation()">
               <input
                 type="checkbox"
                 [checked]="isSelected(persona.id)"
                 (change)="toggleSelection(persona.id, $event)"
+                (click)="$event.stopPropagation()"
                 [attr.aria-label]="'Seleccionar ' + persona.nombre"
               />
             </td>
             <td><img [src]="getFotoUrl(persona.foto)" class="table-avatar"></td>
-            <td>
+            <td class="info-col">
               <div class="primary-text">{{ persona.nombre }}</div>
               <div class="secondary-text">{{ (persona.empresa || '-') | uppercase }}</div>
               <div class="secondary-text">{{ getPersonaPeriodDisplay(persona) }}</div>
-              <div class="secondary-text">{{ getPersonaAssignmentLabel(persona) }}</div>
+              <div class="secondary-text assignment-text" [title]="getPersonaAssignmentLabel(persona)">
+                {{ getPersonaAssignmentLabel(persona) }}
+              </div>
             </td>
-            <td>{{ persona.curp || '-' }}</td>
-            <td>
+            <td class="curp-col">{{ persona.curp || '-' }}</td>
+            <td class="contact-col">
               <div class="primary-text">{{ persona.email }}</div>
               <div class="secondary-text">{{ persona.telefono || '-' }}</div>
             </td>
-            <td><span class="badge">{{ persona.lugar || '-' }}</span></td>
-            <td>{{ formatCalificacion(persona.clfPractica) }}</td>
-            <td>{{ formatCalificacion(persona.clfTeorica) }}</td>
-            <td>{{ formatCalificacion(getCalificacionFinal(persona)) }}</td>
-            <td>
+            <td class="location-col"><span class="badge">{{ persona.lugar || '-' }}</span></td>
+            <td class="score-col">{{ formatCalificacion(persona.clfPractica) }}</td>
+            <td class="score-col">{{ formatCalificacion(persona.clfTeorica) }}</td>
+            <td class="score-col">{{ formatCalificacion(getCalificacionFinal(persona)) }}</td>
+            <td class="result-col">
               <span class="status-badge" [ngClass]="getResultadoClase(persona)">
                 {{ getResultadoTexto(persona) }}
               </span>
             </td>
-            <td>
+            <td class="files-col">
               <div class="file-badges">
                 <span class="file-tag">{{ getPersonaArchivos(persona).length }} archivo(s)</span>
                 <button
                   type="button"
                   class="btn btn-sm btn-secondary"
-                  (click)="openPersonaEntregablesModal(persona)"
+                  (click)="$event.stopPropagation(); openPersonaEntregablesModal(persona)"
                 >
                   Ver
                 </button>
               </div>
             </td>
-            <td>
+            <td class="actions-col">
               <div class="actions">
-                <button type="button" class="btn btn-info btn-sm" (click)="startEdit(persona)" *ngIf="canEditPersonas">Editar</button>
+                <button type="button" class="btn btn-info btn-sm" (click)="$event.stopPropagation(); startEdit(persona)" *ngIf="canEditPersonas">Editar</button>
                 <button
                   type="button"
                   class="btn btn-danger btn-sm"
-                  (click)="deletePersona(persona.id)"
+                  (click)="$event.stopPropagation(); deletePersona(persona.id)"
                   *ngIf="isAdmin"
                   [disabled]="deletingPersonaId === persona.id"
                 >
@@ -545,6 +556,64 @@
           </tr>
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <div *ngIf="showPersonaDetalle && personaDetalleTarget" class="modal-overlay" (click)="closePersonaDetalleModal()">
+    <div class="modal-content persona-detail-modal" (click)="$event.stopPropagation()">
+      <div class="file-preview-header">
+        <h4>Detalle de {{ personaDetalleTarget.nombre || 'Persona' }}</h4>
+        <div class="file-preview-actions">
+          <button
+            type="button"
+            class="btn btn-sm btn-info"
+            *ngIf="canEditPersonas"
+            (click)="openPersonaDetalleEdit()"
+          >
+            Editar
+          </button>
+          <button type="button" class="btn btn-sm btn-secondary" (click)="closePersonaDetalleModal()">Cerrar</button>
+        </div>
+      </div>
+
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Informacion</span>
+          <strong>{{ personaDetalleTarget.nombre || '-' }}</strong>
+          <small>{{ (personaDetalleTarget.empresa || '-') | uppercase }}</small>
+          <small>{{ getPersonaPeriodDisplay(personaDetalleTarget) }}</small>
+          <small>{{ getPersonaAssignmentLabel(personaDetalleTarget) }}</small>
+        </div>
+
+        <div class="detail-item">
+          <span class="detail-label">CURP</span>
+          <strong class="detail-curp">{{ personaDetalleTarget.curp || '-' }}</strong>
+          <small>{{ personaDetalleTarget.email || '-' }}</small>
+          <small>{{ personaDetalleTarget.telefono || '-' }}</small>
+          <small>{{ personaDetalleTarget.lugar || '-' }}</small>
+        </div>
+      </div>
+
+      <div class="detail-grid detail-grid-scores">
+        <div class="detail-item">
+          <span class="detail-label">Practica</span>
+          <strong>{{ formatCalificacion(personaDetalleTarget.clfPractica) }}</strong>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Teorica</span>
+          <strong>{{ formatCalificacion(personaDetalleTarget.clfTeorica) }}</strong>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Final</span>
+          <strong>{{ formatCalificacion(getCalificacionFinal(personaDetalleTarget)) }}</strong>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Resultado</span>
+          <span class="status-badge" [ngClass]="getResultadoClase(personaDetalleTarget)">
+            {{ getResultadoTexto(personaDetalleTarget) }}
+          </span>
+        </div>
+      </div>
     </div>
   </div>
 

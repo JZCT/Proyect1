@@ -14,6 +14,8 @@ export interface Curso {
   descripcion: string;
   anioCurso?: number;
   mesCurso?: number;
+  dia?: Date;
+  // Legacy fields kept for backward compatibility with old stored documents.
   Fecha_inicio?: Date;
   Fecha_fin?: Date;
   nom_representante: string;

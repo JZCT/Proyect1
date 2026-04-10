@@ -34,6 +34,11 @@ export function isCursoCaducadoParaAsignacion(
 }
 
 function resolveCursoCaducidadBaseDate(curso: Partial<Curso>): Date | null {
+  const dia = coerceDate(curso.dia);
+  if (dia) {
+    return dia;
+  }
+
   const fechaFin = coerceDate(curso.Fecha_fin);
   if (fechaFin) {
     return fechaFin;
