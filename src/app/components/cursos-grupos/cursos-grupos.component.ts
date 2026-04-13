@@ -8,7 +8,7 @@ import { CursoService } from '../../services/curso.service';
 import { InstructorService } from '../../services/instructor.service';
 import { PersonaService } from '../../services/persona.service';
 import { AuthService } from '../../services/auth.service';
-import { ReportData, ReportService } from '../../services/report.service';
+import { CursoEntregableReportRow, ReportData, ReportService } from '../../services/report.service';
 import { NotificationService } from '../../services/notification.service';
 import { ViewStateService } from '../../services/view-state.service';
 
@@ -121,6 +121,8 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   savingCalificaciones: Record<string, boolean> = {};
   removingPersonasIds: Record<string, boolean> = {};
   exportingCursoReport = false;
+  exportingCompanyCoursesReport = false;
+  exportingCompanyEntregablesReport = false;
   savingCurso = false;
   deletingCursoId: string | null = null;
   deletingArchivoKey: string | null = null;
@@ -255,6 +257,10 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
 
   canExportCursoReport(): boolean {
     return !!this.selectedCurso && !!this.currentUser;
+  }
+
+  get canExportCompanyGlobalReports(): boolean {
+    return this.currentUser?.role === 'company';
   }
 
   loadCursos() {
@@ -426,7 +432,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     const availablePromise = companyTag
       ? this.personaService.searchAvailablePersonas({
           companyTag,
-          term: this.personaDisponibleSearchTerm,
+          term: this.getEffectiveSearchTerm(this.personaDisponibleSearchTerm),
           maxResults: this.PERSONAS_QUERY_LIMIT,
           targetYear: cursoAssignmentPeriod?.year ?? null,
           targetMonth: cursoAssignmentPeriod?.month ?? null
@@ -823,6 +829,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
       const updatedPersonasIds = Array.from(new Set([...(this.selectedCurso.personasIds || []), personaId]));
       this.updateSelectedCursoPersonasIds(updatedPersonasIds);
       await this.loadPersonas({ autoAssign: false, reloadEnCurso: true });
+      this.ensurePersonaVisibleInCursoList(personaId);
       this.selectNextPersonaPendiente();
       this.notificationService.success('Persona asignada al curso');
     } catch (error) {
@@ -1525,10 +1532,183 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     }
   }
 
+  async exportCompanyCursosReportPDF(): Promise<void> {
+    if (!this.canExportCompanyGlobalReports || this.exportingCompanyCoursesReport) return;
+
+    const cursos = this.getCompanyCursosForGlobalReport();
+    if (cursos.length === 0) {
+      this.notificationService.info('No hay cursos visibles para exportar.');
+      return;
+    }
+
+    try {
+      this.exportingCompanyCoursesReport = true;
+      const personas = await this.getCompanyPersonasForGlobalReport(cursos);
+      if (personas.length === 0) {
+        this.notificationService.info('No hay personas asignadas para exportar en PDF.');
+        return;
+      }
+
+      const reportData: ReportData = {
+        title: this.getCompanyPersonasReportTitle(),
+        generatedAt: new Date(),
+        totalPersonas: personas.length,
+        personas,
+        empresa: this.normalizeCompanyTag(this.currentUser?.companyTag),
+        lugar: this.getReportLocationLabel(personas),
+        instructorName: 'Todos',
+        showCursosAsignados: false
+      };
+
+      await this.reportService.exportToPDF(reportData);
+      this.notificationService.success('Reporte global de personas generado');
+    } catch (error) {
+      console.error('Error exportando reporte global de personas (PDF):', error);
+      this.notificationService.error('Error al exportar el reporte global de personas');
+    } finally {
+      this.exportingCompanyCoursesReport = false;
+    }
+  }
+
+  async exportCompanyEntregablesPDF(): Promise<void> {
+    if (!this.canExportCompanyGlobalReports || this.exportingCompanyEntregablesReport) return;
+
+    const cursos = this.getCompanyCursosForGlobalReport();
+    if (cursos.length === 0) {
+      this.notificationService.info('No hay cursos visibles para exportar entregables.');
+      return;
+    }
+
+    try {
+      this.exportingCompanyEntregablesReport = true;
+      const rows = await this.buildCompanyEntregablesRows(cursos);
+
+      if (rows.length === 0) {
+        this.notificationService.info('No se encontraron entregables para los cursos visibles.');
+        return;
+      }
+
+      await this.reportService.exportCursosEntregablesToPDF(rows, {
+        title: this.getCompanyEntregablesReportTitle(),
+        companyTag: this.currentUser?.companyTag || '',
+        totalCursos: cursos.length
+      });
+      this.notificationService.success('PDF de entregables generado');
+    } catch (error) {
+      console.error('Error exportando entregables globales (PDF):', error);
+      this.notificationService.error('Error al exportar PDF de entregables');
+    } finally {
+      this.exportingCompanyEntregablesReport = false;
+    }
+  }
+
+  private getCompanyCursosForGlobalReport(): Curso[] {
+    return [...this.cursos].sort((a, b) => this.compareCursos(a, b));
+  }
+
+  private getCompanyPersonasReportTitle(): string {
+    const tag = this.normalizeCompanyTag(this.currentUser?.companyTag);
+    return tag
+      ? `Reporte Global de Personas - Empresa: ${tag.toUpperCase()}`
+      : 'Reporte Global de Personas';
+  }
+
+  private getCompanyEntregablesReportTitle(): string {
+    const tag = this.normalizeCompanyTag(this.currentUser?.companyTag);
+    return tag
+      ? `Entregables Globales - Empresa: ${tag.toUpperCase()}`
+      : 'Entregables Globales por Curso';
+  }
+
+  private async buildCompanyEntregablesRows(cursos: Curso[]): Promise<CursoEntregableReportRow[]> {
+    const personaIds = Array.from(
+      new Set(
+        cursos.flatMap((curso) =>
+          (curso.personasIds || [])
+            .map((id) => (id || '').trim())
+            .filter(Boolean)
+        )
+      )
+    );
+    const personas = personaIds.length > 0
+      ? await this.personaService.getPersonasByIds(personaIds)
+      : [];
+    const personasById = new Map(
+      personas
+        .map((persona) => [String(persona.id || '').trim(), persona] as [string, Persona])
+        .filter(([id]) => !!id)
+    );
+
+    const rows: CursoEntregableReportRow[] = [];
+
+    for (const curso of cursos) {
+      const cursoNombre = (curso.nombre || '').trim() || 'Curso sin nombre';
+      const cursoFecha = curso.dia ?? curso.Fecha_inicio ?? curso.Fecha_fin;
+      const companyTag = this.normalizeCompanyTag(curso.companyTag);
+
+      for (const archivo of (curso.archivos || []) as CursoArchivo[]) {
+        if (!archivo?.nombre || !archivo?.url) continue;
+
+        rows.push({
+          cursoNombre,
+          cursoFecha,
+          companyTag,
+          origen: 'curso',
+          archivoNombre: archivo.nombre,
+          archivoTipo: archivo.tipo || this.getFileTypeFromName(archivo.nombre),
+          archivoUrl: archivo.url
+        });
+      }
+
+      const cursoPersonaIds = Array.from(
+        new Set((curso.personasIds || []).map((id) => (id || '').trim()).filter(Boolean))
+      );
+      for (const personaId of cursoPersonaIds) {
+        const persona = personasById.get(personaId);
+        if (!persona) continue;
+
+        for (const archivo of this.getPersonaEntregables(persona)) {
+          rows.push({
+            cursoNombre,
+            cursoFecha,
+            companyTag,
+            origen: 'persona',
+            personaNombre: persona.nombre || '',
+            personaEmail: persona.email || '',
+            archivoNombre: archivo.nombre,
+            archivoTipo: archivo.tipo || this.getFileTypeFromName(archivo.nombre),
+            archivoUrl: archivo.url
+          });
+        }
+      }
+    }
+
+    return rows;
+  }
+
+  private async getCompanyPersonasForGlobalReport(cursos: Curso[]): Promise<Persona[]> {
+    const personaIds = Array.from(
+      new Set(
+        cursos.flatMap((curso) =>
+          (curso.personasIds || [])
+            .map((id) => (id || '').trim())
+            .filter(Boolean)
+        )
+      )
+    );
+
+    if (personaIds.length === 0) {
+      return [];
+    }
+
+    const personas = await this.personaService.getPersonasByIds(personaIds);
+    return [...personas].sort((a, b) => this.comparePersonas(a, b));
+  }
+
   private buildCursoReportData(): ReportData {
     const cursoNombre = this.selectedCurso?.nombre || 'Curso sin nombre';
     const instructorName = this.instructoresEnCurso.map((item) => item.nombre).join(', ');
-    const personas = this.filteredPersonasEnCurso;
+    const personas = this.personasEnCurso;
     const lugar = this.getReportLocationLabel(personas);
 
     return {
@@ -1845,7 +2025,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   }
 
   get filteredPersonasEnCurso(): Persona[] {
-    const term = this.normalizeSearch(this.personaSearchTerm);
+    const term = this.getEffectiveSearchTerm(this.personaSearchTerm);
     if (
       this.filteredPersonasEnCursoCache &&
       this.filteredPersonasEnCursoCache.source === this.personasEnCurso &&
@@ -1879,7 +2059,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   }
 
   get filteredPersonasDisponibles(): Persona[] {
-    const term = this.normalizeSearch(this.personaDisponibleSearchTerm);
+    const term = this.getEffectiveSearchTerm(this.personaDisponibleSearchTerm);
     if (
       this.filteredPersonasDisponiblesCache &&
       this.filteredPersonasDisponiblesCache.source === this.personasDisponibles &&
@@ -1987,6 +2167,41 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   private selectNextPersonaPendiente(): void {
     const siguiente = this.filteredPersonasDisponibles.find((persona) => !this.isPersonaAsignada(persona.id));
     this.selectedPersonaToAdd = siguiente?.id || null;
+  }
+
+  private ensurePersonaVisibleInCursoList(personaId: string): void {
+    const targetId = (personaId || '').trim();
+    if (!targetId) {
+      return;
+    }
+
+    const persona = this.personasEnCurso.find((item) => (item.id || '').trim() === targetId);
+    if (!persona) {
+      return;
+    }
+
+    let filtersChanged = false;
+    let searchChanged = false;
+
+    if (!this.matchesResultadoFilter(persona)) {
+      this.resultadoFilter = 'all';
+      filtersChanged = true;
+    }
+
+    const term = this.normalizeSearch(this.personaSearchTerm);
+    const matchesSearch = !term || this.getPersonaSearchTarget(persona).includes(term);
+    if (!matchesSearch) {
+      this.personaSearchTerm = '';
+      this.persistSearchState();
+      searchChanged = true;
+    }
+
+    if (filtersChanged || searchChanged) {
+      this.personasFilterRevision += 1;
+      this.notificationService.info(
+        'La persona se asigno correctamente. Se ajustaron los filtros para mostrarla en la lista.'
+      );
+    }
   }
 
   private mergePersonasContext(asignadas: Persona[], disponibles: Persona[]): Persona[] {
@@ -2172,6 +2387,11 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
 
   private normalizeSearch(value?: string): string {
     return this.normalizeText(value || '').trim();
+  }
+
+  private getEffectiveSearchTerm(value?: string): string {
+    const normalized = this.normalizeSearch(value);
+    return normalized.length >= 2 ? normalized : '';
   }
 
   private normalizeText(value: string): string {

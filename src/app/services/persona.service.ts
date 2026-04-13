@@ -281,41 +281,46 @@ export class PersonaService {
     ].join('|');
 
     return this.resolveInFlight(this.availablePersonasInFlight, requestKey, async () => {
-      const q = queryToken
-        ? query(
-            this.personasCollection,
-            where('companyTag', '==', normalizedCompanyTag),
-            where('assignmentStatus', '==', 'available'),
-            where('searchTokens', 'array-contains', queryToken),
-            limit(requestLimit)
-          )
-        : query(
-            this.personasCollection,
-            where('companyTag', '==', normalizedCompanyTag),
-            where('assignmentStatus', '==', 'available'),
-            limit(requestLimit)
-          );
-
-      const legacyQ = queryToken
-        ? query(
-            this.personasCollection,
-            where('companyTag', '==', normalizedCompanyTag),
-            where('searchTokens', 'array-contains', queryToken),
-            limit(requestLimit)
-          )
-        : query(
-            this.personasCollection,
-            where('companyTag', '==', normalizedCompanyTag),
-            limit(requestLimit)
-          );
-
       try {
-        const snapshot = await getDocs(q);
-        const docs = [...snapshot.docs];
+        const primaryQueries: unknown[] = [];
+        if (queryToken) {
+          primaryQueries.push(query(
+            this.personasCollection,
+            where('companyTag', '==', normalizedCompanyTag),
+            where('assignmentStatus', '==', 'available'),
+            where('searchTokens', 'array-contains', queryToken),
+            limit(requestLimit)
+          ));
+        }
 
-        if (snapshot.size < requestLimit) {
-          const legacySnapshot = await getDocs(legacyQ);
-          docs.push(...legacySnapshot.docs);
+        primaryQueries.push(query(
+          this.personasCollection,
+          where('companyTag', '==', normalizedCompanyTag),
+          where('assignmentStatus', '==', 'available'),
+          limit(requestLimit)
+        ));
+
+        const legacyQueries: unknown[] = [];
+        if (queryToken) {
+          legacyQueries.push(query(
+            this.personasCollection,
+            where('companyTag', '==', normalizedCompanyTag),
+            where('searchTokens', 'array-contains', queryToken),
+            limit(requestLimit)
+          ));
+        }
+
+        legacyQueries.push(query(
+          this.personasCollection,
+          where('companyTag', '==', normalizedCompanyTag),
+          limit(requestLimit)
+        ));
+
+        const docs = await this.collectDocsFromQueries(primaryQueries);
+
+        if (docs.length < requestLimit || !!queryToken) {
+          const legacyDocs = await this.collectDocsFromQueries(legacyQueries);
+          docs.push(...legacyDocs);
         }
 
         const deduped = new Map<string, Persona>();
@@ -333,9 +338,8 @@ export class PersonaService {
           return personas.slice(0, requestLimit);
         }
 
-        const termTokens = this.tokenizeSearch(normalizedTerm);
         return personas.filter((persona) =>
-          this.includesEveryToken(persona.searchTokens || [], termTokens)
+          this.matchesPersonaSearchTerm(persona, normalizedTerm)
         ).slice(0, requestLimit);
       } catch (error) {
         console.error('Error buscando personas disponibles:', error);
@@ -1216,6 +1220,66 @@ export class PersonaService {
     }
 
     return { year, month };
+  }
+
+  private async collectDocsFromQueries(queries: unknown[]): Promise<Array<{ id: string; data: () => unknown }>> {
+    const snapshots = await Promise.allSettled(
+      queries.map((candidate) => getDocs(candidate as any))
+    );
+    const docs: Array<{ id: string; data: () => unknown }> = [];
+
+    for (const snapshot of snapshots) {
+      if (snapshot.status === 'fulfilled') {
+        docs.push(...snapshot.value.docs);
+        continue;
+      }
+
+      console.warn('Consulta de busqueda omitida:', snapshot.reason);
+    }
+
+    return docs;
+  }
+
+  private matchesPersonaSearchTerm(persona: Persona, normalizedTerm: string): boolean {
+    const term = this.normalizeSearchValue(normalizedTerm || '');
+    if (!term) {
+      return true;
+    }
+
+    // Evita busquedas de un solo caracter para priorizar cadenas de texto reales.
+    if (term.length < 2) {
+      return false;
+    }
+
+    const textTarget = this.normalizeSearchValue([
+      persona.nombre || '',
+      persona.curp || '',
+      persona.email || '',
+      persona.telefono || '',
+      persona.empresa || '',
+      persona.lugar || ''
+    ].join(' '));
+    if (textTarget.includes(term)) {
+      return true;
+    }
+
+    const termTokens = this.tokenizeSearch(term).filter((token) => token.length >= 2);
+    if (termTokens.length === 0) {
+      return false;
+    }
+
+    const searchTokens = (persona.searchTokens || [])
+      .map((token) => this.normalizeSearchValue(token))
+      .filter(Boolean);
+
+    const hasAllTokens = termTokens.every((token) =>
+      searchTokens.some((candidate) => candidate === token || candidate.includes(token))
+    );
+    if (hasAllTokens) {
+      return true;
+    }
+
+    return termTokens.every((token) => textTarget.includes(token));
   }
 
   private isAvailablePersona(persona: Partial<Persona>): boolean {

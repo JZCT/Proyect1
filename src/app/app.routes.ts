@@ -1,52 +1,44 @@
 import { Routes } from '@angular/router';
-
-import { CursosGruposComponent } from './components/cursos-grupos/cursos-grupos.component';
-import { LoginComponent } from './components/login/login.component';
-import { HomeComponent } from './components/home/home.component';
-import { PersonasComponent } from './components/personas/personas.component';
-import { InstructorComponent } from './components/Instructores/instructores.component';
-import { CursosComponent } from './components/cursos/cursos.component';
-import { UsersComponent } from './components/Usuarios/Usu.component';
 import { roleGuard } from './guards/role.guard';
 
 export const routes: Routes = [
   {
     path: 'login',
-    component: LoginComponent
+    loadComponent: () => import('./components/login/login.component').then(m => m.LoginComponent)
   },
   {
     path: 'home',
-    component: HomeComponent,
+    loadComponent: () => import('./components/home/home.component').then(m => m.HomeComponent),
     canActivate: [roleGuard],
     data: { roles: ['admin', 'director'] }
   },
   {
     path: '',
-    component: CursosGruposComponent,
+    loadComponent: () => import('./components/cursos-grupos/cursos-grupos.component').then(m => m.CursosGruposComponent),
     canActivate: [roleGuard],
     data: { roles: ['admin', 'instructor', 'director', 'company'] }
   },
   {
     path: 'personas',
-    component: PersonasComponent,
+    loadComponent: () => import('./components/personas/personas.component').then(m => m.PersonasComponent),
     canActivate: [roleGuard],
     data: { roles: ['admin', 'instructor'] }
   },
   {
     path: 'instructores',
-    component: InstructorComponent,
+    loadComponent: () => import('./components/Instructores/instructores.component').then(m => m.InstructorComponent),
     canActivate: [roleGuard],
     data: { roles: ['admin'] }
   },
   {
     path: 'cursos',
-    component: CursosComponent,
+    loadComponent: () => import('./components/cursos/cursos.component').then(m => m.CursosComponent),
     canActivate: [roleGuard],
     data: { roles: ['admin'] }
   },
   {
     path: 'usuario',
-    component: UsersComponent,
+    loadComponent: () => import('./components/Usuarios/Usu.component').then(m => m.UsersComponent),
     canActivate: [roleGuard],
     data: { roles: ['admin'] }
   },

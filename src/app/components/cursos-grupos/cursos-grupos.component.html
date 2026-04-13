@@ -1,20 +1,41 @@
 <ng-container *ngIf="currentUser$ | async as user">
   <div class="container-fluid">
     <div class="header">
-      <div class="page-title-group">
-        <h2 class="page-title">Gestion de Cursos y Personas</h2>
-        <p class="page-subtitle" *ngIf="user.role === 'director'">
-          Vista ejecutiva de solo lectura. Revisa el estado general y entra al detalle solo cuando lo necesites.
-        </p>
-        <p class="page-subtitle" *ngIf="user.role === 'admin'">
-          1) Selecciona un curso. 2) Asigna personas. 3) Revisa resultados y aprobados.
-        </p>
-        <p class="page-subtitle" *ngIf="user.role === 'company'">
-          Consulta los cursos de tu empresa y revisa el avance de sus grupos.
-        </p>
-        <p class="page-subtitle" *ngIf="user.role === 'instructor'">
-          Revisa tus cursos, administra personas y calificaciones desde una sola vista.
-        </p>
+      <div class="header-top">
+        <div class="page-title-group">
+          <h2 class="page-title">Gestion de Cursos y Personas</h2>
+          <p class="page-subtitle" *ngIf="user.role === 'director'">
+            Vista ejecutiva de solo lectura. Revisa el estado general y entra al detalle solo cuando lo necesites.
+          </p>
+          <p class="page-subtitle" *ngIf="user.role === 'admin'">
+            1) Selecciona un curso. 2) Asigna personas. 3) Revisa resultados y aprobados.
+          </p>
+          <p class="page-subtitle" *ngIf="user.role === 'company'">
+            Consulta los cursos de tu empresa y revisa el avance de sus grupos.
+          </p>
+          <p class="page-subtitle" *ngIf="user.role === 'instructor'">
+            Revisa tus cursos, administra personas y calificaciones desde una sola vista.
+          </p>
+        </div>
+
+        <div class="header-actions" *ngIf="canExportCompanyGlobalReports">
+          <button
+            type="button"
+            class="btn btn-sm btn-secondary"
+            (click)="exportCompanyCursosReportPDF()"
+            [disabled]="exportingCompanyCoursesReport || exportingCompanyEntregablesReport || cursos.length === 0"
+          >
+            {{ exportingCompanyCoursesReport ? 'Generando...' : 'Reporte Personas (PDF)' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-secondary"
+            (click)="exportCompanyEntregablesPDF()"
+            [disabled]="exportingCompanyEntregablesReport || exportingCompanyCoursesReport || cursos.length === 0"
+          >
+            {{ exportingCompanyEntregablesReport ? 'Generando...' : 'Entregables (PDF)' }}
+          </button>
+        </div>
       </div>
     </div>
 

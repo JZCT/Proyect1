@@ -21,6 +21,18 @@ export interface ReportData {
   showCursosAsignados?: boolean;
 }
 
+export interface CursoEntregableReportRow {
+  cursoNombre: string;
+  cursoFecha?: unknown;
+  companyTag?: string;
+  origen: 'curso' | 'persona';
+  personaNombre?: string;
+  personaEmail?: string;
+  archivoNombre: string;
+  archivoTipo?: string;
+  archivoUrl?: string;
+}
+
 interface ReportMetadataItem {
   label: string;
   value: string;
@@ -73,7 +85,7 @@ export class ReportService {
 
   generateReportData(personas: Persona[], filter: ReportFilter, instructorName?: string): ReportData {
     const generatedAt = new Date();
-    const filtered = this.filterPersonas(personas, filter);
+    const filtered = this.sortPersonasForReport(this.filterPersonas(personas, filter));
 
     return {
       title: this.getReportTitle(filter),
@@ -88,7 +100,8 @@ export class ReportService {
   }
 
   exportToCSV(reportData: ReportData): void {
-    const resumen = this.getResumenResultados(reportData.personas);
+    const orderedPersonas = this.sortPersonasForReport(reportData.personas);
+    const resumen = this.getResumenResultados(orderedPersonas);
     const includeCursosAsignados = reportData.showCursosAsignados !== false;
     const headers = [
       'Nombre',
@@ -104,7 +117,7 @@ export class ReportService {
     ];
     if (includeCursosAsignados) headers.push('Cursos');
 
-    const rows = reportData.personas.map((persona) => {
+    const rows = orderedPersonas.map((persona) => {
       const row: Array<string | number> = [
         persona.nombre || '',
         persona.curp || '',
@@ -144,10 +157,11 @@ export class ReportService {
   async exportToExcel(reportData: ReportData): Promise<void> {
     try {
       const XLSX = await this.loadXLSX();
-      const resumen = this.getResumenResultados(reportData.personas);
+      const orderedPersonas = this.sortPersonasForReport(reportData.personas);
+      const resumen = this.getResumenResultados(orderedPersonas);
       const includeCursosAsignados = reportData.showCursosAsignados !== false;
 
-      const data = reportData.personas.map((persona) => ({
+      const data = orderedPersonas.map((persona) => ({
         Nombre: persona.nombre,
         CURP: persona.curp || '',
         Email: persona.email,
@@ -372,6 +386,102 @@ export class ReportService {
     }
   }
 
+  async exportCursosEntregablesToPDF(
+    rows: CursoEntregableReportRow[],
+    options?: { title?: string; companyTag?: string; totalCursos?: number; onClose?: () => void }
+  ): Promise<void> {
+    try {
+      const generatedAt = new Date();
+      const title = options?.title || 'Reporte de Entregables por Curso';
+      const origenCurso = rows.filter((row) => row.origen === 'curso').length;
+      const origenPersona = rows.filter((row) => row.origen === 'persona').length;
+
+      const tableRowsHtml = rows
+        .map((row) => {
+          const safeUrl = this.escapeHtml(row.archivoUrl || '');
+          const urlCell = safeUrl
+            ? `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>`
+            : '-';
+
+          return `
+            <tr>
+              <td>${this.escapeHtml(row.cursoNombre || '-')}</td>
+              <td>${this.escapeHtml(this.formatDate(row.cursoFecha))}</td>
+              <td>${this.escapeHtml(this.formatCompanyTag(row.companyTag) || '-')}</td>
+              <td>${row.origen === 'curso' ? 'Curso' : 'Persona'}</td>
+              <td>${this.escapeHtml(row.personaNombre || '-')}</td>
+              <td>${this.escapeHtml(row.personaEmail || '-')}</td>
+              <td>${this.escapeHtml(row.archivoNombre || '-')}</td>
+              <td>${this.escapeHtml(row.archivoTipo || '-')}</td>
+              <td>${urlCell}</td>
+            </tr>
+          `;
+        })
+        .join('');
+
+      const html = this.buildPdfDocument({
+        title,
+        subtitle: 'Concentrado de archivos cargados en cursos y personas para respaldo documental.',
+        documentCode: 'RPT-ENT',
+        generatedAt,
+        metadata: [
+          { label: 'Fecha de emision', value: generatedAt.toLocaleString() },
+          { label: 'Empresa', value: this.formatCompanyTag(options?.companyTag) || 'Todas las empresas' },
+          { label: 'Cursos analizados', value: String(options?.totalCursos || 0) }
+        ],
+        summary: [
+          { label: 'Total entregables', value: rows.length, tone: 'neutral' },
+          { label: 'Entregables de curso', value: origenCurso, tone: 'success' },
+          { label: 'Entregables de persona', value: origenPersona, tone: 'muted' }
+        ],
+        tableHeaders: [
+          'Curso',
+          'Fecha',
+          'Etiqueta',
+          'Origen',
+          'Persona',
+          'Email',
+          'Archivo',
+          'Tipo',
+          'URL'
+        ],
+        tableRowsHtml,
+        emptyMessage: 'No hay entregables para mostrar en este reporte.'
+      });
+
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = window.URL.createObjectURL(blob);
+
+      const reportWindow = window.open(url, '_blank');
+      if (!reportWindow) {
+        window.URL.revokeObjectURL(url);
+        throw new Error('No se pudo abrir la ventana del reporte');
+      }
+
+      let closeHandled = false;
+      const handleClose = () => {
+        if (closeHandled) return;
+        closeHandled = true;
+        window.clearInterval(closeMonitor);
+        options?.onClose?.();
+      };
+      const closeMonitor = window.setInterval(() => {
+        if (reportWindow.closed) {
+          handleClose();
+        }
+      }, 500);
+
+      reportWindow.addEventListener('beforeunload', handleClose, { once: true });
+      reportWindow.onload = () => {
+        reportWindow.print();
+        window.URL.revokeObjectURL(url);
+      };
+    } catch (error) {
+      console.error('Error exportando entregables a PDF:', error);
+      throw new Error('Error al exportar reporte de entregables');
+    }
+  }
+
   private getReportTitle(filter: ReportFilter): string {
     if (filter.empresa) return `Reporte de Personas - Empresa: ${this.formatCompanyTag(filter.empresa)}`;
     if (filter.lugar) return `Reporte de Personas - Ubicacion: ${filter.lugar}`;
@@ -380,9 +490,10 @@ export class ReportService {
   }
 
   private generateHTMLReport(reportData: ReportData): string {
-    const resumen = this.getResumenResultados(reportData.personas);
+    const orderedPersonas = this.sortPersonasForReport(reportData.personas);
+    const resumen = this.getResumenResultados(orderedPersonas);
     const includeCursosAsignados = reportData.showCursosAsignados !== false;
-    const personasTable = reportData.personas
+    const personasTable = orderedPersonas
       .map((persona) => `
         <tr>
           <td>${this.escapeHtml(persona.nombre || '')}</td>
@@ -565,6 +676,7 @@ export class ReportService {
     const normalized = (header || '').trim().toLowerCase();
     if (!normalized) return 1;
     if (normalized.includes('descripcion')) return 1.5;
+    if (normalized.includes('archivo') || normalized.includes('url')) return 1.4;
     if (normalized.includes('email')) return 1.35;
     if (normalized.includes('nombre')) return 1.25;
     if (normalized.includes('empresa') || normalized.includes('ubicacion')) return 1.1;
@@ -1186,6 +1298,42 @@ export class ReportService {
   private formatDate(value: unknown): string {
     const date = coerceDate(value);
     return date ? date.toLocaleDateString() : '-';
+  }
+
+  private sortPersonasForReport(personas: Persona[]): Persona[] {
+    return [...(personas || [])].sort((left, right) => {
+      const leftLocation = this.normalizeForSort(left.lugar || '');
+      const rightLocation = this.normalizeForSort(right.lugar || '');
+
+      if (!leftLocation && rightLocation) return 1;
+      if (leftLocation && !rightLocation) return -1;
+
+      const locationComparison = leftLocation.localeCompare(rightLocation);
+      if (locationComparison !== 0) return locationComparison;
+
+      const leftCompany = this.normalizeForSort(left.empresa || '');
+      const rightCompany = this.normalizeForSort(right.empresa || '');
+      const companyComparison = leftCompany.localeCompare(rightCompany);
+      if (companyComparison !== 0) return companyComparison;
+
+      const leftName = this.normalizeForSort(left.nombre || '');
+      const rightName = this.normalizeForSort(right.nombre || '');
+      const nameComparison = leftName.localeCompare(rightName);
+      if (nameComparison !== 0) return nameComparison;
+
+      const leftEmail = this.normalizeForSort(left.email || '');
+      const rightEmail = this.normalizeForSort(right.email || '');
+      return leftEmail.localeCompare(rightEmail);
+    });
+  }
+
+  private normalizeForSort(value: unknown): string {
+    return String(value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private getCalificacionFinal(persona: Partial<Persona>): number | null {

@@ -11,6 +11,31 @@
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
 }
 
+.header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.page-title-group {
+  min-width: 0;
+  flex: 1 1 420px;
+}
+
+.page-subtitle {
+  margin: 6px 0 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+}
+
 .executive-summary {
   background: linear-gradient(180deg, rgba(37, 99, 235, 0.08), rgba(37, 99, 235, 0.02));
   border: 1px solid rgba(37, 99, 235, 0.16);
@@ -702,6 +727,15 @@ select:focus {
     grid-template-columns: 1fr;
   }
 
+  .header-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-actions {
+    justify-content: flex-start;
+  }
+
   .form-header {
     flex-direction: column;
     align-items: flex-start;
@@ -739,6 +773,7 @@ select:focus {
   }
 
   .report-actions .btn,
+  .header-actions .btn,
   .form-actions .btn,
   .curso-actions .btn,
   .grupo-actions .btn {
