@@ -1,59 +1,54 @@
 <div class="layout">
-  <header class="app-header" *ngIf="!isLoginPage && !isEmbedMode">
-    <div class="app-header__inner">
-      <div class="app-header__top">
-        <div class="brand">
-          <h1>{{ title }}</h1>
-          <p>Operacion diaria simple para cursos, personas e instructores</p>
+  <ng-container *ngIf="currentUser$ | async as user">
+    <header class="app-header" *ngIf="!isLoginPage && !isEmbedMode">
+      <div class="app-header__inner">
+        <div class="app-header__top">
+          <div class="brand">
+            <h1>{{ title }}</h1>
+            <p>Operacion diaria simple para cursos, personas e instructores</p>
+          </div>
+
+          <button
+            type="button"
+            class="nav-toggle"
+            [attr.aria-expanded]="mobileNavOpen"
+            aria-controls="primary-navigation"
+            aria-label="Abrir menu de navegacion"
+            (click)="toggleMobileNav()"
+          >
+            {{ mobileNavOpen ? 'Cerrar menu' : 'Menu' }}
+          </button>
         </div>
 
-        <button
-          type="button"
-          class="nav-toggle"
-          [attr.aria-expanded]="mobileNavOpen"
-          aria-controls="primary-navigation"
-          aria-label="Abrir menu de navegacion"
-          (click)="toggleMobileNav()"
+        <nav
+          id="primary-navigation"
+          class="app-nav"
+          [class.is-open]="mobileNavOpen"
         >
-          {{ mobileNavOpen ? 'Cerrar menu' : 'Menu' }}
-        </button>
-      </div>
+          <a *ngIf="user.role === 'admin' || user.role === 'director'" routerLink="/home" routerLinkActive="active" (click)="closeMobileNav()">Home</a>
+          <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeMobileNav()">
+            {{ user.role === 'director' ? 'Resumen' : 'Cursos y Personas' }}
+          </a>
+          <a *ngIf="user.role === 'admin'" routerLink="/cursos" routerLinkActive="active" (click)="closeMobileNav()">Cursos</a>
+          <a *ngIf="user.role === 'admin' || user.role === 'instructor'" routerLink="/personas" routerLinkActive="active" (click)="closeMobileNav()">Personas</a>
+          <a *ngIf="user.role === 'admin'" routerLink="/instructores" routerLinkActive="active" (click)="closeMobileNav()">Instructores</a>
+          <a *ngIf="user.role === 'admin'" routerLink="/usuario" routerLinkActive="active" (click)="closeMobileNav()">Usuarios</a>
 
-      <nav
-        *ngIf="currentUser$ | async as user; else guestLinks"
-        id="primary-navigation"
-        class="app-nav"
-        [class.is-open]="mobileNavOpen"
-      >
-        <a *ngIf="user.role === 'admin' || user.role === 'director'" routerLink="/home" routerLinkActive="active" (click)="closeMobileNav()">Home</a>
-        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeMobileNav()">
-          {{ user.role === 'director' ? 'Resumen' : 'Cursos y Personas' }}
-        </a>
-        <a *ngIf="user.role === 'admin'" routerLink="/cursos" routerLinkActive="active" (click)="closeMobileNav()">Cursos</a>
-        <a *ngIf="user.role === 'admin' || user.role === 'instructor'" routerLink="/personas" routerLinkActive="active" (click)="closeMobileNav()">Personas</a>
-        <a *ngIf="user.role === 'admin'" routerLink="/instructores" routerLinkActive="active" (click)="closeMobileNav()">Instructores</a>
-        <a *ngIf="user.role === 'admin'" routerLink="/usuario" routerLinkActive="active" (click)="closeMobileNav()">Usuarios</a>
-
-        <div class="user-block">
-          <span>{{ user.nombre || user.email }}</span>
-          <small class="role-badge">{{ user.role || 'user' }}</small>
-          <button type="button" class="btn-logout" (click)="logout()">Salir</button>
-        </div>
-      </nav>
-
-      <ng-template #guestLinks>
-        <nav id="primary-navigation" class="app-nav" [class.is-open]="mobileNavOpen">
-          <a routerLink="/login" class="active" (click)="closeMobileNav()">Login</a>
+          <div class="user-block">
+            <span>{{ user.nombre || user.email }}</span>
+            <small class="role-badge">{{ user.role || 'user' }}</small>
+            <button type="button" class="btn-logout" (click)="logout()">Salir</button>
+          </div>
         </nav>
-      </ng-template>
-    </div>
-  </header>
+      </div>
+    </header>
+  </ng-container>
 
   <main class="app-main">
     <router-outlet></router-outlet>
   </main>
 
-  <footer class="app-footer" *ngIf="!isLoginPage && !isEmbedMode">
+  <footer class="app-footer" *ngIf="!isLoginPage && !isEmbedMode && (currentUser$ | async)">
     <p>&copy; 2026 CecaptaINS</p>
   </footer>
 </div>

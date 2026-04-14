@@ -614,6 +614,44 @@
           </span>
         </div>
       </div>
+
+      <div class="detail-assignment" *ngIf="canEditPersonas">
+        <h5>Gestion de curso</h5>
+        <p class="field-help">Puedes cambiar o remover el curso asignado de esta persona.</p>
+
+        <div class="form-group">
+          <label>Curso destino</label>
+          <select
+            [(ngModel)]="personaDetalleCursoDestino"
+            name="persona_detalle_curso_destino"
+            [disabled]="changingPersonaCurso || removingPersonaCurso || personaDetalleCursoOptions.length === 0"
+          >
+            <option value="">Selecciona curso</option>
+            <option *ngFor="let curso of personaDetalleCursoOptions; trackBy: trackByCursoId" [value]="curso.idcurso">
+              {{ getCursoOptionLabel(curso) }}
+            </option>
+          </select>
+        </div>
+
+        <div class="modal-actions">
+          <button
+            type="button"
+            class="btn btn-sm btn-primary"
+            (click)="changePersonaCursoFromDetalle()"
+            [disabled]="!personaDetalleCursoDestino || changingPersonaCurso || removingPersonaCurso"
+          >
+            {{ changingPersonaCurso ? 'Actualizando...' : 'Cambiar curso' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-danger"
+            (click)="removePersonaCursoFromDetalle()"
+            [disabled]="!(personaDetalleTarget.assignedCursoId || '').trim() || changingPersonaCurso || removingPersonaCurso"
+          >
+            {{ removingPersonaCurso ? 'Removiendo...' : 'Remover curso' }}
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 

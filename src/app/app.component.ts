@@ -1,4 +1,4 @@
-import { Component, HostBinding } from '@angular/core';
+import { Component, HostBinding, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { AuthService } from './services/auth.service';
@@ -78,5 +78,13 @@ export class AppComponent {
     }
 
     return new URLSearchParams(window.location.search).get('embed') === 'wordpress';
+  }
+
+  @HostListener('window:beforeunload')
+  @HostListener('window:unload')
+  handleWindowClose(): void {
+    this.authService.logout().catch(() => {
+      // Ignorar errores durante la descarga de la ventana
+    });
   }
 }

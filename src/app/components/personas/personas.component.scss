@@ -617,6 +617,27 @@ select:focus {
   word-break: break-word;
 }
 
+.detail-assignment {
+  border: 1px solid var(--surface-elevated);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--surface-soft);
+  display: grid;
+  gap: 10px;
+}
+
+.detail-assignment h5 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.detail-assignment .field-help {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .file-preview-modal {
   width: min(900px, 100%);
 }
@@ -851,4 +872,3 @@ select:focus {
     max-width: 210px;
   }
 }
-

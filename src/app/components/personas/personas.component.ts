@@ -80,6 +80,9 @@ export class PersonasComponent implements OnInit, OnDestroy {
   deletingPersonaId: string | null = null;
   showPersonaDetalle = false;
   personaDetalleTarget: Persona | null = null;
+  personaDetalleCursoDestino = '';
+  changingPersonaCurso = false;
+  removingPersonaCurso = false;
   showPersonaEntregables = false;
   personaEntregablesTarget: Persona | null = null;
   showFilePreview = false;
@@ -244,6 +247,7 @@ export class PersonasComponent implements OnInit, OnDestroy {
       this.cursosAsignables = activeCursos;
       this.ensureBulkAssignCursoIsValid();
       this.updatePersonaAssignmentLabels();
+      this.syncPersonaDetalleCursoDestino();
       return;
     }
 
@@ -258,12 +262,14 @@ export class PersonasComponent implements OnInit, OnDestroy {
       });
       this.ensureBulkAssignCursoIsValid();
       this.updatePersonaAssignmentLabels();
+      this.syncPersonaDetalleCursoDestino();
       return;
     }
 
     this.cursosAsignables = [];
     this.ensureBulkAssignCursoIsValid();
     this.updatePersonaAssignmentLabels();
+    this.syncPersonaDetalleCursoDestino();
   }
 
   loadPersonas() {
@@ -915,12 +921,16 @@ export class PersonasComponent implements OnInit, OnDestroy {
 
   openPersonaDetalleModal(persona: Persona): void {
     this.personaDetalleTarget = persona;
+    this.syncPersonaDetalleCursoDestino();
     this.showPersonaDetalle = true;
   }
 
   closePersonaDetalleModal(): void {
     this.showPersonaDetalle = false;
     this.personaDetalleTarget = null;
+    this.personaDetalleCursoDestino = '';
+    this.changingPersonaCurso = false;
+    this.removingPersonaCurso = false;
   }
 
   openPersonaDetalleEdit(): void {
@@ -929,6 +939,132 @@ export class PersonasComponent implements OnInit, OnDestroy {
     const persona = this.personaDetalleTarget;
     this.closePersonaDetalleModal();
     this.startEdit(persona);
+  }
+
+  get personaDetalleCursoOptions(): Curso[] {
+    const deduped = new Map<string, Curso>();
+
+    for (const curso of this.cursosAsignables) {
+      const cursoId = (curso.idcurso || '').trim();
+      if (!cursoId) continue;
+      deduped.set(cursoId, curso);
+    }
+
+    const assignedCursoId = (this.personaDetalleTarget?.assignedCursoId || '').trim();
+    if (assignedCursoId && this.cursosById[assignedCursoId]) {
+      deduped.set(assignedCursoId, this.cursosById[assignedCursoId]);
+    }
+
+    return [...deduped.values()].sort((left, right) =>
+      this.getCursoOptionLabel(left).localeCompare(this.getCursoOptionLabel(right), 'es', { sensitivity: 'base' })
+    );
+  }
+
+  async changePersonaCursoFromDetalle(): Promise<void> {
+    if (!this.canEditPersonas || this.changingPersonaCurso || this.removingPersonaCurso) return;
+    if (!this.personaDetalleTarget?.id) {
+      this.showMessage('No se encontro la persona seleccionada');
+      return;
+    }
+
+    const personaId = (this.personaDetalleTarget.id || '').trim();
+    const destinoCursoId = (this.personaDetalleCursoDestino || '').trim();
+    const currentCursoId = (this.personaDetalleTarget.assignedCursoId || '').trim();
+    const personaNombre = (this.personaDetalleTarget.nombre || '').trim() || 'la persona';
+
+    if (!destinoCursoId) {
+      this.showMessage('Selecciona un curso destino');
+      return;
+    }
+
+    const validDestino = this.personaDetalleCursoOptions.some(
+      (curso) => (curso.idcurso || '').trim() === destinoCursoId
+    );
+    if (!validDestino) {
+      this.showMessage('El curso destino no esta disponible');
+      return;
+    }
+
+    if (currentCursoId === destinoCursoId) {
+      this.showMessage('La persona ya esta asignada al curso seleccionado');
+      return;
+    }
+
+    const destinoCursoLabel = this.getCursoNombreById(destinoCursoId);
+    const confirmed = confirm(
+      currentCursoId
+        ? `Se cambiara el curso de ${personaNombre} por ${destinoCursoLabel}. ¿Continuar?`
+        : `Se asignara a ${personaNombre} al curso ${destinoCursoLabel}. ¿Continuar?`
+    );
+    if (!confirmed) return;
+
+    try {
+      this.changingPersonaCurso = true;
+
+      if (currentCursoId) {
+        await this.cursoService.removePersonaFromCurso(currentCursoId, personaId);
+      }
+
+      try {
+        await this.cursoService.addPersonaToCurso(destinoCursoId, personaId);
+      } catch (assignError) {
+        if (currentCursoId) {
+          try {
+            await this.cursoService.addPersonaToCurso(currentCursoId, personaId);
+          } catch (restoreError) {
+            console.error('No se pudo restaurar el curso previo de la persona:', restoreError);
+          }
+        }
+
+        throw assignError;
+      }
+
+      this.showMessage('Curso actualizado correctamente');
+      this.loadPersonas();
+    } catch (error) {
+      console.error('Error cambiando curso de persona:', error);
+      const message = error instanceof Error ? error.message : 'No se pudo cambiar el curso de la persona';
+      this.showMessage(message);
+    } finally {
+      this.changingPersonaCurso = false;
+    }
+  }
+
+  async removePersonaCursoFromDetalle(): Promise<void> {
+    if (!this.canEditPersonas || this.removingPersonaCurso || this.changingPersonaCurso) return;
+    if (!this.personaDetalleTarget?.id) {
+      this.showMessage('No se encontro la persona seleccionada');
+      return;
+    }
+
+    const personaId = (this.personaDetalleTarget.id || '').trim();
+    const currentCursoId = (this.personaDetalleTarget.assignedCursoId || '').trim();
+    const personaNombre = (this.personaDetalleTarget.nombre || '').trim() || 'la persona';
+
+    if (!currentCursoId) {
+      this.showMessage('La persona no tiene un curso asignado');
+      return;
+    }
+
+    const currentCursoLabel = this.getCursoNombreById(currentCursoId);
+    const confirmed = confirm(
+      `Se removera a ${personaNombre} del curso ${currentCursoLabel}. ¿Continuar?`
+    );
+    if (!confirmed) return;
+
+    try {
+      this.removingPersonaCurso = true;
+      await this.cursoService.removePersonaFromCurso(currentCursoId, personaId);
+      this.personaDetalleCursoDestino = '';
+      this.showMessage('Curso removido correctamente');
+      this.loadPersonas();
+    } catch (error) {
+      console.error('Error removiendo curso de persona:', error);
+      const message = error instanceof Error ? error.message : 'No se pudo remover el curso de la persona';
+      this.showMessage(message);
+    } finally {
+      this.removingPersonaCurso = false;
+    }
   }
 
   closePersonaEntregablesModal(): void {
@@ -1789,6 +1925,27 @@ export class PersonasComponent implements OnInit, OnDestroy {
     }
 
     this.personaDetalleTarget = updatedTarget;
+    this.syncPersonaDetalleCursoDestino();
+  }
+
+  private syncPersonaDetalleCursoDestino(): void {
+    if (!this.personaDetalleTarget) {
+      this.personaDetalleCursoDestino = '';
+      return;
+    }
+
+    const assignedCursoId = (this.personaDetalleTarget.assignedCursoId || '').trim();
+    if (assignedCursoId) {
+      this.personaDetalleCursoDestino = assignedCursoId;
+      return;
+    }
+
+    const current = (this.personaDetalleCursoDestino || '').trim();
+    const currentStillValid = !!current && this.personaDetalleCursoOptions.some(
+      (curso) => (curso.idcurso || '').trim() === current
+    );
+
+    this.personaDetalleCursoDestino = currentStillValid ? current : '';
   }
 
   private ensureBulkAssignCursoIsValid(): void {
