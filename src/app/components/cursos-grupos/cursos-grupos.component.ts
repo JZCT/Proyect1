@@ -123,6 +123,7 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
   exportingCursoReport = false;
   exportingCompanyCoursesReport = false;
   exportingCompanyEntregablesReport = false;
+  exportingCompanyPersonasExcelReport = false;
   savingCurso = false;
   deletingCursoId: string | null = null;
   deletingArchivoKey: string | null = null;
@@ -1570,6 +1571,44 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     }
   }
 
+  async exportCompanyPersonasExcel(): Promise<void> {
+    if (!this.canExportCompanyGlobalReports || this.exportingCompanyPersonasExcelReport) return;
+
+    const cursos = this.getCompanyCursosForGlobalReport();
+    if (cursos.length === 0) {
+      this.notificationService.info('No hay cursos visibles para exportar.');
+      return;
+    }
+
+    try {
+      this.exportingCompanyPersonasExcelReport = true;
+      const personas = await this.getCompanyPersonasForGlobalReport(cursos);
+      if (personas.length === 0) {
+        this.notificationService.info('No hay personas asignadas para exportar en Excel.');
+        return;
+      }
+
+      const reportData: ReportData = {
+        title: this.getCompanyPersonasExcelReportTitle(),
+        generatedAt: new Date(),
+        totalPersonas: personas.length,
+        personas,
+        empresa: this.normalizeCompanyTag(this.currentUser?.companyTag),
+        lugar: 'Todas las ciudades',
+        instructorName: 'Todos',
+        showCursosAsignados: false
+      };
+
+      await this.reportService.exportToExcel(reportData);
+      this.notificationService.success('Excel global de personas generado');
+    } catch (error) {
+      console.error('Error exportando personas globales (Excel):', error);
+      this.notificationService.error('Error al exportar Excel global de personas');
+    } finally {
+      this.exportingCompanyPersonasExcelReport = false;
+    }
+  }
+
   async exportCompanyEntregablesPDF(): Promise<void> {
     if (!this.canExportCompanyGlobalReports || this.exportingCompanyEntregablesReport) return;
 
@@ -1611,6 +1650,13 @@ export class CursosGruposComponent implements OnInit, OnDestroy {
     return tag
       ? `Reporte Global de Personas - Empresa: ${tag.toUpperCase()}`
       : 'Reporte Global de Personas';
+  }
+
+  private getCompanyPersonasExcelReportTitle(): string {
+    const tag = this.normalizeCompanyTag(this.currentUser?.companyTag);
+    return tag
+      ? `Reporte Global de Personas por Ciudad - Empresa: ${tag.toUpperCase()}`
+      : 'Reporte Global de Personas por Ciudad';
   }
 
   private getCompanyEntregablesReportTitle(): string {

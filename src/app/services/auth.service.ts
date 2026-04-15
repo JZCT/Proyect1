@@ -10,7 +10,12 @@ import {
   query,
   setDoc,
   where,
-  getDocs
+  getDocs,
+  orderBy,
+  limit,
+  startAfter,
+  QueryDocumentSnapshot,
+  DocumentData
 } from '@angular/fire/firestore';
 import {
   Auth,
@@ -62,6 +67,35 @@ export class AuthService {
     }
 
     return this.allUsers$;
+  }
+
+  async getUsersPage(
+    pageSize: number,
+    startAfterSnapshot?: QueryDocumentSnapshot<DocumentData>
+  ): Promise<{ users: User[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null; hasMore: boolean }> {
+    const usersRef = collection(this.firestore, 'users');
+    const pageLimit = pageSize + 1;
+    const constraints: any[] = [orderBy('nombre'), limit(pageLimit)];
+
+    if (startAfterSnapshot) {
+      constraints.push(startAfter(startAfterSnapshot));
+    }
+
+    const usersQuery = query(usersRef, ...constraints);
+    const snapshot = await getDocs(usersQuery);
+    const docs = snapshot.docs;
+    const hasMore = docs.length > pageSize;
+    const pageDocs = hasMore ? docs.slice(0, pageSize) : docs;
+    const users = pageDocs.map((docSnap) => ({
+      ...(docSnap.data() as User),
+      id: docSnap.id
+    }));
+
+    return {
+      users,
+      lastDoc: pageDocs.length ? pageDocs[pageDocs.length - 1] : null,
+      hasMore
+    };
   }
 
   getCompanyTags(): Observable<string[]> {

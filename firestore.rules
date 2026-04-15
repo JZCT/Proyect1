@@ -45,10 +45,6 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
-    match /usuarios/{docId} {
-      allow read, write: if isAdmin();
-    }
-
     match /cursos/{docId} {
       allow read: if isAdmin() || isInstructor() || companyMatches(resource.data.companyTag);
       allow create, update, delete: if isAdmin();

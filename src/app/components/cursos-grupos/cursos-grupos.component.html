@@ -23,17 +23,17 @@
             type="button"
             class="btn btn-sm btn-secondary"
             (click)="exportCompanyCursosReportPDF()"
-            [disabled]="exportingCompanyCoursesReport || exportingCompanyEntregablesReport || cursos.length === 0"
+            [disabled]="exportingCompanyCoursesReport || exportingCompanyPersonasExcelReport || cursos.length === 0"
           >
             {{ exportingCompanyCoursesReport ? 'Generando...' : 'Reporte Personas (PDF)' }}
           </button>
           <button
             type="button"
             class="btn btn-sm btn-secondary"
-            (click)="exportCompanyEntregablesPDF()"
-            [disabled]="exportingCompanyEntregablesReport || exportingCompanyCoursesReport || cursos.length === 0"
+            (click)="exportCompanyPersonasExcel()"
+            [disabled]="exportingCompanyPersonasExcelReport || exportingCompanyCoursesReport || cursos.length === 0"
           >
-            {{ exportingCompanyEntregablesReport ? 'Generando...' : 'Entregables (PDF)' }}
+            {{ exportingCompanyPersonasExcelReport ? 'Generando...' : 'Excel Personas (por ciudad)' }}
           </button>
         </div>
       </div>
@@ -512,7 +512,7 @@
               />
               <div class="instructor-data">
                 <strong>{{ instructor.nombre }}</strong>
-                <span>{{ instructor.telefono || 'Sin telefono' }}</span>
+                <span *ngIf="user.role !== 'company'">{{ instructor.telefono || 'Sin telefono' }}</span>
               </div>
             </div>
           </div>

@@ -1302,6 +1302,15 @@ export class ReportService {
 
   private sortPersonasForReport(personas: Persona[]): Persona[] {
     return [...(personas || [])].sort((left, right) => {
+      const leftCity = this.extractCitySortKey(left.lugar || '');
+      const rightCity = this.extractCitySortKey(right.lugar || '');
+
+      if (!leftCity && rightCity) return 1;
+      if (leftCity && !rightCity) return -1;
+
+      const cityComparison = leftCity.localeCompare(rightCity);
+      if (cityComparison !== 0) return cityComparison;
+
       const leftLocation = this.normalizeForSort(left.lugar || '');
       const rightLocation = this.normalizeForSort(right.lugar || '');
 
@@ -1325,6 +1334,18 @@ export class ReportService {
       const rightEmail = this.normalizeForSort(right.email || '');
       return leftEmail.localeCompare(rightEmail);
     });
+  }
+
+  private extractCitySortKey(location: unknown): string {
+    const normalized = this.normalizeForSort(location);
+    if (!normalized) return '';
+
+    const city = normalized
+      .split(/[;,/|\\-]+/g)
+      .map((part) => part.trim())
+      .filter(Boolean)[0];
+
+    return city || normalized;
   }
 
   private normalizeForSort(value: unknown): string {

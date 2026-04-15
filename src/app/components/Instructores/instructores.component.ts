@@ -29,6 +29,7 @@ export class InstructorComponent implements OnInit, OnDestroy {
   cursosAsignables: Curso[] = [];
 
   editIndex: number | null = null;
+  editingInstructorId: string | null = null;
   isAdmin = false;
   loadingAssignment = false;
   searchTerm = '';
@@ -138,11 +139,14 @@ export class InstructorComponent implements OnInit, OnDestroy {
       };
 
       if (this.editIndex !== null) {
-        const instructor = this.instructores[this.editIndex];
-        if (instructor.id) {
-          await this.instructorService.updateInstructor(instructor.id, instructorPayload);
-          this.notificationService.success('Instructor actualizado');
+        const instructorId = (this.editingInstructorId || '').trim();
+        if (!instructorId) {
+          this.notificationService.warning('No se encontro el instructor para actualizar');
+          return;
         }
+
+        await this.instructorService.updateInstructor(instructorId, instructorPayload);
+        this.notificationService.success('Instructor actualizado');
       } else {
         await this.instructorService.addInstructor(instructorPayload);
         this.notificationService.success('Instructor agregado');
@@ -168,6 +172,7 @@ export class InstructorComponent implements OnInit, OnDestroy {
     if (index < 0) return;
 
     this.editIndex = index;
+    this.editingInstructorId = this.instructores[index].id || null;
     this.nuevoInstructor = {
       ...this.instructores[index],
       telefono: sanitizePhoneInput(this.instructores[index].telefono),
@@ -191,7 +196,7 @@ export class InstructorComponent implements OnInit, OnDestroy {
         await this.instructorService.deleteInstructor(instructor.id);
         this.instructores = this.instructores.filter((item) => item.id !== instructor.id);
         this.refreshVisibleInstructores();
-        if (this.editIndex !== null && this.nuevoInstructor.id === instructor.id) {
+        if (this.editIndex !== null && this.editingInstructorId === instructor.id) {
           this.cancelar();
         }
         this.notificationService.success('Instructor eliminado');
@@ -208,6 +213,7 @@ export class InstructorComponent implements OnInit, OnDestroy {
 
   cancelar() {
     this.editIndex = null;
+    this.editingInstructorId = null;
     this.nuevoInstructor = {
       nombre: '',
       telefono: '',

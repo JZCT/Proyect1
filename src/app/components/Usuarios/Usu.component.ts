@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { InstructorService } from '../../services/instructor.service';
 import { NotificationService } from '../../services/notification.service';
+import { QueryDocumentSnapshot, DocumentData } from '@angular/fire/firestore';
 import { User } from '../../models/user.model';
 import { Instructor } from '../../models/instructor.model';
 
@@ -27,11 +28,15 @@ export class UsersComponent implements OnInit {
   isAdmin: boolean = false;
   currentUser: User | null = null;
   loading: boolean = false;
+  loadingUsers: boolean = false;
   searchTerm: string = '';
   editingCompanyTagUserId: string | null = null;
   editingCompanyTagValue: string = '';
   savingCompanyTagUserId: string | null = null;
   deletingUserId: string | null = null;
+  pageSize = 20;
+  lastUserSnapshot: QueryDocumentSnapshot<DocumentData> | null = null;
+  hasMoreUsers = true;
   private instructorNameById: Record<string, string> = {};
   private filteredUsersCache: FilteredUsersCache | null = null;
 
@@ -60,7 +65,7 @@ export class UsersComponent implements OnInit {
   ngOnInit(): void {
     this.checkAdminStatus();
     this.getCurrentUser();
-    this.loadUsers();
+    this.loadUsers(true);
     this.loadInstructores();
   }
 
@@ -85,17 +90,37 @@ export class UsersComponent implements OnInit {
     });
   }
 
-  private loadUsers() {
-    this.authService.getAllUsers().subscribe({
-      next: (users) => {
-        this.users = users;
-        this.filteredUsersCache = null;
-        console.log('Usuarios cargados:', users);
-      },
-      error: (error) => {
-        console.error('Error cargando usuarios:', error);
-      }
-    });
+  private async loadUsers(reset = false) {
+    if (reset) {
+      this.users = [];
+      this.lastUserSnapshot = null;
+      this.hasMoreUsers = true;
+      this.filteredUsersCache = null;
+    }
+
+    if (!this.hasMoreUsers || this.loadingUsers) {
+      return;
+    }
+
+    this.loadingUsers = true;
+
+    try {
+      const result = await this.authService.getUsersPage(this.pageSize, this.lastUserSnapshot ?? undefined);
+      this.users = [...this.users, ...result.users];
+      this.lastUserSnapshot = result.lastDoc;
+      this.hasMoreUsers = result.hasMore;
+      this.filteredUsersCache = null;
+      console.log('Usuarios cargados:', this.users);
+    } catch (error) {
+      console.error('Error cargando usuarios:', error);
+      this.hasMoreUsers = false;
+    } finally {
+      this.loadingUsers = false;
+    }
+  }
+
+  loadMoreUsers() {
+    this.loadUsers(false);
   }
 
   private loadInstructores() {
@@ -170,6 +195,7 @@ export class UsersComponent implements OnInit {
       await this.authService.addUser(this.newUser as User);
       this.notificationService.success('Usuario agregado exitosamente');
       this.resetForm();
+      await this.loadUsers(true);
     } catch (error: any) {
       console.error('Error al agregar usuario:', error);
       this.notificationService.error('Error al agregar usuario: ' + (error.message || 'Error desconocido'));

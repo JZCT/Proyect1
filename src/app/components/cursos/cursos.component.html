@@ -258,7 +258,7 @@
             <td>{{ (curso.companyTag || '-') | uppercase }}</td>
             <td>
               <div class="instructor-cell">
-                <span class="instructor-count">{{ curso.instructorIds?.length || 0 }}</span>
+                <span class="instructor-count" *ngIf="currentUser?.role !== 'company'">{{ curso.instructorIds?.length || 0 }}</span>
                 <small>{{ getInstructorSummary(curso.instructorIds) }}</small>
               </div>
             </td>
